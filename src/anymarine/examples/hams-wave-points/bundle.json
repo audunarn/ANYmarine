@@ -1,0 +1,13 @@
+{
+  "field_hash": "c2d65231580929382cbb99a70b7dc16e89c035ed6bc297d5ad641e5f125fcd87",
+  "files": {
+    "coefficients.nc": "c733dd0dafa473164b1dd20ed933d531554be9cc720ca7de449afa67c2aa1dc9",
+    "fields.json": "05a7fb24585b70b65c0a11a7491606122e59589918b295c30300a4789722b214",
+    "project.json": "c739902d5a26a9f81401c0f46fecfd367f809dfa374565d65c5da062f613ff82"
+  },
+  "format": "anymarine_stored_hams_wave_bundle_v1",
+  "parent_hash": "9560e2a7280b725ad6a20ed0d09741c1a87f76eb102e5d853e0c744ebe9eed07",
+  "project_hash": "cf387e05ba71890e54169d4bdd238639f99f6a425e8367e1e458f8881beb1679",
+  "source_kind": "hams_canonical_point_fields_v1",
+  "status": "development_unqualified"
+}

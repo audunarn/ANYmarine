@@ -1,0 +1,221 @@
+{
+  "format": "anymarine-development-status-v1",
+  "schema_version": 1,
+  "snapshot_date": "2026-10-10",
+  "summary": {
+    "headline": "Development snapshot: application foundation and loadable examples; hydrodynamics not admitted.",
+    "scope_note": "Dated development snapshot for app users, not a dynamic qualification claim. No result in this application is a qualified marine analysis.",
+    "next_development_question": "Reconcile the reference case, lid/projection treatment and energy accounting before any new numerical attempt. No speculative cause is established."
+  },
+  "capabilities": [
+    {
+      "id": "synthetic-replay",
+      "area": "Examples",
+      "feature": "Two-body synthetic replay example",
+      "status": "available",
+      "menu_path": "File > Load example (two-body replay)",
+      "note": "Deterministic demonstration labelled 'synthetic_unqualified'; not BEM output and not dynamics integration."
+    },
+    {
+      "id": "native-dry-two-body",
+      "area": "Examples",
+      "feature": "Native dry two-body example",
+      "status": "available",
+      "menu_path": "File > Load native dry two-body example",
+      "note": "Development input; results remain unqualified."
+    },
+    {
+      "id": "attached-plates",
+      "area": "Examples",
+      "feature": "Attached-plate geometry example",
+      "status": "available",
+      "menu_path": "File > Load attached-plate geometry example",
+      "note": "Geometry only; no hydrodynamic result."
+    },
+    {
+      "id": "native-mooring",
+      "area": "Examples",
+      "feature": "Native mooring example (three lines)",
+      "status": "available",
+      "menu_path": "File > Load native mooring example (three lines)",
+      "note": "Development route; unqualified."
+    },
+    {
+      "id": "native-coupled-fluid",
+      "area": "Examples",
+      "feature": "Native coupled fluid/mechanics example",
+      "status": "available",
+      "menu_path": "File > Load native coupled fluid example",
+      "note": "Load two bodies; Jobs > Run native mechanical job... creates results. Development evidence, unqualified."
+    },
+    {
+      "id": "seeded-sea-state",
+      "area": "Examples",
+      "feature": "Coupled seeded-wave (shared sea state) example",
+      "status": "available",
+      "menu_path": "File > Load coupled seeded-wave example",
+      "note": "Development route; unqualified."
+    },
+    {
+      "id": "calculated-wave-preview",
+      "area": "Waves",
+      "feature": "Calculated incident/diffraction stored-wave preview",
+      "status": "available",
+      "menu_path": "File > Load calculated wave preview example",
+      "note": "Stored calculated waves for visualization; development evidence, unqualified."
+    },
+    {
+      "id": "stored-hams-waves",
+      "area": "Waves",
+      "feature": "Stored HAMS incident/total/scattered and prescribed-motion radiation point displays",
+      "status": "available",
+      "menu_path": "File > Load stored HAMS wave samples / Open stored HAMS wave bundle...",
+      "note": "Stored samples and saved bundles visualize; they are not mechanics ResultRecords and not qualification."
+    },
+    {
+      "id": "native-morison",
+      "area": "Examples",
+      "feature": "Native wave/current Morison example",
+      "status": "available",
+      "menu_path": "File > Load native wave/current Morison example",
+      "note": "Development route; unqualified."
+    },
+    {
+      "id": "native-line-hydro",
+      "area": "Examples",
+      "feature": "Native wave/current mooring example",
+      "status": "available",
+      "menu_path": "File > Load native wave/current mooring example",
+      "note": "Development route; unqualified."
+    },
+    {
+      "id": "native-seabed-contact",
+      "area": "Examples",
+      "feature": "Native seabed contact example",
+      "status": "available",
+      "menu_path": "File > Load native seabed contact example",
+      "note": "Development route; unqualified."
+    },
+    {
+      "id": "static-equilibrium",
+      "area": "Examples",
+      "feature": "Coupled static equilibrium example and job",
+      "status": "available",
+      "menu_path": "File > Load coupled static equilibrium example / Jobs > Run coupled static equilibrium job",
+      "note": "Development route; adoption of a static equilibrium is a development action, not qualification."
+    },
+    {
+      "id": "linear-development-jobs",
+      "area": "Jobs",
+      "feature": "Linear development jobs (analytic demo, explicit inputs, ANYhydro dataset/kernel import)",
+      "status": "development",
+      "menu_path": "Jobs > Run linear development job / Jobs > Import hydrodynamic inputs...",
+      "note": "Development imports only; never BEM qualification evidence. Results carry 'linear_development'."
+    },
+    {
+      "id": "native-mechanical-jobs",
+      "area": "Jobs",
+      "feature": "Native mechanical input import/edit and job run",
+      "status": "development",
+      "menu_path": "Jobs > Import native mechanical inputs... / Edit native mechanical inputs... / Run native mechanical job...",
+      "note": "Development route; unqualified."
+    },
+    {
+      "id": "hams-field-workflow",
+      "area": "Jobs",
+      "feature": "Native HAMS field workflow (configured HAMS fields)",
+      "status": "development",
+      "menu_path": "Jobs > Run configured HAMS fields...",
+      "note": "Optional and unqualified; requires an explicitly trusted, source-bound native producer build. No implicit WSL or shell fallback."
+    },
+    {
+      "id": "assessment-workflow",
+      "area": "Assessment",
+      "feature": "Case registration and coarse/fine assessment snapshots",
+      "status": "development",
+      "menu_path": "Assessment menu",
+      "note": "Development assessment tooling; separate from this development status view and never a qualification claim."
+    },
+    {
+      "id": "cad-mesh-import",
+      "area": "Import",
+      "feature": "CAD/mesh-file import",
+      "status": "unsupported",
+      "menu_path": "",
+      "note": "Not available yet."
+    },
+    {
+      "id": "qualified-marine-analysis",
+      "area": "Qualification",
+      "feature": "Qualified marine analysis / BEM qualification evidence",
+      "status": "unsupported",
+      "menu_path": "",
+      "note": "General numerical admission is false (W5 NO_GO). No result in this application is qualified."
+    },
+    {
+      "id": "physical-six-dof-admission",
+      "area": "Qualification",
+      "feature": "Physical six-DOF source admission, HAMS-MREL and full coupled qualification",
+      "status": "unsupported",
+      "menu_path": "",
+      "note": "Outstanding; broader numerical development is paused by user decision."
+    }
+  ],
+  "hydrodynamic_status": {
+    "roadmap_state": "incomplete",
+    "broader_numerical_development": "paused by user decision",
+    "w5_decision": "NO_GO",
+    "general_numerical_admission": false,
+    "qualified": false,
+    "energy_point": {
+      "label": "energy-point-02",
+      "run_state": "finished with exit code 1",
+      "summary_status": "energy_point_comparison_failed_unqualified",
+      "computation_state": "completed_unqualified",
+      "registered_comparison": "failed",
+      "registered_predicates": {
+        "added_mass_block": "failed",
+        "radiation_damping_block": "failed",
+        "mean_power": "failed"
+      },
+      "added_mass_counts": {"passed": 10, "failed": 6},
+      "radiation_damping_counts": {"passed": 8, "failed": 8},
+      "retained_dofs": "4x4 coupled matrices retained",
+      "candidate_mean_power_w": 0.0008646219627273671,
+      "hams_reference_mean_power_w": 0.0015879742100973749,
+      "mean_power_comparison": "failed",
+      "sign_note": "The candidate mean power sign is positive; a positive sign does not imply admission."
+    },
+    "checker_mock_tests": {
+      "recorded_result": "50 passed",
+      "receipt": "energy-tests-receipt-energy-tests-08 (exit code 0)",
+      "scope": "mock native only; no BEM solver case execution; not qualification"
+    },
+    "independent_audit": {
+      "state": "COMPLETE",
+      "checks_total": 100,
+      "checks_passed": 100,
+      "interpretation": "Stored-array consistency audit; it reproduces all three failed predicates. It is not physical acceptance.",
+      "handoff_note": "The audit owner timed out before the final handoff; no completed extra diagnostic is recorded."
+    }
+  },
+  "provenance": {
+    "data_kind": "Bundled dated development snapshot; raw evidence files do not ship with the application.",
+    "public_document": "docs/DEVELOPMENT_STATUS.md",
+    "sources": [
+      {
+        "id": "anyhydro-w5-e1-energy-check-20261010-energy-point-02-summary",
+        "format": "anyhydro-e1-energy-check-controls-v1",
+        "status": "energy_point_comparison_failed_unqualified",
+        "case_hash": "4c5309232d7e549b548ba3274ee5edfd17351f5b5ac4edc4fb06c9b2f68c214b"
+      },
+      {
+        "id": "anyhydro-w5-e1-energy-check-20261010-audit02-run-02",
+        "format": "anyhydro-audit02-independent-energy-audit-v1",
+        "audit_state": "COMPLETE",
+        "audit_script_sha256": "6139d28d3ea9ea065964ce057d24243b7cd4d6afeac9da592b9b32b7d23b1b66",
+        "executed_at_utc": "2026-10-10T17:02:12.767816+00:00"
+      }
+    ]
+  }
+}

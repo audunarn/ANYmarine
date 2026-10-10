@@ -1,0 +1,36 @@
+{
+  "bodies": {
+    "cad3c9b9-4c64-43db-a13e-6e4a1d742b86": {
+      "sha256": "c0f6923c8d39ad4d3354ee63b69411df50a57ab2d353ff739d1b0df5588e5e54",
+      "sidecar": "bodies/c0f6923c8d39ad4d3354ee63b69411df50a57ab2d353ff739d1b0df5588e5e54.json"
+    },
+    "f3879aaf-4300-4b6b-b18f-2c15584e2dd8": {
+      "sha256": "270b49502d92c9328aabbd2dfe3d3e86c3c6983c169756fabee180615949b6a8",
+      "sidecar": "bodies/270b49502d92c9328aabbd2dfe3d3e86c3c6983c169756fabee180615949b6a8.json"
+    }
+  },
+  "body_order": [
+    "f3879aaf-4300-4b6b-b18f-2c15584e2dd8",
+    "cad3c9b9-4c64-43db-a13e-6e4a1d742b86"
+  ],
+  "equilibrium": {
+    "description": "Synthetic demonstration equilibrium (not a solved equilibrium).",
+    "source": "synthetic",
+    "waterline_z": 0.0
+  },
+  "name": "Two-body example \u2014 synthetic replay",
+  "results": [
+    {
+      "result_id": "e05850c2-ebaf-48fb-a2a2-eac2f0aa84e7",
+      "sha256": "eade1bf95cc8176a1c4ef23280aba81906d0361c5e159c1eb219332b8875518e",
+      "sidecar": "results/eade1bf95cc8176a1c4ef23280aba81906d0361c5e159c1eb219332b8875518e.json"
+    }
+  ],
+  "schema_version": 2,
+  "settings": {
+    "dt": 0.25,
+    "duration": 20.0,
+    "wave_amplitude": 0.8,
+    "wave_period": 6.0
+  }
+}

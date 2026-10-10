@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "anymarine"
+version = "0.1.0"
+description = "Marine multibody application: project model, persistence, CLI and PySide6 Qt Widgets shell with synthetic deterministic replay."
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MPL-2.0"
+authors = [{ name = "ANYmarine developers" }]
+dependencies = ["numpy>=1.24"]
+
+[project.optional-dependencies]
+gui = ["PySide6>=6.10.1,<6.11", "ANY3dView>=0.5.5,<0.6"]
+native-morison = ["ANYsolver>=0.4.7", "ANYloads>=0.1.0"]
+native-waves = ["ANYsolver>=0.4.7", "ANYloads>=0.1.0", "ANYhydro>=0.1.0"]
+waves = ["ANYloads>=0.1.0", "anyhydro>=0.1.0", "capytaine==3.0.0"]
+dev = [
+    "pytest>=7",
+    "build>=1",
+]
+
+[project.scripts]
+anymarine = "anymarine.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--basetemp=.pytest-tmp"
+
+[tool.setuptools.package-data]
+anymarine = ["development_status.json", "examples/hams-wave-points/*.json", "examples/hams-wave-points/*.nc", "examples/calculated-wave-preview/*.json", "examples/shared-sea-state-development/*.json", "examples/two-body-replay/*.json", "examples/two-body-replay/bodies/*.json", "examples/two-body-replay/results/*.json"]

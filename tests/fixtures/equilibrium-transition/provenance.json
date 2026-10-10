@@ -1,0 +1,9 @@
+{
+  "scope": "Declared fully submerged native development fixture; no BEM, scientific qualification or release",
+  "evidence": "C:\\ANYworkspaceWork\\anymarine-evidence\\equilibrium-transition-20261010\\numerical\\attempts\\02-fixture-public-worker",
+  "sha256": {
+    "input.json": "d05461e79cefe0bacbd1ae1471add738753463a0cb572c95d434c6b2d18e3d92",
+    "output.json": "68de41c0adf5d1e4fb316bc8d682b821ab654ef0e326b441d6b31a5e5c8eda94",
+    "dynamic-output.json": "950dde2ed47edb0c8b42d862354404ee28c28473ff01ce9ac84b0e15dacc6efe"
+  }
+}

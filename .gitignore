@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest*/
+.evidence/
+.venv*/
+build/
+dist/
+
+# Local execution evidence and editor state (preserved on disk)
+.development-evidence/
+.evidence-*/
+.idea/
+.pytest*/
+.venv*/

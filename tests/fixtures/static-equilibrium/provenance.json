@@ -1,0 +1,9 @@
+{
+  "scope": "Unqualified development worker fixture; no scientific acceptance",
+  "evidence": "static-app-01-real-source",
+  "solver_api": "marine_coupled_equilibrium_development_v1",
+  "sha256": {
+    "input.json": "4000a6c8e9171f3aca9509b01c61ce468c5172adeca436e5c4a62d6d46c037f1",
+    "output.json": "4815e8fef5e99c0cf0f1093a4a9436d036749d3765eb0e5ec82c43c54b4f8c40"
+  }
+}
