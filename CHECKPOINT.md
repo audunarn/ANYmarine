@@ -1,3 +1,79 @@
+# Published restart point - 2026-10-10
+
+Broader development remains PAUSED. User authorised a scoped GUI/publication
+handoff; it is implemented, verified and published. Saved UTC 2026-10-10T19:05:39.458648+00:00.
+This section supersedes earlier stopping states; historical evidence follows.
+
+Published source baselines on main:
+- ANYmarine https://github.com/audunarn/ANYmarine/commit/8e97dbb97e1c85f35d25134fd883ea3197aae27f
+- ANYhydro https://github.com/audunarn/ANYhydro/commit/1bb3b82cd94ad3229156dc3da51b56da410396d6
+Both remote main heads were verified equal to local at first publication.
+A subsequent documentation-only commit records this checkpoint on main.
+Canonical roots: C:/Github/ANYmarine and C:/Github/ANYhydro. Preserve dirty
+sibling work; do not move development back to C:/Github/ANYsolver.
+
+## Current application
+
+Run C:/Github/ANYmarine/run_gui.py (restart an existing process to load updates).
+The tested isolated runtime remains
+C:/ANYworkspaceWork/anymarine-evidence/runtime/Scripts/python.exe.
+Public ANY3dView/Qt GPU-preferred startup shows the built-in two-body example
+without manual renderer selection. Model, plate, native mechanics/Morison,
+mooring/static and wave routes remain exposed through the existing menus.
+Startup now displays the dated development status. Help > Development status
+opens19 capability rows and the latest W5 result. File > Load calculated wave
+preview example restores saved waves; Waves switches incident/disturbed display
+without a solve. No project results are created or promoted by the status view.
+
+Measured final status tests39 passed; startup/menu22 passed; wave regressions43
+passed. Headless CI selection54 passed/1 skipped (Windows symlinks unavailable).
+Hydro neutral checks64 passed plus persistence13 passed. Both wheels built and
+installed locally without downloads;69 marine/37 hydro files matched source.
+Actual Windows GPU first paint:0 black pixels of217920 canvas pixels,2 bodies;
+status dialog and stored incident/disturbed waves verified, no job launched.
+See docs/GUI_MAIN_HANDOFF_20261010.md for scope, identities and limitations.
+GitHub Actions results attach to the source commits; this checkpoint does not
+claim unobserved CI completion or Linux desktop qualification.
+
+## Scientific stopping state and first resume action
+
+The full roadmap is incomplete; W5 NO_GO/general numerical admission false.
+Native energy-point-02 is TERMINAL, exit1, one-shot consumed. Added mass6/16,
+damping8/16 and mean-power comparison failed. Candidate power is positive,
+but does not establish admission. Independent stored-array audit run-02
+COMPLETE100/100 reproduced all three failures; it is consistency evidence,
+not physical acceptance. Audit worker timed out before final handoff; no
+completed extra diagnostic is recorded. Do not restart that terminal job.
+
+On explicit resume: read current AGENTS/TASK/plan, verify main/dirty ownership
+and relevant source/evidence identities. Root coordinates Mistral directly;
+do not launch Astra. Give Mistral a bounded stored-array diagnosis of physical
+case/reference conventions, auxiliary lid/projection and near/far energy
+accounting. Recover a concise scientific handoff and choose a discriminating
+check before any new expensive calculation. No cause is established; retain
+physics, rates, coordinate maps, tolerances and failed evidence. Root adopts
+reserved contract changes and new bounded execution scope.
+
+Historical W5 pools remain frozen/consumed; unused seconds do not permit retry.
+The GUI/publication pools are frozen after handoff. No worker remains running.
+Publication authority covers this handoff, not future numerical release claims.
+All remaining scientific/headless/desktop/thin-sheet roadmap gates still apply.
+
+## Preserved evidence
+
+Portable: ANYhydro docs/development-status/energy-point-02-snapshot.json
+preserves original compact reports and SHA256s. GUI snapshot is bundled at
+ANYmarine src/anymarine/development_status.json; loader is Qt-free.
+Full local evidence/raw arrays/failures/receipts:
+C:/Github/ANYhydro/.development-evidence/w5-e1-energy-check-20261010/
+C:/ANYworkspaceWork/anymarine-evidence/w5-e1-energy-check-20261010/
+GUI/build/desktop receipts and screenshots:
+C:/ANYworkspaceWork/anymarine-evidence/gui-main-handoff-20261010/
+Raw evidence and caches remain on disk outside Git. Existing MPL-2.0 licenses
+are preserved; Git source bytes are protected by .gitattributes.
+
+---
+
 # PAUSED restart point - 2026-10-10
 
 Development is PAUSED at the user's request. Saved 2026-10-10T17:08:35.844126+00:00.

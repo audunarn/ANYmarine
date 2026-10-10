@@ -1,6 +1,20 @@
 # ANYmarine Multibody Potential-Flow + Morison Implementation Plan
 
-### PAUSED restart point - 2026-10-10
+### GUI publication complete; scientific development paused - 2026-10-10
+
+Current application workflows, bundled examples and a dated development-status
+view are published on main in ANYmarine and ANYhydro. Installed Windows GPU
+startup, status and saved incident/disturbed waves are verified. See
+CHECKPOINT.md for published source identities and exact restart action; see
+docs/GUI_MAIN_HANDOFF_20261010.md for measured checks and limitations.
+The native energy-point-02 comparison remains failed/unqualified, independent
+audit is consistency only, W5 NO_GO and the full roadmap incomplete. No new
+scientific calculation or release qualification was performed for publication.
+Broader development remains paused; resume with bounded Mistral diagnosis of
+stored physical-case/energy evidence before a new numerical scope decision.
+
+
+### Historical: PAUSED restart point - 2026-10-10
 
 Development paused by the user. Definitive restart: C:/Github/ANYmarine/CHECKPOINT.md.
 The one-shot energy-point-02 completed but FAILED the registered added-mass,
