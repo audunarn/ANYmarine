@@ -1,3 +1,67 @@
+## Final GUI/main handoff accepted; numerical work paused - 2026-10-10
+
+Current restart C:/Github/ANYmarine/CHECKPOINT.md; source main baselines
+ANYmarine 77c308bdc875c43ad4065f2332a5d64fde23d5a1, ANYhydro 4f10a55d8b45b57249b0aa8ca37c3b1cf1b44022.
+Both GitHub Windows/Linux3.11/3.13 clean-CI matrices observed SUCCESS.
+Hydro portable coverage is explicit34 modules;15 exclusions retain mandatory
+integration/qualification obligations. Process-lifecycle repair and immutable
+legacy test oracles are recorded separately; numerical algorithms unchanged.
+W5 NO_GO.
+Latest installed GUI reflects status and includes the Linux root-link refusal.
+No new native campaign. All workers terminal/pools frozen; recovered CI-check
+accounting gap/overrun preserved in docs/CLEAN_CI_HANDOFF_20261010.md.
+Resume with bounded Mistral stored-array diagnosis, not a consumed native retry.
+Saved UTC 2026-10-10T20:11:30.683224+00:00. Historical sections below preserved verbatim.
+
+## Root CI tail repair handoff - 2026-10-10
+
+After two bounded Mistral attempts delivered inspection only/no checkpoint,
+root completed the small test-infrastructure repair to unblock publication.
+Protected numerical algorithms, source hashing and scientific criteria unchanged.
+50 focused Windows passes;19 Linux lifecycle passes; Linux legacy compatibility
+and golden roundtrip pass. Failed CLI/CI/shim evidence and measured overrun
+preserved; see ANYhydro docs/PLATFORM_CI_REPAIR.md. Worker pool frozen; no new
+native/BEM campaign. Broader scientific development remains paused pending the
+explicit resume action in the final checkpoint. Root observes clean CI next.
+
+## Prospective final clean-CI repair - 2026-10-10
+
+GUI publication complete on main; scientific work remains paused. Hydro source
+8530b92 clean Linux3.11 CI38081165749 returned3 failed/816 passed/1 skipped;
+other matrix legs cancelled by fail-fast. Preserved log in prior repair evidence.
+Question: missing-packet refusal defect vs asynchronous guard-state test race,
+and two environment-dependent long-kernel golden hashes. Mistral owns the
+connected bounded diagnosis/repair/check of these exact failures, using the
+already adopted immutable legacy-reference contract and existing tolerances.
+Discriminating checks inspect actual owned guard/pidfd completion and frozen
+canonical-data identity plus live computation/roundtrip. No new physics/hash
+algorithm, scientific promotion or native/BEM/compiler campaign is authorized.
+Fresh prospective worker360s, checks120s, build60s, one job/thread; older pools
+frozen, prior failures/overrun preserved. Evidence gui-ci-final-tail-repair-20261010.
+Root inspects actual artifacts/check receipts and clean CI before final handoff.
+
+## Newly observed clean-platform CI repair - 2026-10-10
+
+ANYmarine clean matrix is green. Hydro run38079385447 exposed missing declared
+threadpoolctl test dependency, three legacy generated-fixture hash differences,
+and Linux close leaving parent poll() without terminal return status. Mistral
+continues the coherent platform repair in ANYhydro with explicit test/dependency/
+Linux-process ownership. Numerical/hash/fixture production algorithms remain
+read-only; legacy exact golden identities and numerical assertions preserved.
+Root reserves adopting any same-input compatibility oracle: content hashes bind
+exact bytes, not an unproven guarantee for freshly recomputed floating arrays.
+Candidate requires actual field/byte delta evidence, no matching-magic constants.
+Linux process preimage preserved at gui-ci-platform-repair-20261010; any changed
+installed-module identity invalidates dependent future admission and never rewrites
+old evidence. Historical101-file unchanged claim is scoped before this repair;
+reconcile the current set after ownership completes. No native source/profile/
+caller mutation or consumed-request reuse. New prospective platform scope budget:
+worker720s/checks180s/build120s, one thread, nativeZERO. Earlier CI-check pool
+remains frozen with its recovered overrun; this scope addresses new observed
+failures, not a retroactive extension. No unaccounted tests; all executed through
+the new harness. Final acceptance uses clean CI, never optional/scientific waiver.
+Saved UTC 2026-10-10T19:28:40.768230+00:00. Broader numerical development still paused.
+
 ## Clean-CI publication repair - 2026-10-10
 
 First source GitHub CI failed: ANYmarine's existing Linux persistence test

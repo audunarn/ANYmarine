@@ -1,6 +1,20 @@
 # ANYmarine Multibody Potential-Flow + Morison Implementation Plan
 
-### GUI publication complete; scientific development paused - 2026-10-10
+### Published GUI/main handoff accepted; numerical work paused - 2026-10-10
+
+The application reflects latest available workflows and W5's failed/unqualified
+state. Source is on main in both canonical repositories; clean GitHub CI passed
+Windows/Linux3.11/3.13. Portable hydro base coverage and15 excluded dependency/
+artifact suites are explicit; their scientific/optional integration obligations
+remain. Linked project roots now fail closed on Linux. See CHECKPOINT.md for
+current source/CI identities, installed GUI evidence and exact resume action.
+All protected scientific source/evidence is retained. No native calculation,
+physics/tolerance change or qualification promotion occurred in this handoff.
+Broader numerical development remains paused; full roadmap/W5 gates still open.
+Resume with bounded Mistral stored-array diagnosis before new execution scope.
+
+
+### Historical: GUI publication complete; scientific development paused - 2026-10-10
 
 Current application workflows, bundled examples and a dated development-status
 view are published on main in ANYmarine and ANYhydro. Installed Windows GPU
