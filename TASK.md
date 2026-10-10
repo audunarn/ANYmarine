@@ -1,3 +1,22 @@
+## Clean-CI publication repair - 2026-10-10
+
+First source GitHub CI failed: ANYmarine's existing Linux persistence test
+exposed missing refusal of a symbolic-link project root; ANYhydro's broad
+tests command assumed optional ecosystem dependencies/private stored artifacts.
+Root adopts root-link refusal consistent with the existing fail-closed test
+and sidecar contract and implements this small reserved boundary fix directly.
+Mistral owns the substantial portable ANYhydro CI selection/integration outcome.
+Preserve every scientific test and remaining optional/backend qualification
+obligation; green neutral base CI cannot confer those capabilities. No tests
+are skipped to hide failing base contracts, no tolerance/physics changes.
+New scoped CI budget worker720s/checks360s/build120s, one thread, native ZERO;
+all historical and completed GUI pools remain frozen. Root actual Linux symlink
+probe plus existing affected checks will verify the refusal before publication.
+This resolves GitHub delivery failures within the user's publication request;
+broader numerical development remains paused. Evidence:
+C:/ANYworkspaceWork/anymarine-evidence/gui-ci-repair-20261010/.
+Saved UTC 2026-10-10T19:09:57.005231+00:00. Historical notes follow.
+
 ## GUI publication complete; numerical development paused - 2026-10-10
 
 Definitive restart: C:/Github/ANYmarine/CHECKPOINT.md. Published source baselines

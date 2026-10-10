@@ -187,6 +187,10 @@ def resolve_sidecar(root: Path, reference: str) -> Path:
     """Resolve a validated reference under *root*, refusing symlink escapes."""
 
     relative = check_relative_reference(reference)
+    # Do not erase a linked root's identity while resolving sidecars. This
+    # keeps the same fail-closed contract for roots and child components.
+    if root.is_symlink():
+        raise UnsafePathError("project root must not be a symbolic link")
     root_real = root.resolve()
     candidate = root / Path(*relative.parts)
     resolved = candidate.resolve()
