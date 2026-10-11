@@ -1,3 +1,48 @@
+## Current — development resumed by Claude, 2026-10-11
+
+User resumed development and handed the goal to Claude; Codex is the independent
+reviewer (GPT 6.1 Sol high default; GPT 6 Astra high for very complex reviews).
+Mistral worker ownership and the metered root/worker pools of earlier slices are
+retired; the workspace AGENTS.md Normal-token policy governs resource use.
+
+Replay diagnosis: worker replay-verify-01.log (94 mismatches, REPLAY FAIL) was a
+harness defect. replay_verify_primitives.py rebuilt the composite as
+native.real + 1j*pole.imag; the recorded convention is native.real + 1j*pole with a
+real-valued pole (imag channel exactly 0), so all 47x2 composite potential entries
+mismatched. Under the recorded convention: 0 mismatches. Root replay
+(root-replay-primitives-01.json) passes: exact composite reassembly, Robin
+residual/scale recomputation (rtol 2e-14) matching the pre-repair run (1e-12),
+core 6648b6c5...6257fa4a unchanged before/after. Windows focused tests 85 passed,
+7 skipped (needs writable --basetemp under the sandbox).
+
+Codex review (codex-review-01.md, GPT 6.1 Sol high): diagnosis confirmed; tracked
+persistence diff clean; 16-ulp additivity bound acceptable; mock coefficients do
+not mask a production path. Six defects in the UNTRACKED experimental component
+oracle: missing triangle-area factor in reference face integrals, tuple+list
+TypeError at the first surface receiver, wrong tail exponents (missing -2h/-4h),
+incomplete exact node evaluator (no Prony images), attribution emitted without
+validation gating, broken skipped regression. Component attribution is invalid
+until repaired.
+
+Committed ANYhydro 36cd502 "Persist authoritative physical-field primitive arrays"
+(local, not pushed). Four free-surface Robin failures remain (hull 2.6666/2.9019,
+lid 2.9248/3.1494); W5 NO_GO, admission false. Evidence:
+C:/ANYworkspaceWork/anymarine-evidence/w5-free-surface-repair-20261011
+(replay-diagnosis.md, root-replay-primitives-01.json, codex-review-01.md).
+
+Next: repair the component oracle per the review, then attribute the surface
+residual. Working lead: kh = 34.4 (effectively deep water) and the residual is
+~3e-4 relative, the order of the frozen 4-term Prony fit accuracy.
+
+## Current restart — PAUSED by user, 2026-10-11
+
+Goal status PAUSED. User requested a restart point, summary and goal/plan references. See CHECKPOINT.md for exact source, evidence, process and authority identities; governing plan remains docs/IMPLEMENTATION_PLAN.md. No development or checks until explicit resume. The owned Mistral PID67192 tree was verified and terminated; the harness recorded200.211840000004s used of separately granted600s closure. No owned Linux numerical/check job remained observed. No commit/push of this slice.
+
+Partial implementation: authoritative native/pole/composite potential/gradient persistence with coefficient/core metadata and caller regression. Worker Windows/Linux checks each85pass/7skip; actual2source native capture completed in3.827702199982s,2batches/1constructor/376quadinteractions, unchanged core/input identity. Four original surface failures reproduced (ratios2.6666–3.1494); W5 NO_GO/admissionfalse. Worker replay-verify-01.log reports94 mismatches/REPLAY FAIL: root replay not run, acceptance pending. Experimental component tool/test remain untracked partial candidates; no physical-cause or repair claim. All previous failures retained. Scope/workspace w5-free-surface-repair-20261011; next resume action is narrow replay diagnosis with same Mistral owner and independent root verification. Original1800s worker consumed;600s closure399.78816s recorded remaining; native/check accounting and shares in checkpoint, including unmetered replay uncertainty. No old authority renewed.
+## Prospective free-surface repair — 2026-10-11
+
+Previous turn PROGRESS: installed E1 artifact/reference/refusals and56 Windows/Linux tests verified; actual2source physicalrun now isolates4failed free-surface samples (2.6666–3.1494 times fixed criterion), with otherphysicalpredicates passing. Bothmaincheckouts clean. Question: frozen finite-depth representation, real Green/source integration, or evaluation contract? Mistral owns one connected component discriminator, compatible repair, stored authoritativearrays, caller regression andhandoff. Rootadoptsphysicaldelta/acceptance/Git. Newscope w5-free-surface-repair-20261011: worker1800s, native240/per60/max6 (worker180s/4launches/12batches; root60s/2launches/4batches), onejob/thread47receivercap, checks180/per45/max8(worker120/root60), build600/per240/max3 offline/ninja-j1 ifneeded. Alloldscopesclosed, frozenreference/k/geometry/physics/tolerances preserved, nofullsolve/HAMS/newfit/cache. Current W5 NO_GO notvoided by thisboundeddefect; no cause claim forglobalenergy.
+
 Published ANYhydro main30404e4649baed5200afefa0ea09f1f9eb0fbd1c (remote verified; clean). ANYmarine GUI source remains at its verified version; this commit updates its plan/restart record. Delivery receipt: C:/ANYworkspaceWork/anymarine-evidence/w5-e1-root-verification-20261011/main-delivery.json.
 
 ## Current restart — E1 artifact verified; free-surface defect isolated, 2026-10-11

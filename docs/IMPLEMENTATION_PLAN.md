@@ -1,3 +1,16 @@
+## Development resumed — Claude takeover, 2026-10-11
+
+The user resumed development and handed ANYmarine/ANYhydro to Claude (Codex as
+independent reviewer: GPT 6.1 Sol high by default, GPT 6 Astra high for very
+complex reviews). The worker replay's 94 mismatches were a replay-harness defect
+(it read the pole's zero imaginary channel instead of the real-valued pole); the
+saved primitive arrays are consistent and an independent root replay passes.
+Primitive persistence is committed in ANYhydro 36cd502 (local, not pushed).
+The four free-surface Robin failures (2.67–3.15× the unchanged criterion) remain
+the open W5 repair target. Codex found six defects in the untracked experimental
+component oracle, so no component attribution exists yet. W5 NO_GO, original
+scientific criteria, failed evidence and release restrictions are unchanged.
+
 ## Status amendment — installed E1 gate and free-surface discriminator, 2026-10-11
 
 Typed domain preflight is implemented and exact experimental core6648b6c5...6257fa4a is registered after an offline wheel build, installed408-point independent-reference checks and14 typed refusals. 56 focused regression tests pass Windows/Linux. Old unsupported and unknown artifacts refuse before native evaluation; planned and observed constructor counts are distinct.
