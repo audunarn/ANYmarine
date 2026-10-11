@@ -1,3 +1,33 @@
+Published ANYhydro main30404e4649baed5200afefa0ea09f1f9eb0fbd1c (remote verified; clean). ANYmarine GUI source remains at its verified version; this commit updates its plan/restart record. Delivery receipt: C:/ANYworkspaceWork/anymarine-evidence/w5-e1-root-verification-20261011/main-delivery.json.
+
+## Current restart — E1 artifact verified; free-surface defect isolated, 2026-10-11
+
+Development ACTIVE in C:/Github/ANYmarine and C:/Github/ANYhydro. No owned worker/numerical processes active. Mistral owns the connected implementation; root coordinates, adopts contracts, verifies and publishes. W5 NO_GO and general numerical admission FALSE; full goal incomplete. Qt GUI remains the verified published source (4cd9a6c); this slice changes diagnostics, not GUI or production mechanics.
+
+Implemented exact-artifact E1 domain preflight and corrected planned/actual constructor accounting. Old bounded core now reports domain_refused (440/1504 unsupported), actual constructors0, measured unchanged inputs/reference, before native entry. Unknown core refuses. New isolated Capytaine3.0.0 wheel4efc4ea6... core6648b6c5...6257fa4a built offline; installed408/408 fixed independent-reference values and14/14 typed refusal cases pass via preserved split evidence. New exact domain entry applies only to this experimental discriminator, not general qualification. Non-E1 Fortran suffix and all production Python source preserved. Apache upstream/MPL2 owned wrappers retained.
+
+56 focused tests pass Windows and Linux; new02 binding/sidecar public load verified. Root physical run completed in4.18717440002365s,2actual native batches/47receivers each,1successful shared constructor,2observed frozen overrides; primitive E1 calls unmeasured. All1504 image arguments supported. Both source cases PASS Laplace, gradient finite-difference, seabed, far-leading and outgoing checks; both FAIL free-surface Robin condition (4surface samples,2.6666–3.1494 times unchanged abs1e-9+rel1e-4 criterion). Execution completion is NOT scientific acceptance. Original energy/negative-damping failures remain open.
+
+Next coherent Mistral-owned slice: isolate the free-surface residual among frozen finite-depth representation, real Green/source integration and evaluation contract, then deliver a compatible repair and focused oracle under a new prospective bounded scope. No full coupled campaign, favourable subset replacement, coefficient clipping or tolerance change. Physical failure alone does not establish the cause of the previous energy gap.
+
+Evidence: C:/ANYworkspaceWork/anymarine-evidence/w5-e1-root-verification-20261011/root-assessment.json; physical arrays-derived diagnostics C:/ANYworkspaceWork/anymarine-field-restart-20261011/physical-e1-01.json; root scopes C:/Github/ANYhydro/.development-evidence/w5-e1-root-verification-20261011. Binding/sidecar: that scope/inputs/native-{binding,sidecar}-e1-pointgate-02.json. Isolated runtime /var/tmp/anyhydro-e1-installed-repair-20261011/install-env (Ubuntu-24.04). All current scopes CLOSED/FROZEN; no unused balance reusable. Original w5-e1-domain-extension limits/failed receipts remain closed, even if old ledger fields say otherwise. Worker last two invocations ended at turn caps without final handoff; root reconstructed verified source/check results from exact receipts and independent integration evidence, without taking over the central implementation. Goal stays active.
+
+## Prospective physical-field check — 2026-10-11
+
+Root reviewed installed-core408/408 point values and14/14 split typed refusals (historical falsegate retained). Exactcore6648b6c5...6257fa4a adopted for experimental discriminator only; no general admission. After connected regression/public-binding checks pass, root may perform exactlyone90s physical check: 2single-panel batches,47receivers/source,376source quadrature interactions/1504image arguments; unchanged frozenk/geometry/Prony and predicate tolerances. Onejob/thread1536MiB, inner80s. No full coupled solve/newfit/HAMS. Separate physical-pool receipt, fresh neutral output anymarine-field-restart-20261011/physical-e1-01.json. W5 NO_GO remains.
+
+## Root installed-artifact verification — 2026-10-11
+
+Offline wheel build succeeded; worker E1 probe attempts hit optional-mpmath and f2py-caller harness defects before installed-function evaluation. Root independently verified the exported attribute and uses a separate caller with those mechanical repairs: same408 fixed points/14 refusals, one60s E1-only launch, oneprocess/thread1536MiB. Old consumed native attempts preserved; no balance reuse, no physical-field/fullsolve authorization from this scope. Evidence w5-e1-root-verification-20261011.
+
+## Restart — installed E1 repair, 2026-10-11
+
+Development resumed by user. Prior worker terminated with driver408/408 pass and typed preflight56tests, but installed-wheel gate UNMET. Original build4/4 and native3/3 consumed, failure receipts retained; no old authority reused. New bounded connected repair is Mistral-owned: offline isolated wheel/install/probe and artifact proposal. Root chooses worker1100s, build600s/per240/max3, E1-only native120s/per60/max2, checks120s/per45/max6 (root45s reserve), onejob/thread; no full solve or worker physical-field run. New evidence w5-e1-installed-repair-20261011. Root adoption and W5 NO_GO preserved.
+
+## Prospective transition — connected E1 extension, 2026-10-11
+
+Previous turn PROGRESS: published discriminator51 Windows/Linux tests and concrete tested-domain obstruction. Both repositories clean marineb23c42dc/hydro58cb1fff. No owned jobs active before dispatch. Question: can a stable branch-correct scaled-E1 extension cover missing physical receiver arguments while preserving native physics? Mistral owns domain preflight, central algorithm, point references, isolated artifact/build and connected integration; root keeps contract/admission/Git. Added rectangle[-150,0]+i[-210,210] is a DEVELOPMENT target only, union prior admitted-domain guards; point criterion1e-12+1e-10|ref| unchanged. No full numerical solve or worker Green-field run. New bounded worker1800s/checks240/build600/native240 scopes; prior balances frozen. Full brief/evidence C:/ANYworkspaceWork/anymarine-evidence/w5-e1-domain-extension-20261011. Scientific decisions, failed evidence and W5 NO_GO preserved.
+
 Published hydro main 58cb1fffbb0cb1a376ccdf931356c8eec366367f (experimental discriminator,51 Windows/Linux tests; actual native-field check domain-blocked, unqualified). GUI remains at verified marine4cd9a6c source. This checkpoint records the next domain-preflight/reference step; development remains active and full goal incomplete.
 
 ## Current restart — physical-field discriminator and domain obstruction, 2026-10-11

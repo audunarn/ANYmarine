@@ -1,3 +1,11 @@
+## Status amendment — installed E1 gate and free-surface discriminator, 2026-10-11
+
+Typed domain preflight is implemented and exact experimental core6648b6c5...6257fa4a is registered after an offline wheel build, installed408-point independent-reference checks and14 typed refusals. 56 focused regression tests pass Windows/Linux. Old unsupported and unknown artifacts refuse before native evaluation; planned and observed constructor counts are distinct.
+
+The small physical-field discriminator now executes both source cases successfully. Interior Laplace, gradient consistency, seabed, far-leading and outgoing conditions pass. The free-surface Robin condition FAILS at all four surface samples by2.6666–3.1494 times its unchanged case criterion. This resolves the execution-domain obstruction and narrows the next repair target; it does not admit the evaluator, qualify a rectangular domain, explain the full energy gap or satisfy W5. Original physical assumptions/tolerances and W5 NO_GO remain unchanged.
+
+Next milestone: one connected Mistral-owned free-surface component discriminator and compatible repair, governed by explicit source/representation contracts and new bounded execution. Compare the frozen finite-depth representation, real Green/source integration and evaluation contract before another large campaign. Root retains contract adoption, independent verification, scientific admission and Git delivery. Current scopes frozen and failed evidence retained; TASK/CHECKPOINT contain the exact restart identities and evidence.
+
 ## Status amendment — bound native domain obstruction, 2026-10-11
 
 A matched physical-field discriminator is implemented with51 Windows/Linux
