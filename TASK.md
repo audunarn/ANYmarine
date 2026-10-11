@@ -1,3 +1,70 @@
+Published hydro main 58cb1fffbb0cb1a376ccdf931356c8eec366367f (experimental discriminator,51 Windows/Linux tests; actual native-field check domain-blocked, unqualified). GUI remains at verified marine4cd9a6c source. This checkpoint records the next domain-preflight/reference step; development remains active and full goal incomplete.
+
+## Current restart — physical-field discriminator and domain obstruction, 2026-10-11
+
+Development ACTIVE in C:/Github/ANYmarine and C:/Github/ANYhydro. Mistral owns
+central implementation; root directly coordinates, adopts contracts and verifies.
+No owned worker/numerical process active. Full goal remains incomplete; W5 NO_GO,
+general numerical admission false. GUI/sourcephysics unchanged from published
+working state. Existing platform gates and all scientific failures remain open.
+
+Implemented NEW hydro tools/check_physical_green_field.py, focused tests and
+PHYSICAL_GREEN_FIELD_DISCRIMINATOR.md. 51 tests pass on Windows (Mistral receipt
+finalize-pytest-01) and Linux (root-linux-tests-01). Mocked positive caller verifies
+reference DIRECTORY, canonical triangle/four Gauss source nodes, exact frozen k,
+full real+imaginary composite, two47-receiver calls, shared constructor, observed
+frozen-coefficient use, metadata/input trust, fresh-output/path/symlink refusals.
+All pre-existing source files preserved (only three new hydro files); no GUI or
+production numerical API changed. Root fixed-contract decisions remain distinct
+from worker verification and scientific qualification.
+
+Actual root-only run root-native-01 STOPPED with exit1 in1.1356318999896757s:
+ANYHYDRO-NATIVE-E1: zeta outside the tested envelope. No physical predicates were
+measured; this is an execution-domain obstruction, not evidence of PDE failure
+or validation. Raw native01.json remains partial/running; external receipt and
+domain-postmortem.json record failed outcome. No complete native batch count or
+primitive E1 count can be claimed from this fatal stop. Planned2batches/376source
+quadrature interactions, constructor1,47receivers per source; no full BEM/solve,
+new fit, HAMS, cache or kernel modification. Exact case, binding/sidecar four
+input-file hashes remain unchanged after stop. Reference binding verified before
+native entry; its post-run full-directory identity was not independently checked.
+
+Read-only reconstruction against the explicit bound guard finds220/752 planned
+image arguments unsupported for EACH source triangle (440/1504 overall). First
+hull argument r~100.0033,z~-1.7242. Kernel only supports deep Re(zeta)<=-30 with
+|Im|<=10, or surface Re>-.5, |Im|<=10, |zeta|<=8/nonzero. Proposed far and mid-depth
+receivers exceed that domain; surface/bottom subsets alone cannot replace the
+missing physical checks. Guard remains intact. No amplitude fitting, clipping,
+symmetry enforcement, tolerance relaxation or general backend admission.
+
+Next coherent action: add typed prospective domain preflight using this exact
+bound-artifact envelope before native entry, then choose a scientifically reviewed
+extension/oracle for the missing E1 domain needed by physical-field checks. Do not
+repeat the current receiver set or disable the native guard. Governing physics,
+work/power conventions and W5 criteria unchanged. A domain extension is a new
+candidate needing independent reference evidence, not a policy-only widening.
+No full coupled refinement/test-space sweep before this obstruction is resolved.
+
+Evidence root: C:/ANYworkspaceWork/anymarine-evidence/w5-physical-green-discriminator-20261011
+Receipts/pools: C:/Github/ANYhydro/.development-evidence/w5-physical-green-discriminator-20261011
+Root physical contract, reviewer findings, all intermediate tests, raw logs,
+partial candidate and final Mistral handoff retained. Initial worker inspection
+was intentionally interrupted after271.193s (missed checkpoint/repeated remote
+lookups); second max-turn run delivered partial code after250.916s but synthetic
+checks bypassed accounting. Their duration remains UNKNOWN; old checks scope is
+frozen, no unused authority assumed. Original worker scope891.9319382/900s closed.
+Integration correction worker300.4660817/300s timed out without handoff; useful
+caller/test changes preserved. Narrow completion125.1353162/180s delivered51tests
+and final handoff. These are not numerical authority extensions. Metered repair
+checks34.1146413/120s; root share2.6054934s. Native one-attempt scope1.1356319/90s
+closed/frozen, with no retry authorised; all unused scope balances frozen. Future
+new work needs prospective bounds under user delegation, never historical reuse.
+
+Earlier records below are historical; they preserve rather than renew authority.
+## Restart transition — physical Green discriminator, 2026-10-11
+
+Development resumed from published marine77edb6b/hydro456292a, both clean. No owned jobs active before dispatch. Next uncertainty: does the exact bound evaluator satisfy physical field conditions away from source, or does the energy discrepancy remain a discretization issue? Mistral owns a small matched-source discriminator, synthetic checks only initially; root adopts prospective physical controls before one tiny native execution. Existing failures, W5 NO_GO and consumed scopes remain intact. New worker900s, synthetic checks120s/root40 reserve; no actualGreen execution granted to worker. Full brief/evidence: C:/ANYworkspaceWork/anymarine-evidence/w5-physical-green-discriminator-20261011. This changes diagnostic sequencing only, not scientific criteria/admission.
+
 ## Current restart — weak hull testing measured; self jump checked, 2026-10-11
 
 Goal ACTIVE, development in C:/Github/ANYmarine and C:/Github/ANYhydro; root

@@ -1,3 +1,18 @@
+## Status amendment — bound native domain obstruction, 2026-10-11
+
+A matched physical-field discriminator is implemented with51 Windows/Linux
+focused tests and a guarded mocked native caller. The actual bound run stopped
+in1.14s because proposed far/mid-depth arguments exceed the native E1 tested
+envelope. No physical predicates were measured; no evaluator/PDE failure or
+qualification follows. Preserve this failure and the guard.
+
+Next add prospective typed domain preflight, then establish a reviewed E1
+domain extension/reference route before repeating physical-field checks. Such
+extension needs independent numerical evidence; do not widen a guard by policy,
+replace missing checks with favourable subsets or launch another full coupled
+campaign. W5 NO_GO/all criteria and open platform/release gates remain unchanged.
+TASK/CHECKPOINT record exact candidate, evidence, closed budgets and next action.
+
 ## Status amendment — physical-hull test-space experiment, 2026-10-11
 
 The retained potential-tested hull Neumann experiment is implemented/verified
