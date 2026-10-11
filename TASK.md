@@ -1,3 +1,61 @@
+## Current restart — panel reference obstruction resolved, 2026-10-11
+
+Development ACTIVE in C:/Github/ANYmarine and C:/Github/ANYhydro; root
+coordinates Mistral directly. Full plan/goal remain incomplete; W5 NO_GO and
+general numerical admission false. No owned worker or numerical job is active.
+
+Published ANYmarine GUI main: 4cd9a6c490bdac818fa9166334b27d812ee2ac94.
+All 58 GUI/application source files matched the already-verified installed
+Linux snapshot byte-for-byte. Startup framing, GPU default, model/examples,
+surface/member authoring and installed GUI paths are included. Existing Windows
+console.exe (WinError5) and Linux hardware-GPU (WSLg llvmpipe) gates remain unmet.
+No additional GUI or numerical qualification is claimed by Git publication.
+
+Published ANYhydro main: c540e5672ab564bece2c6514d95fc888c5548404.
+Includes prior artifact binding/retained energy diagnostic (33be96c) and the
+new retained panel-pair discriminator, its tests and documentation. GitHub
+remote main identities were verified after pushing. No other repository edited.
+
+Final 25 focused tests pass. Actual retained03c case: 12/12 selected pairs pass
+fixed independent scalar/gradient controls; 96 analytic, 288 radial angular
+and 288 labelled legacy Duffy evaluations. No total Green/native evaluation,
+BEM assembly, source solve, HAMS, Capytaine or Prony execution. Measured Linux
+native thread count one; RLIMIT_AS1536MiB virtual cap; input files unchanged.
+All 150 protected pre-existing ANYhydro files retain exact hashes.
+
+Mixed exact-source/four-node receiver Rankine quadrature accounts for selected
+skew: approximately -1.61828348e-5 versus stored -1.61321313e-5, with unexplained
+residual +5.07035125e-8 (0.3143%) and conservative observed uncertainty about
+1.79e-10. These perpendicular, nonadjacent same-body hull/lid pairs capture
+only 3.4021% of full absolute real skew mass. No global cause, physical energy
+closure, evaluator accuracy, production repair or qualification is established.
+No forced symmetry, eigenvalue clipping or physical tolerance change adopted.
+
+Exact evidence/source identities/resources/adjudication:
+C:/Github/ANYhydro/.development-evidence/w5-panel-pair-discriminator-20261011/root-acceptance.json
+Report: C:/ANYworkspaceWork/anymarine-evidence/w5-panel-pair-discriminator-20261011/root-final-case-04/.
+Original worker pool1200.4035492000112/1200s closed/frozen (timeout overhead
+recorded); checks24.499222099984763/180s closed/frozen; root verification share
+13.212209500052268/60s. No unused authority from this scope remains available.
+
+Mistral delivered localization, analytic primitive and guards. Final continuation
+timed out with 21 tests passing/one failing and no updated handoff; root finished
+the independent radial-gradient verification boundary and integration within the
+remaining check reserve. Archive, failed Duffy/FD/edge controls and historical
+failures preserved. Root's initial review incorrectly assumed equal receiver
+weights; corrected using authenticated actual weights, with no product change.
+
+Next bounded outcome: establish the source/receiver-consistent discretization,
+normal-trace and jump/work contracts needed for a candidate repair; distinguish
+the measured mixed-quadrature contribution from evaluator error before any
+production source change. Use Mistral for the coherent candidate implementation
+once governing equations are adopted. The tool's suggested wave-part test is a
+proposal, not automatic authority or the selected next action. Do not launch an
+expensive full native campaign merely to refine the small selected residual.
+Any new execution receives a new prospective scope; all previous runs remain
+frozen. GUI/backend admission and full W5–W10/release gates remain open.
+Earlier entries below are historical and cannot renew authority.
+
 ## Active matched panel-pair discriminator — 2026-10-11
 
 Previous turn PROGRESS: discrete work/covariance/physicalhull diagnosis verified.

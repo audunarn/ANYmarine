@@ -1,3 +1,22 @@
+## Status amendment — matched panel references, 2026-10-11
+
+The independent retained panel-pair discriminator is verified (25 focused
+tests, 12/12 selected pairs passing fixed scalar/gradient controls). A matched
+analytic and radial-angular reference resolves the near-coplanar control
+obstruction. Mixed exact-source/four-receiver-node Rankine quadrature accounts
+for the selected-pair asymmetry with about0.3143% unexplained residual. These
+pairs cover only3.4021% of full skew mass; no global cause or physical energy
+closure is established. No forced symmetry or tolerance/physics change adopted.
+
+Prospective sequencing: establish consistent source/receiver integration,
+normal-trace/jump and work contracts before a production repair. Avoid automatic
+expensive refinement of the small selected residual; the tool's proposed wave
+test is advisory. Candidate implementation remains Mistral-owned, with governing
+scientific decisions and acceptance reserved to root. New numerical execution
+needs a fresh bounded scope; all previous authorities/evidence remain frozen.
+W5 NO_GO/full W5–W10/release gates remain open. Latest verified GUI and hydro
+updates are published to main; TASK.md/CHECKPOINT.md record identities/evidence.
+
 ## Status amendment — discrete work diagnosis, 2026-10-11
 
 The retained diagnostic tool now has verified complex work-conjugate matrices,
