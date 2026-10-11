@@ -183,3 +183,90 @@ def test_anyfem_controls_and_plot_use_light_workbench(qapp, window):
     image = window._plot.grab().toImage()
     assert image.pixelColor(0, 0).name() == "#ffffff"
 
+
+def test_load_example_leaves_pending_body_fit_until_visible(qapp, window):
+    # Cold software startup regression: load_example before show() must leave
+    # the body fit queued. Previously the inactive _waves.reset() inside
+    # _set_result cancelled the pending fit and nothing re-armed it.
+    window.load_example()
+    assert window._fit_pending is True
+    assert window._fit_timer.isActive()
+    window.show()
+    assert wait_until(lambda: window._fit_pending is False, app=qapp)
+    size = window.viewer.size()
+    assert size.width() > 1 and size.height() > 1
+
+
+def test_hide_layer_without_active_wave_preserves_pending_fit(qapp, window):
+    window.load_example()
+    assert window._fit_pending is True
+    window._waves.hide_layer()
+    assert window._fit_pending is True
+    assert window._fit_timer.isActive()
+    window._waves.reset()
+    assert window._fit_pending is True
+    assert window._fit_timer.isActive()
+    window.show()
+    assert wait_until(lambda: window._fit_pending is False, app=qapp)
+
+
+def test_active_wave_hide_cancels_own_fit_and_restores_poses(qapp, window, monkeypatch):
+    # Synthetic wave-layer stand-in (fake mesh, no BEM/solver data): an active
+    # wave layer still owns its pending fit, removes its layer and restores
+    # the saved body poses and camera view.
+    from any3dview import MeshArrays
+    window.load_example()
+    window.show()
+    assert wait_until(lambda: not window._fit_pending, app=qapp)
+    waves = window._waves
+    body_id = window._project.bodies[0].body_id
+    handle = window._handles[body_id]
+    expected = np.array(handle.transform, copy=True)
+    waves.saved_poses = {bid: np.array(h.transform, copy=True)
+                          for bid, h in window._handles.items()}
+    waves.saved_view = saved_view = window.viewer.export_view_state()
+    vertices = np.array([[0., 0., 0.], [10., 0., 0.], [0., 10., 0.]])
+    triangles = np.array([[0, 1, 2]], dtype=np.uint32)
+    layer = window.viewer.add_mesh_arrays(
+        MeshArrays(positions=vertices, triangles=triangles), tags='wave-preview')
+    waves.handle = layer
+    moved = np.eye(4)
+    moved[:3, 3] = [5., 5., 5.]
+    handle.set_transform(moved)
+    applied = []
+    original = window.viewer.apply_view_state
+    monkeypatch.setattr(window.viewer, "apply_view_state",
+                        lambda state: (applied.append(state), original(state))[1])
+    window._schedule_fit()
+    assert window._fit_pending is True
+    waves.hide_layer()
+    assert window._fit_pending is False
+    assert not window._fit_timer.isActive()
+    assert waves.handle is None
+    assert layer.removed
+    assert waves.saved_poses is None and waves.saved_view is None
+    assert np.allclose(np.array(handle.transform), expected)
+    assert applied == [saved_view]
+
+
+def test_software_viewport_fits_and_renders_body_pixels_without_manual_action(qapp, window):
+    # Cold offscreen software startup and reload fit automatically; the
+    # rendered viewport shows both example bodies (>= 200 pixels each).
+    window.show()
+    window.load_example()
+    assert wait_until(lambda: not window._fit_pending, app=qapp)
+    qapp.processEvents()
+
+    def body_pixels():
+        pixels = np.asarray(window.viewer.capture_image().convert("RGB"), dtype=int)
+        blue = (pixels[:, :, 2] - pixels[:, :, 0] > 35) & (pixels[:, :, 0] < 150)
+        orange = (pixels[:, :, 0] - pixels[:, :, 2] > 50) & (pixels[:, :, 0] > 130)
+        return int(blue.sum()), int(orange.sum())
+
+    blue, orange = body_pixels()
+    assert blue >= 200 and orange >= 200
+    window.load_example()
+    assert wait_until(lambda: not window._fit_pending, app=qapp)
+    qapp.processEvents()
+    blue, orange = body_pixels()
+    assert blue >= 200 and orange >= 200

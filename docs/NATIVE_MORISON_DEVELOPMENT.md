@@ -11,11 +11,21 @@ in the project tree to highlight it.
 
 **Jobs → Edit native mechanical inputs…** edits existing endpoint coordinates,
 diameter, drag/added-mass coefficients, quadrature order, Airy components and
-current profile. Identities and textual ownership declarations are read-only in
-this editor. Add/remove definitions by importing a named native-input JSON file.
-Validation uses the same public ANYsolver compiler as the CLI and worker.
-Rejected edits leave the existing project intact. Saving/reopening preserves
-all member/environment records; changes invalidate dependent results.
+current profile. The same editor also authors members natively: **Add Morison
+member…**, **Edit Morison member…** and **Remove Morison member** operate on
+explicit member identities, body-local endpoint attachments (restricted to the
+declared project bodies), sections and the public ownership choices; **Create
+Morison members…** appears when the project has no Morison contribution and
+starts from a clearly labelled synthetic development environment template, or
+the exact shared environment when hydrodynamic mooring lines already declare
+one. No external JSON or scripting is required for these actions. The public
+envelope requires at least one member, so the last member cannot be removed;
+edit it instead. Validation uses the same public ANYsolver compiler as the CLI
+and worker through the shared admission service; incompatible ownership,
+invalid geometry or missing owner packages are refused there. Rejected edits
+leave the existing project intact. Saving/reopening preserves all
+member/environment records; changes invalidate dependent results and never
+alter saved shared waves or excitation series.
 
 **Jobs → Run native mechanical job…** starts the isolated child process. The
 example selects dt=0.02 s and three steps. No numerical job runs while loading.

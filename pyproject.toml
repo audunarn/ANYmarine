@@ -13,7 +13,7 @@ authors = [{ name = "ANYmarine developers" }]
 dependencies = ["numpy>=1.24"]
 
 [project.optional-dependencies]
-gui = ["PySide6>=6.10.1,<6.11", "ANY3dView>=0.5.5,<0.6"]
+gui = ["PySide6>=6.10.1,<6.11", "ANY3dView[qt,gpu]>=0.5.5,<0.6"]
 native-morison = ["ANYsolver>=0.4.7", "ANYloads>=0.1.0"]
 native-waves = ["ANYsolver>=0.4.7", "ANYloads>=0.1.0", "ANYhydro>=0.1.0"]
 waves = ["ANYloads>=0.1.0", "anyhydro>=0.1.0", "capytaine==3.0.0"]
@@ -24,6 +24,7 @@ dev = [
 
 [project.scripts]
 anymarine = "anymarine.cli:main"
+anymarine-gui = "anymarine.gui:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

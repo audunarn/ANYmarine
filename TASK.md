@@ -1,3 +1,1193 @@
+## Active matched panel-pair discriminator — 2026-10-11
+
+Previous turn PROGRESS: discrete work/covariance/physicalhull diagnosis verified.
+Question: does mixed exact-source/receiver quadrature of directRankine1/r explain
+summed weightedS asymmetry at its largest panel pairs, or is another kernel
+contribution required? Mistral owns coherent new pair-localization/reference
+algorithm/tool/tests/actualcase interpretation. Prospective bounded independent
+primitive reference only, max12pairs/96 directedreceivercomparisons with fixed
+controllevels; no new totalGF/native/Prony/BEM/source solve. Physics/source
+adoption and unchangedW5 criteria remain root decisions. Authority/brief:
+C:/ANYworkspaceWork/anymarine-evidence/w5-panel-pair-discriminator-20261011/.
+All prior scopes frozen; W5 NO_GO/general admissionfalse. No claimedGalerkin
+symmetrization repair or numericalqualification. Absolutecontextpaths supplied.
+
+## Current restart — discrete work diagnostic verified, 2026-10-11
+
+Goal ACTIVE; previous goal turn made PROGRESS. Development remains in
+C:/Github/ANYmarine and C:/Github/ANYhydro. Root coordinates Mistral directly.
+The retained audit now exports correct complex motion-coordinate work matrices,
+mean-power normalization, summed quadrature reciprocity and exact panel-mean/
+covariance decomposition. Final20 tests pass. Root independently verified
+all5 motion decompositions (max absolute difference1.918e-13W)
+and public complex-velocity counterexample (correct5W; wrong transpose3W).
+Actual finalLinux run has measured native OpenBLAS1 thread and1536MiB virtual
+cap. Saved source/array/case identity and originalpower recovery preserved.
+No Green/kernel evaluation, operator assembly or new source solve occurred.
+
+Frozenrate mean flux0.0008646213777789673W, covariance
+0.0002837188329358708W, all-panel flux
+0.001148340210714777W. Physical hull flux
+0.001165240152590841W differs from far by
+0.003715636173522019W; lid contribution does not remove gap.
+Covariance accounts for only~7.1% of originalfar/mechanical gap. Full summed
+weighted-S asymmetry0.03446422663563036; imaginary6.414440566959449e-16.
+A mean residual near roundoff does not establish physical/source accuracy.
+
+Mistral central implementation delivered; root returned complex conjugation,
+quadrature metric and normalization findings to sameowner. Root rejects an
+unproved weight-symmetrization-as-Galerkin/energy-identity repair. All-panel
+flux includes an artificial internal lid and is not automatically an exterior
+fluid-boundary integral; no continuous kernel failure is proved by it alone.
+Current evidence cannot separate evaluator error from discretization. No
+forced symmetry, eigenvalue clipping, physics or tolerance change adopted.
+
+Exact acceptance/resources/source audit:
+C:/Github/ANYhydro/.development-evidence/w5-discrete-work-audit-20261011/root-acceptance.json
+Report: C:/ANYworkspaceWork/anymarine-evidence/w5-discrete-work-audit-20261011/reports/root-final-case-01/.
+Worker pool823.9924907000095/900s and checks
+23.670102400064934/120s closed/frozen, no active owned process.
+All pre-existing source preserved except3 owned diagnosticfiles. Worker01
+interrupted for governing feedback;02 delivered;03 inspected only, stopped
+after root brief omitted absolute note path. Parent corrected reserved
+interpretation and small physical-flux report integration. Failed checks,
+partial work and unsupported historicalproposal remain with adjudication.
+
+Next bounded scientific action: localize summed weighted-S asymmetry to
+identified source/target panel pairs, then establish a matched independent
+panel-integral/normal-trace discriminator before a proposed kernel or
+quadrature/formulation repair. No new GF/solve/refinement campaign is granted
+by this checkpoint. W5 NO_GO/general admission false and all fullW5–W10,
+shared scientific/release gates remain incomplete. Existing GUI/source startup,
+GPU default, example and authoring updates preserved; Linux hardwareGPU and
+Windows console.exe gates remain unmet. No Git publication in this slice.
+Earlier entries below are historical.
+
+## Active discrete work audit — 2026-10-11
+
+Previous goal turn PROGRESS: retained audit/tool12tests verified. New question:
+is the energy gap due to within-panel pressure/normal-velocity covariance, or
+an additional defect of the saved discrete Green/trace relation? Mistral owns
+one connected extension, derivation, tests and actual-case interpretation.
+Use retained operators only, no new Green/source solve; physical laws and
+W5 criteria unchanged. Prospective authority/brief/checkpoint:
+C:/ANYworkspaceWork/anymarine-evidence/w5-discrete-work-audit-20261011/.
+Earlier scopes frozen; W5 NO_GO. Root independently adjudicates conclusions.
+
+## Current restart — retained energy audit verified, 2026-10-11
+
+Development ACTIVE in C:/Github/ANYmarine and C:/Github/ANYhydro; root coordinates
+Mistral directly. The completed stored-field diagnostic slice adds
+ANYhydro/tools/audit_retained_panel_energy.py, its focused tests and
+RETAINED_PANEL_ENERGY_AUDIT.md. Final12 tests pass; actual retained03c outputs
+restore within8.85e-14 relative, source/array/case identities match. Linux final
+execution has verified OpenBLAS1 thread and RLIMIT_AS1536MiB virtual cap.
+No Green evaluation, new operator assembly or source solve was run.
+
+Mechanical power0.0008646213777890402W and far0.00488087632611286W reproduce.
+Energetic coordinate near/far gaps are1.35–2.15%, so cancellation does not
+confine the closure problem to the frozen rate. Gross/net cancellation is
+28640.9(candidate)/15650.4(HAMS); retained symmetric damping has minimum
+eigenvalue-0.0012336511193195333. Stored real traces/+0.5 jump/force recovery
+reproduce their producer; this proves reconstruction, not evaluator accuracy.
+Signed pressure-residual work accounts for only7.1% of the frozen closure gap.
+Hull-only power is an interference diagnostic, never an additive lid fraction.
+
+Mistral01 interrupted for governing coefficient/protected-path correction;
+02 timed out without tests/handoff. Root took over unreliable partial tool,
+fixed reserved source-pole normalization (no extra1/pi), quadrature contraction,
+refusals and unsupported cancellation-only interpretation. Failed runtime-path,
+thread-environment and validation-order attempts remain. Final evidence:
+C:/Github/ANYhydro/.development-evidence/w5-retained-energy-audit-20261011/root-acceptance.json
+Reports: C:/ANYworkspaceWork/anymarine-evidence/w5-retained-energy-audit-20261011/reports/root-audit-06/.
+
+Worker pool600.4508935000049/600s and checks13.300872300023912/100s are closed/frozen; no active owned worker or numerical job. All105 protected pre-existing Python hashes unchanged. No Git publication in this slice.
+
+Next scientific slice: inspect the discrete work/adjoint relation between
+panel-mean Neumann enforcement and pointwise pressure recovery using retained
+operators; discriminate formulation inconsistency from evaluator error before
+any proposed source repair. This checkpoint grants no new GF/solve/refinement
+campaign and changes no acceptance criteria. W5 NO_GO/general admission false;
+full W5–W10/release gates remain incomplete. Linux hardware GPU gate(llvmpipe)
+and Windows console.exe(WinError5) remain unmet. GUI updates remain in source;
+launch python run_gui.py from C:/Github/ANYmarine, or python -m anymarine.gui
+for the installed consumer. Earlier checkpoint entries are historical.
+
+## Active retained-field audit — 2026-10-11
+
+Previous turn PROGRESS: Linux consumer integrated, original native03c terminal
+failure independently assessed. All earlier execution scopes are frozen.
+Question: does energy imbalance occur across energetic motions or mainly the
+frozen near-null rate? Mistral owns the complete stored-array audit/tool/
+interpretation; physical source and acceptance criteria unchanged. New bounded
+postprocessing scope only, no Green evaluation or solver run. Authority/brief:
+C:/ANYworkspaceWork/anymarine-evidence/w5-retained-energy-audit-20261011/.
+Goal ACTIVE; W5 NO_GO/general admission false.
+
+## Current restart — Linux consumer verified; native point rejected, 2026-10-11
+
+Goal ACTIVE in C:/Github/ANYmarine and C:/Github/ANYhydro. Root coordinates
+Mistral directly. No numerical job or worker remains active. Full W5-W10 and
+release requirements remain incomplete; W5 NO_GO/general admission false.
+
+Linux installed consumer now passes strengthened root-verify-03 (48 active
+constraints, actual console command, Qt-free/Capytaine-blocked native public
+compiler, stored replay and sidecar refusals). Linux native dialog/edit/compiler
+and save/reopen preparation pass without integration. Initial ANYsolver0.4.7
+artifact lacked marine_mechanical despite correct version metadata; its caller
+failure is retained. Root selected exact wheel matching five tested public
+marine module hashes and added a durable refusal control. Metadata verify02
+was narrower evidence, not native capability acceptance. Shapely2.1.2 wheel
+and pure platformdirs donor bytes/licenses retained; no old runtime/global
+install changed. Windows public-Qt GL regression passes on RTX3090Ti.
+
+Real Linux Wayland software desktop passes at1280x720 with two independently
+visible bodies, stored replay, surface controls and zero jobs/clean closure.
+Linux default/GPU paths report actual Mesa llvmpipe; hardware gate fails and
+remains UNMET. Windows generated console.exe execution remains UNMET WinError5.
+These are explicitly reused-dependency development targets, not full releases.
+Linux slice evidence: .development-evidence/w10-linux-gui-20261011/root-acceptance.json.
+All worker/build/check/desktop pools closed and frozen; protected hydro Python
+source unchanged. Mistral01 delivered handoff,02 ended without handoff,03 delivered
+within remaining original780s. Root reserved API/artifact compatibility correction
+and independent Windows/runtime checks. All failed attempts preserved; no Git push.
+
+Original native03c is TERMINAL, not a live wait: Windows supervisor exit1,
+process-wall12937.900977299985s; Linux payload elapsed14025.427034523998s is a
+distinct clock. All four operators plus micro returned; exactly5 GF,1 solve,
+0 Capytaine BEM/defaultProny. Added mass10passed/6failed and damping8passed/8failed
+of16; positive mean power0.0008646213777890402W versus HAMS0.0015879742100973749W
+fails frozen limit4.7649226302921244e-05W. No criteria/normalization relaxed;
+only failure evidence produced. Never replay03/03b/03c or reuse spent authority.
+
+Mistral independently assessed retained artifacts. It supports a bounded source
+admission obstruction, not abandoning the whole roadmap. Local f64 consistency
+does not prove source accuracy. Root challenged a proposed fourfold far constant:
+reviewer retracted it after analytic derivation; current H=A/(4*pi) coefficient
+is correct. No numerical physics change adopted. Unsupported numeric-residue
+verification claim is excluded (tool denial, no successful receipt). Final review
+reconciliation timed out; partial and denied evidence remains, not a completed
+verification. Root also rejects a purported omega mismatch: explicit HAMS gravity
+similarity preserves omega^2/g and re-dimensionalizes A/B. No universal BEM floor
+or tolerance waiver follows from cancellation-conditioned observations.
+
+Native evidence/adjudication:
+C:/Github/ANYhydro/.development-evidence/w5-native-point03c-review-20261011/root-adjudication.json.
+Original and corrected Mistral reports, source derivation, CLI receipts and limits:
+C:/ANYworkspaceWork/anymarine-evidence/w5-native-point03c-review-20261011/.
+Exact original result receipt stays in w5-native-coupled-followup-20261011/attempts/native-coupled-point03c.
+RawNPZ remains in /var/tmp/anyhydro-native-coupled-20261011/results/energy-point-native-coupled-03c;
+JSON copied with hashes to the review artifact directory. No output was promoted.
+
+Next scientific action: define a bounded read of retained03c fields to compare
+mechanical/far energy closure across energetic modes and the frozen near-null
+rate, then locate the responsible assembly/trace issue. No new Green evaluation,
+linear solve, HAMS campaign or automatic refinement is authorised by this record.
+Use a prospective scope and keep independent acceptance, tolerances and protected
+failures. Linux hardware environment/Windows exe gates and full GUI/job/headless
+acceptance remain open. Launch current checkout with python run_gui.py; installed
+GUI with python -m anymarine.gui. Restart existing windows to load source updates.
+
+Earlier entries below are historical; this entry controls current restart status.
+
+## Active Linux installed-GUI slice — 2026-10-11
+
+Previous turn PROGRESS: Windows installed module/desktop/compiler and refusal evidence.
+Original native03c revalidated running PID3562, final operator,5GF/0systems.
+New uncertainty: current installation/desktop tooling has Windows path and GL assumptions;
+Linux/WSLg already has a reusable Qt.6.10.1/viewer.5.5 runtime. Mistral owns
+a connected cross-platform repair and actual installed Linux reproduction,
+within separately bounded scope. No new numerical job or scientific admission.
+Authority and brief: C:/ANYworkspaceWork/anymarine-evidence/w10-linux-gui-20261011/.
+All previous evidence, failures, execution limits and dirty source preserved.
+
+## Current restart — installed Windows GUI consumer, 2026-10-11
+
+Development is active in C:/Github/ANYmarine and C:/Github/ANYhydro.
+Root coordinates directly; no Astra reviewer is active. The full implementation
+objective remains incomplete. W5 is NO_GO; general numerical admission is false.
+
+The shared, Qt-free `anymarine.gui` launcher is packaged as `anymarine-gui` and
+`python -m anymarine.gui`. Checkout `run_gui.py` uses the same launcher. The
+GUI dependency now declares ANY3dView's `qt,gpu` extras. GPU remains default;
+ANYfem styling, startup example and the surface/member authoring work are
+preserved. Launch instructions: docs/INSTALLATION.md and docs/USER_WORKFLOW.md.
+Restart an already-open app to load the updated source.
+
+Fresh snapshot-02 marine/hydro wheels in a disposable target-02 reproduced the
+installed consumer with compatible current geometry/mesh/material/fileio wheels
+and explicitly reused third-party dependencies. No broad global site-packages
+or editable checkout imports were accepted. Owned MPL-2.0 and upstream notices
+were retained. Donor checkouts and all hydro Python sources are unchanged.
+
+Root checks: 38 launcher/verifier tests pass; desktop helper run has 33 passes
+plus a retained positive-fixture failure (pytest temp lived inside the denied
+checkout). Correcting only that fixture gives 3 installed-origin passes with
+31 deselected. Actual installed GPU/software desktop cases pass at 1280x720,
+with both bodies independently visible (5155/6973 and 5301/7124 pixels; limit
+200). Actual GPU is NVIDIA RTX 3090 Ti, OpenGL 3.3, driver616.92. Root inspected
+installed startup and scrolled thin-sheet images. The actual installed module
+entry route separately starts on GPU with two bodies and zero jobs. Native
+Morison dialog records, atomic edit, public compiler preparation, save/reopen
+and input hashes pass without integration. Injected checkout-path and obsolete
+mesher-version controls produce non-success and retain both refusal reasons.
+
+The complete installed verifier is still FAIL solely for console_script_exe:
+Windows returns WinError5 executing the generated .exe. The separately verified
+Python module launch is not evidence that this executable works. Other checks
+pass: wheel/source/installed bytes, licenses, 48 active dependency constraints,
+Qt-free core, missing Qt diagnostics, blocked Capytaine, stored replay arrays,
+body transforms, stale results and missing/corrupt sidecar refusals. This is
+Windows installed-consumer development evidence with reused dependencies,
+not a clean release install, complete W9/W10, Linux or scientific acceptance.
+
+Protected failures: early false-green aggregation and broad-global target03
+claims are rejected. Earlier failed saved-consumer scripts generated analytic
+synthetic series; those attempts do not count as stored-only acceptance. No
+real dynamics, BEM or GF job was launched here. Root helper KeyErrors were
+fixed by explicitly importing the neutral package; all failed receipts remain.
+Worker01 was deliberately interrupted for the dependency contract; worker02
+already timed out before the root kill request. Root completed integration
+following the recorded unreliable continuation, with no final worker handoff.
+
+All worker/build/check/desktop pools for this slice are now frozen, including
+unused reserves. Exact process-wall accounting, candidate hashes, logs and
+partial acceptance: .development-evidence/w10-installed-gui-20261011/root-acceptance.json.
+Workspace reports: C:/ANYworkspaceWork/anymarine-evidence/w10-installed-gui-20261011/reports/.
+Documentation updated after snapshot-02; installed Python/metadata claims bind
+to the named snapshot and wheel hashes, not subsequent documentation edits.
+No Git publication occurred in this slice; existing dirty work is preserved.
+
+Native point03c continues independently under its consumed admission. Last
+observed LinuxPID3562 running operator_3_running, 5 GF calls started and zero
+numerical systems; Windows supervisorPID12432 remains owned. Final receipt:
+C:/Github/ANYhydro/.development-evidence/w5-native-coupled-followup-20261011/attempts/native-coupled-point03c/result.json.
+Never replay03/03b/03c. Revalidate that exact process/receipt before the next
+scientific action; retain original timeouts, budgets and acceptance criteria.
+
+Next: inspect the original native terminal evidence when available; adjudicate
+against frozen criteria before any follow-up. Remaining GUI delivery work is
+Windows console execution and Linux installed-consumer acceptance, then the
+full W9/W10 gates under a separately defined bounded slice. Do not repeat
+passed checks without changed inputs or an unresolved concern.
+
+Earlier entries below are historical; this restart entry controls current status.
+
+## ACTIVE installed GUI reproduction slice - 2026-10-11
+
+Previous turn PROGRESS: startup and responsive sourceQt consumer verified.
+Now native03c revalidated R/Linux3562, operator_2_running,4 GF/0systems;
+consumedadmissionneverreplay. GoalACTIVE/W5NO_GO unchanged.
+Decision: current wheel lacks a packagedGUIlaunch command; checkouttool cannot
+prove installedcurrentapplication. Mistral owns Qt-free anymarine-gui launcher,
+localdisposabletwo-wheelbuild/install and installedconsumerverification, with
+optional-backendabsent savedprojectreproduction and realWindowsdesktop.
+LiveANYhydroreadonly; snapshotscratchbuilds avoidsource mutations. No new
+numericaljob/network/globalinstall/Git. W10consumer evidence is narrowerthan
+wholeW10/releasequalification; reuseddependencies labelledhonestly.
+Authority: C:/ANYworkspaceWork/anymarine-evidence/w10-installed-gui-20261011/authority.md
+and brief.txt; metered .development-evidence/w10-installed-gui-20261011.
+Worker900s/checkpoint90/final150reserve; build180/checks180/desktop120 seconds.
+Root independentlyacceptsactualsource/artifact/checkevidence, keepsfullgoal.
+
+## ACTIVE restart: responsive GUI integrated and verified - 2026-10-11
+
+Canonical repos C:/Github/ANYmarine and C:/Github/ANYhydro. Root directly
+coordinates Mistral. Goal ACTIVE; W5 NO_GO/general numerical admission false.
+Launch current source: python C:/Github/ANYmarine/run_gui.py. Restart any existing
+app to load changed modules. All surface/member authoring updates are in the GUI.
+
+Delivered: automatic startup framing preserved; workbench defaults1280x720 and
+honours that request exactly. Scrollable Details and dock content keep controls
+reachable; project tree is usable. GPU stays default, ANY3dView remains visual
+owner and ANYfem theme unchanged. Final hardwareGPU/software desktop cases pass:
+actual1280x720, minimum968x490, per-body5155/6973 and5301/7124 changed pixels
+(minimum200 each). Actual scrollbar movement reaches thin-sheet side/control
+fields. Root viewed startup, plate and scrolled side-label screenshots.
+
+Worker checks:5 layout,14 viewport,47 QA/shell/startup,40 mass/surface consumers
+pass in distinct receipts. Root independent42-check layout/startup/member plus
+actual-scroll sequence passes; final36 QA/layout checks pass after assertions
+were strengthened. No added numerical trajectory. Sourcehash audit proves only
+owned details/mainwindow/QAtool changed plusnewtest_qt_layout.py; waves startup
+fix and all other dirty files protected. Source whitespace checks pass.
+
+Preserved failures: root programmatic ensureWidgetVisible test and Mistral
+reproduction fail after prior Qt tests, but standalone passes. That helper is
+not the user's scrolling workflow. Root discriminating manual scrollbar test
+passes the SAME42-check sequence and SAMEcontrol-center-visibility criterion;
+no claim of a fully diagnosed Qt kernel bug. QA/permanent tests now exercise
+actual scrolling. Old failed oracle and diagnostic failures remain intact.
+Scientific gates/tolerances unchanged. Worker01 deliberate interruption retained
+latepartial Details edits; worker02 delivered layout/checks/handoff; worker03
+ended exit0 without handoff or productrepair. Root adopted the reserved oracle
+adjudication and integrated final QA assertions; did not infer pass from exit0.
+
+Evidence: ANYmarine/.development-evidence/w9-responsive-layout-20261011/root-acceptance.json;
+workspace C:/ANYworkspaceWork/anymarine-evidence/w9-responsive-layout-20261011.
+Frozen exact process-wall pools:worker579.563541600015/600;
+checks70.44704670007923/90;desktop10.260690000024624/90.
+Prospective root30/worker60 ordinary reallocation remainedwithin sameopen90 pool;
+no refund or renewed scientific authority. Prior desktop pools remain frozen.
+
+LIVE native point03c: last actual PID3562(parent3561) R, CPU92.2%, elapsed2:29:10,
+RSS274920KiB; Windows wsl12432/session61666. Laststatus operator_2_running,
+4 GF started/0 systems. Revalidate exactreceipt/process beforeaction. Consumed
+admission:NEVER replay03/03b/03c. Existing15000s child/15300s outer timeout and
+original A/B/energy criteria unchanged. One passingpoint cannot qualify allW5.
+
+NEXT inspect terminal native03c receipt whenavailable; otherwise advance a
+separately scoped isolated installed-wheel GUI reproduction slice, with exact
+artifact/source/runtime identity and no new numerical/BEM campaign. Full W5,
+W6-W10 and thin-sheet scientific roadmap remain open. SourceWindows consumer
+acceptance is not installedANYmarine/Linux/fullW9/W10 acceptance. No newGit
+publication this slice. Historical observations below retain their dated scope;
+newest state above controls active/restart claims.
+
+## ACTIVE responsive Qt desktop slice - 2026-10-11
+
+Decision: current desktop screenshot reveals window1387x902 despite requested
+1280x850, cramped project tree and clipped surface metadata. Mistral owns a
+connected bounded Qt layout repair at1280x720, preserving all source/science
+contracts and previous startup/authoring work. Scope/acceptance/resource limits:
+C:/ANYworkspaceWork/anymarine-evidence/w9-responsive-layout-20261011/brief.txt
+and authority.md. Worker600s, actual-edit checkpoint120s, final60s reserve;
+ordinary90s/desktop90s separate metered pools. ZERO new numerical work;
+existing consumed native03c remains live. No Git/publication or gate promotion.
+
+## ACTIVE restart: desktop startup verified and repaired - 2026-10-11
+
+Canonical roots C:/Github/ANYmarine and C:/Github/ANYhydro; root coordinates
+Mistral directly. Goal ACTIVE, W5 NO_GO/general numerical admission false.
+Source run_gui.py includes all delivered surface and native-member editing work.
+Restart the running application to use the new code.
+
+Mistral startup repair: inactive wave reset no longer cancels the queued model
+fit. Active/owned wave layers still cancel their fit and restore body/view state.
+Root accepted the source slice:45 focused QA/viewport tests pass, including four
+startup/wave lifecycle regressions and two thin-sheet selector regressions.
+Default, strict GPU and explicit software real-Windows desktop cases all pass.
+Actual same-viewport GPU is NVIDIA GeForce RTX3090 Ti, OpenGL3.3 NVIDIA616.92.
+Per-body changed pixels:5741/7011 default/GPU;5891/7183 software (minimum200 each).
+Both bodies automatically framed with no manual Renderer action. Root inspected
+software startup and actual thin-sheet details screenshots. Thin-sheet selection
+checks identity, minus_to_plus normal and distinct lower-water/upper-water labels.
+Stored synthetic replay/native form/reload/zero-job clean closure checks pass.
+Source consumer evidence only: full W9/W10, installed marine, Linux and scientific
+acceptance remain open; no physical result fabricated or gate promoted.
+
+Worker04 produced the product patch, but final handoff/check receipts were absent;
+root independent receipts establish the claims above. Worker05 timed out without
+selector edits/handoff. Root completed the small QA-only selector repair because
+repeated continuation execution was unreliable. Two root test-fixture API name
+failures preserved, repaired and final45 pass. Historical software invisible-body
+failures/manual-fit discriminator and all worker timeout evidence retained.
+Source-before audit permits only waves.py and test_qt_viewport.py existing changes;
+new QA tool/tests are within ownership, previous dirty product work preserved.
+Root whitespace checks pass. No sibling/new numerical/Git publication actions.
+
+Evidence: ANYmarine/.development-evidence/w9-desktop-current-20261011/root-acceptance.json
+and attempts/root-qa-startup-final-02 plus root-desktop-{default,gpu,software}-final-01.
+Frozen pools (precise process-wall seconds):worker600.5201254999847/600;
+completion240.40492490000906/240; checks17.02009820000967/60;
+desktop21.55067020005663/120. Supervisor timeout overhead retained, no refunds.
+
+LIVE native point03c unchanged: Windows wsl12432/Linux3562/session61666;
+latest revalidated state operator_2_running,4 GF calls started/0 systems.
+Same consumed admission, one numerical job and thread; NEVER replay03/03b/03c.
+Existing15000s child/15300s outer timeout unchanged. At terminal inspect receipt,
+counts and original A/B/energy criteria. Next independent development candidate:
+make details/tree layout fit smaller desktops; current desktop window1387x902
+shows a cramped tree and long surface identity label. Scope/check budget must be
+prospectively recorded; no renewed scientific authority. Full roadmap remains open.
+Historical statements below retain their dates; newest state supersedes active claims.
+
+## ACTIVE W9 real desktop verification - 2026-10-11
+
+Previous goal turn PROGRESS: integrated native Morison GUI authoring with22
+authoring/15 selected regression passes and2 repaired independent counterexamples.
+Current native03c exact process revalidated alive: wsl12432/Linux3562, R/CPU92.3%,
+elapsed1:16:26. Same consumed admission; W5 NO_GO and no command replay.
+
+Next decision: does current source render visible bodies automatically on the
+real Windows GPU desktop after new Qt editing integration? Competing explanations
+are a valid GPU startup, software/driver substitution, or blank/composed rendering.
+Mistral owns a reusable QA tool/oracles and new desktop verification docs ONLY;
+all existing product code, science/old evidence/root docs protected. Root adopts
+prospective per-body>=200 changed pixels at identical camera/background on hiding
+each body; grid pixels/handles alone cannot pass. Same-viewport OpenGL device is
+required for hardware-GPU claims; actual inherited overrides/platform are recorded.
+Cases default startup without manual Renderer action, strict GPU, explicit software
+fallback; source/module identities, screenshots, diagnostics, zero jobs and clean
+owned-window closure. New surface/member UI and synthetic stored replay consumers
+tested within bounds; no fabricated physical results or qualification labels.
+
+Prospective budget: worker600s/MaxTurns100;120s early actual tool checkpoint and
+final120s handoff reserve. Desktop120s/per30 (worker90/root30), ordinary60s/per30
+(worker40/root20), unique metered receipts, one desktop child at a time, tooldeadline
+<=25s. No installs/build/network/Git/nested workers/sibling edits and ZERO new
+numerical integrations/GF/BEM/HAMS/native jobs. Native03c scope unchanged. Existing
+frozen GUI budgets remain frozen. Partial/source Windows smoke evidence cannot
+promote whole W9/W10, Linux/installed-ANYmarine or scientific acceptance.
+Evidence: C:/ANYworkspaceWork/anymarine-evidence/w9-desktop-current-20261011 and
+ANYmarine/.development-evidence/w9-desktop-current-20261011.
+NEXT inspect actual tool/checkpoint; adjudicate device/pixel truth/screenshots,
+retain failures and return concrete product defect to owner under separate scope.
+
+## ACTIVE restart: native Morison GUI authoring integrated - 2026-10-11
+
+Goal ACTIVE. This goal turn PROGRESS: Mistral delivered the complete native
+member authoring consumer workflow; root adjudicated real counterexamples and
+accepted the repaired source slice. Root coordinates Mistral directly; canonical
+roots C:/Github/ANYmarine and C:/Github/ANYhydro. No Astra reviewer/subagent.
+
+Jobs -> Edit native mechanical inputs now adds/edits/removes explicit Morison
+members and creates a contribution when absent. Body identities/local attachment
+points, diameter/Cd/Ca/quadrature and ownership are explicit; shared public compiler
+owns final admission with no integration. Existing mooring environment is reused
+exactly where required; otherwise a labelled editable development template is
+explicit. Last-member removal is refused without silently deleting environment.
+Missing owners/invalid records/Cancel preserve the project. Save/reopen, inputhash
+invalidation, preview refresh and stale producing geometry are covered.
+
+Root measured two genuine failures: no-op member editing rounded valid coordinates
+and coefficients, and structural changes discarded pending tree edits. Failed
+root-authoring-counterexamples-01 retained. Same Mistral repaired with exact decimal
+fields and staged-edit transactions for add/edit/remove/create/parent acceptance;
+unparseable text warns without mutation, child Cancel keeps pending parent edits.
+Public diameter is positive; Cd/Ca nonnegative (zero Cd/Ca valid); no changed physics.
+
+Evidence:22 permanent authoring tests pass,15 inspected selected regressions pass
+(2 actual-job tests excluded and never claimed passing); unchanged2 independent
+root counterexamples now pass in root-authoring-final-01. Actual shared compiler
+preparation is exercised, no new numerical integration. Source-before audit proves
+all protected dirty surface/mainwindow/services files preserved; changed existing
+files only native_inputs.py and the two assigned user docs, plus new authoring
+widget/tests. No renderer/startup/defaults/schema/sibling source changes.
+
+Evidence/handoffs: C:/ANYworkspaceWork/anymarine-evidence/w9-native-authoring-20261011
+and ANYmarine/.development-evidence/w9-native-authoring-20261011. Pools frozen:
+measured worker 592.1778200999834/900s; metered ordinary 28.823896700021578/180s.
+Initial runtime-import inspection was not separately timed; do not fabricate its
+process duration or claim whole-scope exact accounting/savings. Historical initial
+test tuple/list expectation failure and all counterexamples retained. No refunds
+or new native authority. Source acceptance is not full W9/W10 qualification.
+
+LIVE point03c progressed to operator_1_running,3 GF calls started,0 systems:
+first full operator returned; no coupled solve/energy/acceptance yet. Confirmed
+Windows wsl12432 / Linux3562 command matches exact03c packet; outer session61666.
+Same consumed admission,15000s child/15300s outer cap, single numerical job/thread;
+NEVER replay03/03b/03c. W5 NO_GO/general admissionfalse. All criteria/priorfailed
+evidence/sourcepins untouched. Revalidate process and receipt before action.
+
+NEXT inspect terminal native evidence when available. Independent next W9 obligation
+is real Qt/OpenGL desktop plus documented fallback verification of current source
+workflow, with fresh explicitly bounded non-numerical authority; prior GUI pools
+are frozen. Installed-wheel/W10/scientific/full thin-sheet roadmap remains open.
+No new Git publication. Historical records below remain preserved.
+
+## ACTIVE W9 native Morison authoring slice - 2026-10-11
+
+Previous goal turn PROGRESS: accepted W9 surface editor,49Qt/22root checks;
+three genuine counterexamples repaired by same Mistral, failed evidence retained.
+This turn revalidated actual native point03c: Windows wsl12432/Linux3562 alive,
+Linux R, elapsed54:47/CPU92.3%; same consumed admission/no replay. W5 NO_GO.
+
+Decision question: can the demonstrator's native members be authored without
+external scripts/JSON? Source shows existing NativeInputsDialog edits numeric
+leaves but member identities/attachments are locked and there is no add/remove.
+Existing public native intent and compiler already own admission. Root adopts
+connected Qt authoring rather than duplicating force laws or changing schemas.
+Mistral Edit owns the native-input dialog/new authoring widgets, necessary native
+tree/scene/mainwindow integration, focused tests and relevant user docs. Previously
+accepted dirty surface code and protected domain/services/root notes are retained.
+Explicit body-local endpoints/identity/ownership, environment protection, atomic
+refusal/Cancel, add/remove including envelope-boundary handling, save/reopen/hash
+invalidation and producing-geometry stale replay are completion requirements.
+Missing compiler/package and source-owned shared waves must fail actionably.
+
+Prospective authority: worker900s/MaxTurns140,180s actual-patch checkpoint and
+final180s handoff reserve; ordinary180s/per60 worker120/root60, through unique
+metered harness. Pure records/Qt fake-stored results/public compiler preparation
+only; ZERO new actual numerical integration/GF/BEM/HAMS/native solver jobs.
+Mixed existing native tests containing real trajectories are not admitted.
+No sibling edits/network/install/build/Git/nested workers. No scientific criteria,
+frozen budgets or native03c authority changed. Source integration is distinct from
+full W9/W10/scientific acceptance. Relevant evidence:
+C:/ANYworkspaceWork/anymarine-evidence/w9-native-authoring-20261011 and
+ANYmarine/.development-evidence/w9-native-authoring-20261011.
+NEXT inspect actual180s checkpoint and deliverable; independently adjudicate
+compiler/GUI paths; continue observing existing03c without repeating its command.
+Historical and frozen records below remain intact.
+
+## ACTIVE restart: W9 surface editor integrated; native point03c remains live - 2026-10-11
+
+Root coordinates Mistral directly in C:/Github/ANYmarine and C:/Github/ANYhydro;
+no Astra reviewer/subagent. Goal ACTIVE. The connected W9 surface-assignment GUI
+consumer slice is accepted against its bounded source criteria, not full W9/W5
+scientific or installed-wheel acceptance. Mistral owned implementation and all
+repairs; root adopted the readonly metadata service boundary and independently
+adjudicated source, scope and actual counterexamples. MPL-2.0 policy unchanged.
+
+GUI: surface selection opens its details; atomic public-record edits/create/remove
+preserve owner/role/kind/normal conventions and explicit geometry. Thin sheets
+require distinct sides and explicit mesh; numerical lids never become load owners.
+Actual pressure-jump/capability labels come from the content-addressed producing
+dataset, clearly separate from current-geometry scientific qualification. Missing
+or mutated sidecars/optional packages give unavailable diagnostics, with no external
+path fallback. Hash-verified bytes are loaded through an isolated temporary snapshot.
+Exact decimal fields preserve small plate values; invalid values warn without
+project mutation. Producing snapshots, stale replay and schema7 save/reopen retained.
+
+Root discovered three real failures (uncaught plate validation, silent decimal
+clamp/round, sidecar hash/load race); the same Mistral repaired them and added
+permanent regressions. Failed attempts root-counterexamples-01/02 remain intact.
+Final worker evidence:49 Qt tests pass. Independent root:22 headless/integration
+tests pass, including all3 unchanged counterexamples. Effective GUI runtime:
+Python3.13.9 / PySide6 6.10.1 / ANY3dView0.5.5 / installed neutral ANYhydro0.1.0.
+The checkout launcher uses current marine src; no install/GPU desktop qualification
+was performed. Renderer/GPU defaults/theme/startup paths were not changed.
+
+Evidence and handoffs: C:/ANYworkspaceWork/anymarine-evidence/w9-surface-editor-20261011
+and ANYmarine/.development-evidence/w9-surface-editor-20261011. Worker measured
+805.0789812000003s/900; original ordinary harness50.03248759996495s/180.
+Earlier worker syntax-inspection subprocess duration was not metered; retained
+as unknown, never converted into exact process-wall evidence or refunded authority.
+Pools frozen at completion, unused headroom grants no native execution authority.
+Worker03 checkpoint was late (after actual patch/checks), accurately recorded.
+
+W5 point03c remains the same consumed admission and owned live run: Windows wsl
+PID12432, Linux Python3562, outer session61666. Latest root observation: Linux
+R/CPU92.3%, elapsed52:34, RSS174496KiB; operator_0_running,2 GF calls started,
+0 systems. Micro previously passed; no full coupled result is available yet.
+Native profile SHA256 a4c9925843663f7549df0487879e148a54de8a2f3763a67121dd588b8eb98a92
+unchanged. Root-issued03c authority,15000s child/15300s outer cap, approximately
+18:05:15 Europe/Oslo deadline, single numerical job/thread and all scientific
+criteria remain as recorded below. NEVER replay03/03b/03c commands/admissions.
+Revalidate exact processes/receipt before waiting/cancellation/adjudication.
+
+NEXT: inspect terminal point03c evidence when it exists; preserve partial/failure
+outputs and apply original A/B/energy criteria without tolerance changes. While it
+runs, advance only independently scoped consumer/non-numerical work. W5 stays
+NO_GO; general numerical admission false; full W5/W6-W10/thin-sheet roadmap and
+real desktop/installed-package gates remain open. No new Git publication in this
+private slice. Historical evidence below is preserved; newest active state wins.
+
+## ACTIVE restart: corrected native coupled point is running - 2026-10-11
+
+Development resumed in C:/Github/ANYmarine and C:/Github/ANYhydro. Root directly
+coordinates Mistral; no Astra reviewer/subagent. Goal ACTIVE, W5 NO_GO, general
+numerical admission false. No GUI/runtime deployment/publication in this private
+slice. Source-candidate checking is distinct from installed-ANYhydro acceptance.
+
+VERIFIED: public native-binding v2 pins original producer and distinct float64
+E1 evaluator; post-constructor actual core/kind/interface rechecks, typed native
+file refusal, pinned regular Path/symlink compatibility, manifest version and
+producer/evaluator roles preserved. Final independent root regressions111 pass,
+2 Windows symlink skips. ActualLinux Path and symlink controls pass. Independent
+root counterexamples (effective n10001 /changed fourth face index) now refused
+before mock body. Packet58/58 predicates pass. Source audit226 public source/test/
+tool files confirms only owned profile/test changed;8 old artifact pins intact.
+
+Mistral owned the coherent profile repairs, actual input/domain/settings/count
+guard and fresh03 packet. Root independently adjudicated and fixed final exact
+command integration: stale criteria02 and shared controls-directory paths. Failed
+03b launch stopped input_validation before native work/admission consumption,
+0.21100800001295283s; failure/output/GNUtime/oldone-shot pool preserved/frozen.
+Root encoding preparation failure also retained; successful explicitUTF8 preparation
+changed no scientific arrays. Fresh03c proposal/output/admission is separately
+root-issued after ALL command-line paths/hash/syntax/resource and58 packet checks.
+No old consumed request, numerical budget, kernel source or tolerance was reused.
+
+LIVE observed: outer session61666, Windows wslPID12432, Linux PythonPID3562.
+Start2026-10-11 13:50:15 Europe/Oslo; outer15300s cap (approximately18:05:15 local),
+child15000s cap, kill-after30s, singlejob/thread, RLIMIT_AS4GiB virtual memory.
+Revalidate exact owned processes/receipt before any wait/cancellation/continuation.
+Admission03c is CONSUMED. NEVER re-execute any03/03b/03c command or admission.
+The43x1 micro passed and state is operator_0_running:2 GF started,0 systems.
+Actual settings: n1001/float64/emptytable/low_freq/frozenProny, all runtime thread
+pools1; micro wall0.20326368699988961s. No full operator/result/qualification yet.
+MaxGF5:micro thenfour864x864 operators,12axes/retained4, one linear solve allowed.
+50bE1/51breciprocal caps; conservative47,824,208,432 and47,889,901,026 planned
+reservations, not measured primitive division counts. Same .03/1e-8/floor1e-8,
+printed HAMS bounds and negative-power stop. W5 stays NO_GO regardless of onepoint.
+
+Authority: C:\ANYworkspaceWork\anymarine-evidence\w5-native-coupled-20261011\root-native-point03c-authority.md
+Receipt: C:\Github\ANYhydro\.development-evidence\w5-native-coupled-followup-20261011\attempts\native-coupled-point03c\result.json
+Linux output: /var/tmp/anyhydro-native-coupled-20261011/results/energy-point-native-coupled-03c
+GNUtime: /var/tmp/anyhydro-native-coupled-20261011/receipts/energy-point-native-coupled-03c/linux-time.txt
+GNUtime elapsed is coarse and maxRSS per-process, not aggregate tree; exact outer
+perf_counter wall is supervised and reported at termination. Preserve raw batches,
+partial failure/timeout evidence and terminal status; no automatic retry/admission.
+
+Preparation worker total1491.2097319999884s/1500 (8.790268s unused),
+worker03 ended exit0 after173.7640393000038s atMaxTurns55, no final handoff; root
+reconstructed artifacts and completed111 regression/58 packet/independent boundary
+and preservation checks. Older preparation ordinary pool frozen40.82842640002491s
+measured minimum plus UNKNOWN unmetered syntax/build time, no timestamps substituted.
+Followup ordinary frozen43.24697609987925s/120. Fresh03c exact-command
+checks1.1560593000031077s/40 frozen. All prior failures, sourcepins and spent scopes
+remain preserved; no refund/headroom transfer. Root owns final integration/Git.
+
+NEXT: wait on the already-running owned session; compact status updates while
+actual operators compute. At terminal receipt inspect every batch/micro predicate,
+A/B/energy/retained-coordinate evidence and guard counts under original criteria.
+Keep failed/unresolved outcomes non-success. Full W5 acceptance, W6-W10/thin-sheet
+roadmap, GUI integration of admitted capabilities and release gates remain open.
+Historical records below retain their original observations; newest state above
+supersedes their active/live statements.
+
+## ACTIVE development: native binding repair and coupled-case preparation - 2026-10-11
+
+Development resumed in C:/Github/ANYmarine and C:/Github/ANYhydro. Root directly
+coordinates Mistral; no Astra reviewer/subagent. Goal ACTIVE; W5 NO_GO and general
+numerical admission false. Existing GUI and published baselines are unchanged.
+
+Public native-binding v2 now distinguishes the pinned original reference producer
+from a distinct guarded float64 evaluator, and supports both unchanged and changed
+pinned Python source maps. The real artifact has all three Python source maps
+changed; the earlier claim that v1 blocks this particular artifact is withdrawn.
+The unchanged-source branch has mock coverage only.
+
+Independent Mistral Read review completed with actual source/artifact inspections
+(99.59083899998222s). Its F1/F2/F4/F5 findings were adopted. The same Mistral owns
+repairs in the two already-dirty public profile/test files and private coupled-case
+packet preparation; root independently adjudicates the handoff. Checkpoint confirms
+post-constructor actual-module identity/kind/interface checks and binding-version
+preservation. Repaired public regressions: 106 passed; real metadata/profile load
+passed without any native constructor/evaluation/solve. Packet dry validation failed
+9 of 43 checks, retained; the same owner is repairing actual-input guards and packet validation.
+No new numerical authority has been issued or consumed.
+
+Previous worker terminated normally (exit0), actual799.4138662999903s/1500.
+Root inspection found the proposed guard lacks ACTUAL coordinate/source identity
+and domain/effective-integration-setting checks. The01b corrected packet is
+unverified and is not admitted. Same Mistral owner now receives the coherent repair
+under remaining700.5861337000097s, MaxTurns110, early90s checkpoint and120s handoff
+reserve. Current supervisor session54582 / owned worker PID58292; revalidate before
+reuse. Authority: followup-authority.md in the workspace evidence directory.
+Followup receipts: ANYhydro/.development-evidence/w5-native-coupled-followup-20261011.
+
+Old ordinary ledger frozen:40.82842640002491s measured minimum, including exact
+20.783704600005876s nested check wrongly charged to worker pool. Additional AST/bash
+syntax and packet-build launches lack precise process-wall accounting; UNKNOWN,
+raw effects retained. No effect timestamps substituted, rerun to reconstruct timing,
+refund or remaining authority transfer. Fresh prospective ordinary checks120/per40
+for CHANGED profile/guard/packet candidate only, worker80/root40 reserve. This
+renews no old numerical admission or consumed run. Native GF/constructor/E1/solve
+calls remain prohibited. All original failed evidence and scientific gates retained.
+
+NEXT: inspect terminal handoff, source diff and preserved failures; return concrete
+repairs to the same owner if needed. Independently check guards/packet with the
+remaining shared ordinary authority. Only then consider a fresh root-issued full
+coupled numerical packet. Proposed15000s child/15300s outer and count caps remain
+PREPARATION ONLY. All old pools/failed W5 evidence remain frozen and unchanged.
+Full W5/W6-W10/thin-sheet work and scientific/release gates remain open. No Git
+publication in this private development slice. Missing local ECOSYSTEM_GUIDE.md
+in marine/hydro is recorded; canonical ANYopenSoft policy revision2026-09-24.2
+is available and read.
+
+Previous verified milestone follows; its source-unchanged statement is historical:
+
+## ACTIVE restart: isolated native accuracy verified with frozen inputs - 2026-10-11
+
+Goal ACTIVE; W5 NO_GO and general numerical admission false. Mistral authored
+the guarded E1/tanh-sinh native kernel and adapter; root directly coordinated it.
+No Astra reviewer/subagent. Root completed the small frozen-Prony public-hook
+integration after a bounded Mistral continuation timed out with inspection only.
+The unchanged installed float64 native artifact now matches all16 saved complex
+S/K components: max absolute error 1.563658610346375e-18. All4 real/imag
+transport checks pass independent root reconstruction from authoritative NPZ
+arrays and the independent saved oracle. 226 public source/test/tool files remain
+unchanged; product/GUI/application runtime unchanged and no publication.
+
+Critical resolved obstruction: prior comparison silently regenerated Prony data
+(SHA9e529012...) instead of frozen d5f10c3684cbb71377be9d51adc82a1ad7b4ea0b1dbf5c4669af77e9fa1788e7.
+Its6 S failures and false exit0 remain preserved. The controlled comparison binds
+immutable2x4 stored coefficients using public find_best_exponential_decomposition,
+guards exact kh and coefficient hash, records actual public callback values,
+and exits2 on failed gates. All16 fixed comparisons now pass with unchanged
+thresholds. Measured public GF evaluate 0.05778627000000824s for
+exactly6 receivers x2 panels/n1001; no inferred full-matrix savings or uniform
+domain qualification. Five focused binding/mutation/refusal/CLI tests and19
+existing adapter selftests pass. Earlier22 native E1 probes/7 direct refusals/
+actual library refusal remain valid; no repeated probes in controlled scope.
+
+Artifact: wheel f8c7ec11db01b883903cf9d1400398286e4f75c83d23f34d8f3cb5343f3ab146;
+native core6f05eb7534dd1d3fe0a0c3e067d050c4f5f2180761175201eb3cbd335d2ff891;
+sourcebc9f422ec6fb619ac79b66b767bd4fabf92fb88bad0f7da76cb3491a6466443b.
+Root audits64 installed package files against wheel and262 official archived
+sources, only intended Constants/integrals changes; kind8/ninja-j1/threadenv1.
+Old/new source/build/runtime evidence and all upstream licenses preserved.
+
+Accounting: original worker total1800.3307649999333/1800s (0.330765s timeout
+cleanup overrun retained); final continuation622.332514699985s, inspection only.
+Initial native scope frozen: build8/8 and276.259151599981124/600s charged,
+checks11.010584300005576/240s, native3/3 and8.997815399983665/180s,
+208333 E1 /208494 reciprocal conservative reservations,2 GF calls. Build08
+Linux command succeeded39.71s; precise Windows wall UNKNOWN after interruption,
+entire240s cap conservatively charged. No rerun to reconstruct missing timing.
+Controlled scope frozen: checks0.8893938999972306/90s,
+native1/1 and1.2197108000109438/60s;192192 E1 /192456 reciprocal conservative
+reservations, one12-entry call. Actual primitive evaluation counts not individually
+measured; budgets count wave reciprocal point arguments, not algebraic divisions.
+Root stored-array verification uses a separate30s ordinary-only packet, zero
+new native/E1/BEM calls; first audit had a local rows-variable bug, preserved.
+
+Preserved failures/corrections: build setup/compiler/signature errors; illegal
+function result clauses fixed before build; refusal test wavenumber-shadow bug
+fixed and tested; conservative pre-abort/angle accounting repaired. Root artifact
+audit01 wrongly counted a generated purity.f90 m.mod; corrected262-file archived
+audit passes. Root's first cloned Bash supervisor used CRLF and retained old
+literal log ROOT: first attempt failed, second tests passed but added new logs
+under the previous scratch root. This scope mistake is recorded; added evidence
+was preserved/copied, old artifacts unchanged, supervisor ROOT/LF fixed before
+native execution. No owned processes remain at terminal handoff.
+
+Scientific limitations: negative-half-plane asymptotic omitted-term estimates
+are not proven uniform remainder bounds; broader surface-series stability remains
+unqualified. Internal1e-9 tail setting does not replace external1e-10 E1 criterion.
+Actual n1001 grid is used; native n505 grid is not exactly prototype L6
+(.015598528722402564 vs.015625); comment erratum does not require source rebuild.
+Original W5 A/B/energy .03 relative,1e-8 absolute/floor remain unchanged and failed.
+No new W5 admission, boundary qualification, HAMS truth claim or global replacement.
+
+NEXT: same isolated artifact/frozen coefficient adapter is ready for a separately
+scoped full coupled-case development check. Before any such call adopt prospective
+domain/count/time/memory bounds, preserve original failed packet, validate every
+planned argument and use recorded settings/source identities. Do not execute old
+consumed packets or extrapolate12-entry wall into a performance claim. Diagnose
+the original A/B/energy gates from the complete controlled result; retain plan
+W5/W6-W10/thin-sheet requirements. All completed scopes frozen; unused headroom
+does not transfer. Only documentation is tracked dirty in marine; hydro tracked clean.
+
+Evidence: C:/Github/ANYhydro/.development-evidence/w5-native-frozen-prony-20261011/
+and C:/Github/ANYhydro/.development-evidence/w5-native-accuracy-20261011/.
+Root: C:/ANYworkspaceWork/anymarine-evidence/w5-native-accuracy-20261011/
+root-artifact-audit.json, root-stored-adjudication.json, authority/delta/CLI logs.
+
+## Historical: isolated native accuracy implementation/build - 2026-10-11
+
+Previous goal turn PROGRESS: full matched assembly and root derivative checks
+passed; two-pair evidence supports an isolated native candidate. Same Mistral
+owner now implements the central native accuracy method, guarded integration,
+private artifact build/install and matched public-GF verification. Decision:
+native preservation and measured cost determine next coupled-run scope.
+Only ignored hydro w5-native-accuracy-20261011 and NEW Linux scratch
+/var/tmp/anyhydro-native-accuracy-20261011 are editable; product/GUI/prior
+runtime/source/evidence/siblings remain read only. Freshworker1800/260turns,
+checks240/per60,build600/per240/max6,native180/per60/max3. Onejob/thread,
+ninja-j1; cumulative1mE1/400krecipRankine, at most2GFcalls6receiversx2panels.
+No fullmatrix/BEMsolve/dynamics/fitting/network/globalinstall/publication.
+Exact prospective criteria/limits and owner brief:
+C:/ANYworkspaceWork/anymarine-evidence/w5-native-accuracy-20261011/.
+Old scopes frozen; W5 NO_GO and full roadmap unchanged. Root owns adoption.
+
+## Historical: full matched assembly verified; isolated native candidate next - 2026-10-11
+
+Previous goal turn PROGRESS; this turn PROGRESS. Goal remains ACTIVE, W5
+NO_GO and general numerical admission false. Root directly coordinated the
+same Mistral owner; no Astra reviewer or additional agent was launched.
+Only ignored hydro w5-full-assembly-20261011 changed, plus root-owned marine
+TASK/CHECKPOINT/IMPLEMENTATION_PLAN. All 226 public source/test/tool hashes
+remain unchanged. GUI, runtime, native code and publication are unchanged.
+
+Delivered full finite-depth mathematical assembly: native Rankine analytic/
+farfield branches, reflected and supplemental terms, frozen 2x4 Prony,
+f64 E1 baseline with default-real literal audit, accurate-wave substitution,
+corrected imaginary normalization, case refusal, immutable evidence and
+corrected native text proposal. Baseline reproduces 16 complex values:
+S/K3 for six rows and K1/K2 for the two middle rows, max relative1.184e-15.
+Root independently reduced stored results and confirmed actual FD accuracy.
+Real full-panel transport residuals (not wave-only): dominant7.137e-7 becomes
+4.165e-17; weak -5.444e-9 becomes -1.163e-14. Central FD versus middle K3
+errors4.033e-15 and3.445e-12 meet the original elementary development bound.
+Twenty-four I3 comparisons pass; nine actual runner tests pass. Candidate
+panel Robin residuals, reconstructed from authoritative z0 S/K3, normalize
+to2.177e-4 and4.532e-5 using max(|K3|,|nu*S|,1e-12), nu=k*tanh(kh).
+Those values are descriptive; no boundary qualification criterion is fitted.
+Eight BASELINE point-source bottom controls cancel; root independently
+verified reflection-pair algebra. No candidate panel-bottom runtime test
+or full coupled energy/coefficients/response acceptance was performed.
+
+Adoption: the accurate angular/E1 strategy is supported for a PRIVATE
+isolated native candidate, within this fixture's declared argument domain.
+This is not native implementation, source admission, qualification or release.
+Next bounded Mistral milestone: implement the isolated native kernel with
+case-domain/failure controls, build a reproducible private artifact, compare
+the same matched entries against these authoritative arrays, and measure
+effective settings, wall time and memory. Decide any subsequent full coupled
+coefficient/energy run from that evidence and fresh prospective limits.
+Avoid another open-ended diagnostic sweep. Native I3 was already correct;
+the 1/pi error was in the previous unused Python diagnostic output, not the
+native backend. Preserve native normalization, signs, geometry/lid, Prony,
+Apache notices, source mapping and all original W5/scientific thresholds.
+
+Scientific interpretation corrections to worker reports: the new method
+changes E1 accuracy, angular quadrature and radial-singular integration;
+accurate-minus-stored is their COMBINED effect, not proof of pure H1 error.
+Prior H1 derivation accounts for99.991% of the dominant defect; the weak
+control requires additional E1/finite-h interpretation. Equal FD spacing
+does not establish identical truncation floors for different potentials.
+Boundary point controls used BASELINE wave evaluations; candidate panel
+Robin figures above are root stored-array reductions. Remaining boundary
+residual cannot be attributed exclusively to Prony without separation.
+The root shape inventory was timed by run.py; WORKER context inventories
+were outside the checks ledger (inside overall worker wall). No new Green
+kernel arguments were found in those inventory commands. Do not rerun to
+invent missing timing. Ignore the worker's mistaken attribution to root.
+
+Consumed and now FROZEN: worker1094.8455519000127/1200s (initial388.5376575s
+intentional interruption for checkpoint precision mismatch, followed by
+same-owner706.3078944s repair, normal exit0); checks7.72856620000675/240s,
+per-process60. Conservative math353248/2000000 E1 and65674/400000 reciprocal/
+Rankine arguments,2/3 data launches. No native/backend/GF/BEM/solve/build/
+install/publication calls. Unused authority is not transferable. Initial
+complex64 assumption and fourfold source-point overcount are archived;
+captured bf85b5fa source actually uses complex128,4points x4images=16.
+data-01 failed reconstruction is preserved with nonzero exit2; data-02
+passes exit0. Selftest-01 actually exited0; its 'partial/pre-fix' report
+label is not evidence of a failed check. Source SHA609d27362cc7aa7f04627eb9
+bef86f8fc2b10a016b471fbadf44f09f0eada2e3 was recorded at root adjudication;
+the historical launcher did not hash ignored candidate scripts. Next
+launcher must capture candidate and input identities BEFORE execution.
+
+Evidence: C:/Github/ANYhydro/.development-evidence/w5-full-assembly-20261011/
+(results/data-02, immutable failure data-01, HANDOFF/RESULTS, corrected
+native proposal, archived checkpoints and actual runner logs).
+Root independent acceptance: C:/ANYworkspaceWork/anymarine-evidence/
+w5-full-assembly-20261011/root-verification.json and root-review-obligations.md.
+Primary imaginary identity: https://dlmf.nist.gov/10.9.E1 .
+
+## Historical: full native assembly candidate implementation running - 2026-10-11
+
+Previous turn PROGRESS; verified private real-wave method. Root now gives
+the same Mistral owner a coherent full-assembly development outcome: actual
+native Rankine analytic/farfield branches and frozen Prony, corrected I3,
+case-domain E1 controls, matched full transport and honest boundary checks.
+Question and competing explanations are recorded prospectively in the
+workspace contract; no new broad matrix campaign or physical adjustment.
+Only hydro ignored w5-full-assembly-20261011 is editable. Old scopes remain
+frozen, public/native/runtime/evidence read only. Fresh1200s worker,
+240s checks/per60, 2m E1 and400k reciprocal/Rankine arguments across tests,
+ports/FD/retries; at most3data, one job/thread, exact application3.13.
+Native/GF/BEM/solve/build/install/publication ZERO. Full goal and W5 NO_GO
+unchanged. Root owns adoption; worker supplies candidate and text proposal.
+Scope/brief/precise receipts:
+C:/ANYworkspaceWork/anymarine-evidence/w5-full-assembly-20261011/.
+
+## Historical: private angular accuracy candidate verified; full assembly next - 2026-10-11
+
+Goal remains ACTIVE; W5 NO_GO and general numerical admission false. Root
+directly coordinated Mistral; no Astra reviewer or additional agent was used.
+This scope delivered a private endpoint-aware real-wave candidate, corrected
+independent E1 series, independent graded angular reference, meaningful runner
+refusal tests, stored-pair verification and a text-only native proposal.
+
+Root independently adjudicated the immutable data-03 arrays: 96 elementary
+I1 components meet the prospective criteria; assembled real-wave potential
+and vertical derivative match the reference; actual FD errors 1.535e-13 and
+1.094e-12 also satisfy the original elementary tolerance (the runner's FD
+screen is looser). Wave-only transport residuals are 3.465e-16 and 2.080e-15;
+these are NOT reductions of the measured full-field error. Bottom wave
+cancellation is exact; radial FD covers only 16 dominant-pair components.
+The deep-image Laplace FD value is descriptive, not boundary qualification.
+All nine actual caller/refusal checks pass. All 226 public source/test/tool
+hashes remain unchanged. No product, GUI, native, runtime or Git publication
+change was made; the existing GUI capability claims remain unchanged.
+
+Root acceptance is limited to this private real-wave development candidate.
+Native proposal adoption is WITHHELD: unused i3 output divides by pi, whereas
+pinned native I3 is 2*integral(Re exp), not (2/pi)*integral(Re exp). Correct or
+remove it with an imaginary-normalization oracle. The tested finite-domain
+E1 series is not evidence of a general replacement for arbitrary arguments.
+Do not adopt a consistency-only derivative or reinterpret pole/pole_grad as
+real Rankine terms: those arrays are analytic imaginary-wave data.
+
+Next bounded Mistral outcome: correct the unused I3 normalization, establish
+admissible E1 domain/branch/failure controls, and connect actual native real
+Rankine analytic-panel and frozen-Prony definitions to the verified wave
+candidate. Demonstrate full pair transport and Robin/bottom controls using
+the same geometry and source normalization. Develop a source proposal before
+any separately scoped native build/solve. Root reserves scientific adoption;
+all original A/B/energy tolerances, physical signs, lid and qualification
+gates remain. No broad sweep or duplicate historical investigation is needed.
+
+All current scope authority is now FROZEN. Worker used 999.5872295999725/1000s
+(initial intentional interruption, failed root launcher, same-owner repair
+completed normally). Shared checks used 10.066987800091738/300s including
+root's failed schema read and repaired stored-only verification; no new root
+E1/reciprocal evaluations. Conservative mathematical reservations: 314663/
+500000 E1 arguments, 97465/200000 reciprocal arguments, 3/3 data launches.
+Unused headroom is not transferred. Failures selftest-01..03, runner-tests-01,
+data-01/02 and root-stored-verification-01 are preserved. Earlier GL node
+orders above the prospective <=64 clarification remain a scope ambiguity;
+they are not retroactively authorized. Old scopes stay frozen.
+
+Evidence: C:/Github/ANYhydro/.development-evidence/w5-angular-accuracy-20261011/
+(HANDOFF.md, RESULTS.md, native-patch-proposal.md and immutable attempts).
+Root adjudication and execution receipts:
+C:/ANYworkspaceWork/anymarine-evidence/w5-angular-accuracy-20261011/
+(root-verification.json, root-pending-review.md, worker receipts).
+Independent series basis: https://dlmf.nist.gov/6.6.E2 ; branch basis:
+https://docs.scipy.org/doc/scipy/reference/generated/scipy.special.exp1.html .
+
+## Historical: angular accuracy candidate implementation running - 2026-10-11
+
+Previous turn PROGRESS: matched mechanism and source scaling verified; nine
+runner CLI checks pass in Python3.13, historical counting defects preserved.
+Mistral now owns a complete private accuracy candidate, independent E1/angular
+reference, connected source/reflection/derivative checks and patch proposal.
+Only hydro ignored w5-angular-accuracy-20261011 may be edited. Product/native/
+runtime/old evidence read only; root directly coordinates and owns adoption.
+New worker1000 seconds, checks300/per-process60, one job/thread; cumulative
+E1 evaluations500000 and elementarypoint arguments200000 include all tests,
+FD, ports and retries. At most3 data launches, immutable attempts and count
+refusal required. ONE owned check ledger; exact application3.13 runtime.
+No native/backend/BEM/solve/build/install/publication. Original W5 NO_GO,
+physical boundaries/signs/lid/Prony/scientific tolerances and full goal remain.
+Exact prospective scope, brief and worker receipts:
+C:/ANYworkspaceWork/anymarine-evidence/w5-angular-accuracy-20261011/.
+
+## Historical: matched angular mechanism verified; accuracy candidate next - 2026-10-11
+
+Goal ACTIVE; W5 NO_GO and general numerical admission false. Root directly
+coordinates Mistral. Product, GUI, native source, runtime and publication are
+unchanged; all 226 source/test/tool hashes are intact. Marine tracked edits
+remain TASK.md, CHECKPOINT.md and docs/IMPLEMENTATION_PLAN.md only.
+
+The matched angular-integral prediction explains 99.991% of the strongest
+saved entry discrepancy. Full mathematical wave recomputation agrees with
+the two captured entries to relative differences 6.841e-7 and 4.578e-5.
+Root verified source normalization, reflected geometry and stored reduction.
+This is two-entry development evidence, not full energy closure or W5
+qualification. E1 literal/branch provenance and finite-h remainder remain.
+
+The repaired runner passes nine actual CLI checks in Python 3.13, including
+false-result assertions and refusal/failure preservation. Mathematical use
+is frozen: 129790 reciprocal values, 61 E1 arguments, one data launch. Six
+previously unreserved FD calls are backfilled; original ledger/failures kept.
+Previous gradient 215712/76800 overrun remains unchanged. All current worker,
+check and mathematical pools are frozen; all owned processes are terminal.
+
+Next complete Mistral outcome: private accurate angular-integration candidate
+with controlled E1 accuracy, source/derivative and physical boundary checks,
+plus a concrete compatible patch proposal. Prefer a derived endpoint-aware
+method over a blind n sweep or derivative-only consistency correction.
+Root must set fresh prospective scope/counts before any execution and adopt
+source changes before native builds. Original consumed coupled packet is
+never reused; signs, lid geometry, Prony, scientific gates and tolerances stay.
+
+Authoritative evidence:
+C:/ANYworkspaceWork/anymarine-evidence/w5-angular-identity-20261011/
+root-adjudication.md, root-stored-oracle.json, root-reference-count-audit.json,
+NEXT_ACCURACY_SLICE.md and exact ledgers/attempts. Owned candidate, immutable
+data01, corrected counters and HANDOFF.md:
+C:/Github/ANYhydro/.development-evidence/w5-angular-identity-20261011/.
+Published baselines marine e412932 and hydro 049ef06; full roadmap remains open.
+Saved UTC 2026-10-11T08:25:56.781502+00:00.
+
+---
+
+## Historical: matched angular-identity discriminator running - 2026-10-11
+
+Previous turn made PROGRESS: saved per-panel discrepancy was independently
+verified, false tabulation cause rejected, and execution defects preserved.
+New Mistral ownership is the complete mathematical discriminator plus runner
+repair, tests and correction proposal in hydro ignored w5-angular-identity-
+20261011 only. Product and all previous evidence stay read only.
+Prospective worker 720 seconds, checks 240/per-process60, one job/thread,
+native/GF/solves/build zero. Cumulative mathematical counts: reciprocal
+integrands 200000, E1 reference arguments 64, including retries/tests. At most
+two data launches; unique outputs and counter refusal required before runs.
+All old pools remain frozen; no retrospective renewal of the prior overage.
+Root directly coordinates, owns adoption and living docs. W5 NO_GO and full
+roadmap remain. Exact new contract, brief and ledgers:
+C:/ANYworkspaceWork/anymarine-evidence/w5-angular-identity-20261011/.
+
+## Historical: saved gradient discrepancy verified; cause unresolved - 2026-10-11
+
+Goal ACTIVE; W5 NO_GO and general numerical admission false. Mistral owns the
+next diagnostic and correction proposal; root coordinates directly.
+The discrepancy in 34,560 saved entries is independently reproduced, with a
+maximum normalized residual of 0.0055373. Assembly rounding contributes only
+3.797e-12; side panels account for 98.767% of absolute weighted contributions.
+Ten worker tests and independent arithmetic pass. All 226 source, test and
+tool hashes are unchanged. Product, GUI, native source, runtime and publication
+are unchanged; only the three marine living documents are tracked edits.
+
+The captured route has no tabulation and uses 1,001 angular integration points.
+The initial tabulation explanation was rejected. Next distinguish angular
+Simpson integration error from approximate E1 derivative error on exact saved
+arguments. NEXT_DISCRIMINATOR.md refines the worker proposal to avoid a costly
+full special-function reference. No cause or source correction is adopted.
+
+The assigned slice is not fully accepted: four direct diagnostic launches used
+215,712 Rankine values against a total allowance of 76,800. Exact external
+per-process timing is missing and earlier outputs were overwritten. Original
+CLI records and recovered failures are preserved; authority is not renewed
+retrospectively. The repair timed out after 180.4440081 seconds. Documentation
+completion took 63.23306 seconds. All owned processes are terminal and all
+current pools are frozen. The next execution requires a prospective scope,
+unique output paths and refusal before cumulative limits are exceeded.
+
+Authoritative evidence:
+C:/ANYworkspaceWork/anymarine-evidence/w5-gradient-transport-20261011/
+root-adjudication.md, root-oracle.json, root-original-launch-evidence.json,
+root-recovered-failures.json, NEXT_DISCRIMINATOR.md and ledgers/attempts.
+Owned diagnostics: C:/Github/ANYhydro/.development-evidence/
+w5-gradient-transport-20261011/. Published baselines: marine e412932 and
+hydro 049ef06. Scientific tolerances, signs, lid geometry and the full roadmap
+remain unchanged. The goal remains active.
+
+---
+
+## Historical stored per-pair gradient transport diagnosis running - 2026-10-11
+
+Previous turn PROGRESS: fixed-sourcecapnative completed,25tests/independent
+scalar/time-phase/cap/transportoracles verified. Cap work too small/oppositesign
+at sampledrules; normalizedtransport.0027895 remains. NewMistral owns connected
+saved-matrix/sourceformula diagnosis and privatecompatiblepatch/probe proposal
+in hydroignored w5-gradient-transport-20261011/ ONLY. No product/runtimeedits.
+Freshworker450/MaxTurns110, checks180/per60, onejobthread. NativeGF/systemsolve/
+build0; bounded analyticRankine controls<=20pairs/76800 integrandvalues and
+E1specialfunction<=64case-derivedargs permitted/recorded, notnativeevaluation.
+Early60scheckpoint, final100sverification/handoff reserve. Inspectactualpinned
+source/read-only and localizeσ-amplified per-pair mismatch beforefreshprobe.
+No sign/lid/physics/tolerance/qualification changes; W5NO_GO/fullgoalACTIVE.
+Oldconsumed/frozenauthority unchanged. Root owns contracts/livingdocs/acceptance.
+Brief/contract/uniqueexactwall ledgers:
+C:/ANYworkspaceWork/anymarine-evidence/w5-gradient-transport-20261011/.
+
+## Historical: fixed-source cap-work discriminator verified - 2026-10-11
+
+Current turn PROGRESS: Mistral delivered cap-work diagnostic;25 focused tests,
+real guarded dry validation/preflight passed. Fresh rootnative01 completed
+one120x864evaluation, no coupled/systemsolve, one thread/groupgone; packet
+consumed/nativepoolfrozen. All226 source/test/tool identities unchanged.
+W5NO_GO/general admissionfalse/fullroadmap remain open; no source/GUI/install/
+publication/physics/tolerance/qualification change. All owned runs terminal.
+
+Cap work Gauss2=-6.090567568e-6W,Gauss4=-6.217707053e-6W; orderdelta
+-1.271394846e-7W, opposite sign/<=.170% of needed+.003662397546915821W.
+Independent scalar/time-phase oracle agrees<=9.16e-16W. Cap work at these
+orders does not explain interior imbalance; global integration-error bound
+notproved. Stored higher-order transport control retains normalized.0027895
+gradient inconsistency, not eliminated by the available Simpson samples.
+Formaltruncation/control limitations intact; no intrinsiccause adopted.
+
+Authoritative reconstructed handoff/adjudication and exact resource ledgers:
+C:/ANYworkspaceWork/anymarine-evidence/w5-cap-work-20261011/root-adjudication.md,
+root-cap-oracle.json,root-transport-control.json. Owner's handoff was saved as
+unverified before actual checks then tailinterrupted; root verified completed
+receipts25/preflight02/publicdry02 before newhashbound rootadmission. Original
+worker600 exhausted(+.3956768cleanup), native01frozen; failed tests/compile
+accountinggap/serialization failure preserved. Do not reuse old authority.
+
+Next same Mistral ownership: stored per-pair real/imaginary transport error,
+geometry/source-mode amplification and pinned Rankine/E1/Prony gradient formula
+diagnosis. Localize from captured triples BEFORE new native/fullsolverun;
+derive a counterexample/compatible correction or exact missing observable.
+No blind quadrature/cap repeat, signflip/lidmove, tuning or gateweakening.
+Root owns contracts/acceptance; goal ACTIVE. Saved UTC 2026-10-11T07:40:36.123722+00:00.
+
+## Historical: boundary-source identity verified - 2026-10-11
+
+Previous turn/current slice PROGRESS. Mistral corrected the boundary identity
+diagnostic;32 regressions pass and independent root scalar/domain oracle agrees.
+All226 source/test/tool identities unchanged. W5NO_GO, generaladmissionfalse,
+full W5/W6-W10/thin-sheet obligations open. All owned runs terminal.
+
+Root rejects initial jump-side/welding/wall-fin conclusions (archive-v1 retained).
+Existing +.5 fluid-side jump is correct under negative fundamental convention.
+Auxlid is an internal source sheet in each wetted box closed by a z0 cap.
+Proper interior/source balance still fails by -.003662397546916W; physical
+exterior balance fails by +.003715635484799W. Cause unproved. No source/GUI/
+install/publication/physics/tolerance/qualification change. Latest authority:
+C:/ANYworkspaceWork/anymarine-evidence/w5-boundary-identity-20261011/
+root-adjudication.md, root-final-verification.json and root-domain-oracle.json.
+Actual32 checks supersede handoff33; root also corrects residual-sum formula.
+
+Next: Mistral connected fixed-source cap-work discriminator, fixedGauss2/4 and
+below-water FD; ONE prospective packed GF call only after fresh dry validation
+and root hash-bound admission, no coupled/system solve. Needed cap work
++.003662397546915821W; stable agreement selects source integration/Robin path,
+small cap work selects hull quadrature/harmonicity path. Details in that
+workspace NEXT_CAP_DISCRIMINATOR.md (NO native authority yet). Do not refine
+four saved receiver samples by arbitrary reweighting or rerun already-proved
+source-pole/Robin/angular checks. All consumed/frozen historical pools remain.
+Resource ledgers and full failures retained. Root directly coordinates Mistral.
+Saved UTC 2026-10-11T07:15:40.890355+00:00. Historical records below preserved.
+
+## Historical: restart progressing; Robin micro verified - 2026-10-11
+
+Goal ACTIVE. Canonical ANYmarine/ANYhydro; root directly coordinates Mistral.
+The saved source-pole balance and a new one-triangle/nine-receiver native Robin
+micro diagnostic are complete and independently checked. Latest authoritative
+evidence: C:/ANYworkspaceWork/anymarine-evidence/w5-robin-micro-20261011/
+root-adjudication-02.md and root-verification-02.json. Three normalized real
+Robin residuals <=2.414325e-4; fixed-h receiver FD error <=2.104156e-6.
+No full-case causal bound or qualification is inferred. W5 NO_GO remains.
+
+Mistral repaired the actual startup/admission manifest path and added public
+zero-GF dry validation;23/23 tests pass. Native01 failed before GF and remains
+frozen. Separate changed-candidate native02 completed once (0.9178465s outer,
+0.822487756s child), GF1/constructor1/solves0/positive tables0/thread1; group gone,
+packet consumed, native02 frozen. Original coupled admissions remain consumed.
+All226 product source/test/tool hashes unchanged; no GUI/install/publication.
+Actual resource ledgers and historical failures remain at the evidence path.
+
+Next decision-oriented slice: stored discrete Green/boundary-flux identity and
+oriented surface closure/auxiliary-boundary/quadrature discrimination. Derive
+the physical identity first, then quantify from saved original operators/source
+arrays. Do not repeat Robin, source-pole or angular checks already completed.
+No full coupled rerun, lid relocation, sign tuning or tolerance weakening is
+authorized. Mistral owns connected implementation; root adopts governing
+contracts and adjudicates evidence. Full W5/W6-W10/thin-sheet roadmap open.
+All owned runs terminal. Saved UTC 2026-10-11T06:59:08.732716+00:00. Historical records below.
+
+## Historical: stored W5 diagnosis verified - 2026-10-11
+
+Development resumed in ANYmarine/ANYhydro; goal ACTIVE, W5 NO_GO unchanged.
+Mistral delivered stored-case/lid/operator and energy-closure diagnostics. Root
+verified226 source identities/14 original inputs, effective1thread, and independent
+32-phase time-domain power reproduction (max error1.983e-15 W). No native/GF/
+BEM/system solves, source/GUI capability edits, install or publication occurred.
+Residual work explains7.064% of the constructed far/near gap;0.0037325354 W
+remains after actual boundary-flux work. Cause/reference auxiliary BC unproven.
+Current authoritative adjudication/receipts: C:/ANYworkspaceWork/anymarine-evidence/
+w5-stored-case-diagnosis-20261011/root-adjudication.md. Unsupported report claims
+are superseded there; raw failures/reports and original criteria preserved.
+Next SAME-owner action: stored source-pole work, weighted real-S reciprocity and
+boundary-flux balance; one batch at a time, no solves/native or lid-at-z0 rerun.
+The current candidate refuses z0 geometry. New native work requires a fresh root
+prospective contract; consumed energy-point-02 remains unavailable.
+Worker 220.461107s and checks 292.514108s remain in the
+existing900s/300s stored-only pools. All owned processes terminal. CHECKPOINT.md
+records the restart; broader roadmap and scientific gates remain open.
+
+## Historical: initial restart - 2026-10-11
+
+User restarted development. Canonical roots ANYmarine and ANYhydro; published
+heads e412932 and049ef06 verified clean. Existing source CI/GPU evidence retained;
+no passed GUI/CI suites repeated. Root coordinates Mistral directly, no Astra.
+Immediate decision: distinguish physical/reference-case mismatch, auxiliary-lid
+or retained-projection mismatch, and discrete energy/operator inconsistency in
+the immutable failed energy-point-02 evidence. A bounded saved-array decomposition
+and case-contract comparison must identify the next discriminating check before
+any new native execution decision. No speculative cause is adopted.
+Mistral owns diagnostic tooling and report inside ANYhydro evidence-only boundary
+.development-evidence/w5-stored-case-diagnosis-20261011/. Production solver, saved
+native/HAMS arrays, 100/100 consistency audit, old tolerances, consumed admission
+and frozen pools remain protected. Fresh prospective worker900s/checks300s per90,
+one job/thread, no BEM/native/Green-function/system solve, build or publication.
+Outputs must give numerical decomposition/equations, supported vs unresolved
+hypotheses, and an executable minimal next check. Root owns physical-contract
+adoption and integration. Early120s artifact checkpoint and final120s handoff
+reserve; inspect actual progress, don't wait blindly through repeated inspection.
+Evidence C:/ANYworkspaceWork/anymarine-evidence/w5-stored-case-diagnosis-20261011/.
+Historical sections below retained verbatim; the pause is revoked prospectively.
+
 ## Final GUI/main handoff accepted; numerical work paused - 2026-10-10
 
 Current restart C:/Github/ANYmarine/CHECKPOINT.md; source main baselines
@@ -215,7 +1405,7 @@ C:/Github/ANYhydro/docs/reviews/w5-e1-kind-backend-20261010.md and corresponding
 .development-evidence/w5-e1-kind-backend-20261010/evidence-index.json.
 Prior blocks below are historical checkpoints; current action is defined above.
 
-**E1 PRE-kind source/artifact slice � 2026-10-10.**
+**E1 PRE-kind source/artifact slice — 2026-10-10.**
 Previous goal turn made verified progress: original fixed-reference wave gates pass;
 four self-FD diagnostic failures and signed potential-error decomposition preserved.
 Prospectively adopt minimal exp_e1 arithmetic candidate: PRE-kind complex temporaries,
@@ -232,7 +1422,7 @@ Implementation worker launches no GF/kernel/fit/system. After exact artifact rea
 root may admit one matched original wave micro under fresh180s/120s-child bounds,
 unchanged geometry/reference/tolerances/fixed coefficients, all diagnostics retained.
 Candidate evidence decides precision outcome, then measured operator route/energy.
-No application replacement/publication; original gates/W5NO_GO/W6�W10/thin-sheet
+No application replacement/publication; original gates/W5NO_GO/W6–W10/thin-sheet
 scope and full goal ACTIVE. Evidence: ANYhydro/.development-evidence/
 w5-e1-kind-backend-20261010. All previous pools remain frozen.
 
@@ -261,7 +1451,7 @@ C:/Github/ANYhydro/docs/reviews/w5-wave-artifact-20261010.md.
 
 Wave slice checkpoint: Mistral's first 298.3618400999985-second run produced the connected candidate but ended without tests/handoff. Source/input inspection receipts preserved. Original inference pool frozen; fresh 360-second/35-turn focused continuation finishes mocks, repairs and handoff with no repeated source/data audit. Ordinary 240-second pool and native one-shot 180-second admission remain unchanged; no native wave run yet.
 
-**Fresh wave-component/derivative slice � 2026-10-10.**
+**Fresh wave-component/derivative slice — 2026-10-10.**
 Previous goal turn made verified progress: corrected artifact passed six unchanged
 local Rankine predicates; all its pools are frozen. New outcome assesses the same
 artifact/runtime with untabulated1001-point integration on the original finite-depth
@@ -279,7 +1469,7 @@ stay unchanged. Self inconsistency, if present, remains a blocker to operator
 acceptance, not a hidden passed gate. Free-surface/depth remainder is explicitly
 total minus direct Rankine, including image terms; diagnostics are not qualification.
 Root owns contracts/runtime/admission; Mistral owns connected tool/tests. Full goal
-ACTIVE, W5NO_GO/all original gates/W6�W10/thin-sheet scope intact.
+ACTIVE, W5NO_GO/all original gates/W6–W10/thin-sheet scope intact.
 Evidence: C:/Github/ANYhydro/.development-evidence/w5-wave-artifact-20261010.
 
 **Corrected backend local Rankine check passed — 2026-10-10.**
@@ -305,7 +1495,7 @@ Handoff: C:/Github/ANYhydro/docs/reviews/w5-rankine-artifact-20261010.md.
 
 Focused Mistral continuation: original419.2906329999969s implementation delivered new tools/tests but was unverified. Frozen original inference pool; no unused carry. Fresh300s/24-turn repair addresses root findings (mock broadcasting, cached-method pinning, immediate raw validation, exclusive consumption/output, runtime hash bindings). Shared ordinary pool remains360s, native60s one-shot remains unconsumed. Windows temp refusal and19-pass/14-fail mock results preserved. One worker pure-Python guard probe outside supervisor is recorded as a procedural deviation with unknown precise cost, not native evidence. Runtime setup/public import/pip check and exact installed-package audit completed without GF calls.
 
-**Fresh Rankine artifact development slice � 2026-10-10.**
+**Fresh Rankine artifact development slice — 2026-10-10.**
 Previous role-confirmation turn was no progress; current work takes the next safe action.
 Public Capytaine 3.0.0 source and upstream tests support zero-dimensional tabulation.
 New exact wheel identity is assessed using the unchanged saved 35-point local geometry
@@ -7076,3 +8266,80 @@ flags or broadcast final audit. Six dynamic cases reuse current transport.
 Mistral unavailable; root owns connected fallback. One prospective180s replay-only
 pool with30s reserve,one job/thread,<=60s/process, no new solves/BEM; old300s W6
 pool used225.66987329996482s remains untouched. New exact ledger w6-replay-pool.json.
+
+## 2026-10-11 native continuation resource decision
+
+Initial native owner delivered repaired source, direct E1 probes and adapter
+checks, but six build/setup launches consumed the launch cap before a wheel
+existed. Root prospectively grants two additional build launches within the
+same 600 seconds; original worker/native/check budgets and all consumed records
+remain. Same Mistral owner continues build and installed public-GF comparison.
+Asymptotic uniform-bound claims remain unadopted; named-case development evidence
+is required. W5 remains NO_GO. Authority: C:\ANYworkspaceWork\anymarine-evidence\w5-native-accuracy-20261011\continuation-authority.md
+
+Root intervention: adapter defense shadowed wavenumber K and native-call counters
+omitted pre-abort/angle work. Same owner repairs before native checks. Build08
+finished on Linux after worker interruption; Windows build wall unknown, entire
+240s allowance conservatively charged, no timing reconstruction rerun.
+
+## Frozen-Prony comparison correction — 2026-10-11
+
+Native source builds/installs and derivative transport passes, but6S failures
+remain. Root found different Prony hashes; prior handoff identity claim withdrawn.
+One new controlled12-entry native call binds frozen reference coefficients via
+public callback, same owner/original worker remainder, no new fit/build. Fresh
+60s native/90s checks and250000E1/reciprocal bounds; all old evidence frozen.
+Authority: C:\ANYworkspaceWork\anymarine-evidence\w5-native-accuracy-20261011\frozen-prony-authority.md
+
+Final root checks: 1.6920162999886088/30s, four attempts (one extra launch prospectively granted within same seconds). Final whitespace, UTF-8 and owned-process checks pass; only marine three living-note files tracked dirty, hydro tracked clean. Five legacy CP1252 punctuation bytes in TASK were normalized to UTF-8; pre-repair bytes and failed check preserved. Native/code/scientific data unchanged by encoding repair.
+
+## Prospective full native coupled-case integration — 2026-10-11
+
+Native bindingv1 requires three changed Python sources and excludes Fortran-only
+artifacts. Root adopts separate bindingv2 with distinct pinned native bytes,
+retaining v1 semantics/producer identity/pins/refusal/fixed coefficients. Root
+owns this coupled architecture correction after Mistral inspection-only timeout;
+Mistral remains native algorithm author. Source ownership: two hydro profile/test
+files plus new ignored w5-native-coupled-20261011. Fresh ordinary checks240/per60,
+no native authority yet. Full-case packet follows only verified prerequisites;
+all old scopes frozen, W5 NO_GO, no threshold/physics/release change.
+Authority: C:\ANYworkspaceWork\anymarine-evidence\w5-native-coupled-20261011\prospective-contract.md
+
+Public native-binding v2 passes97 focused caller/profile/reference regressions.
+Actual installed-native/public-source profile load and five complete planned-domain
+inventories pass with zero native calls. Largest batch864x864; planned upper totals
+47,824,208,432 E1 and47,889,901,026 reciprocal point arguments. No full-case native
+authority issued. A new bounded Mistral Read600/24 assessment addresses this
+root-authored integration with small fixed context; previous Edit timeout preserved
+and not diagnosed as service exhaustion. Product profile/test source frozen during
+review. Root may prepare separate integration artifacts, no numerical concurrency.
+
+Independent Mistral Read review completed99.59083899998222s with verified tool
++outcomes, availability established for new bounded outcome. Findings F1 medium
++actual-core guard needs post-constructor recheck; F2 typed native-path failures;
++F4 profile manifest version; F5 refusal/metadata gaps. F3: nativev2 accepts both
++unchanged/changed Python maps with exact pins; real maps all differ, so earlier
++current-artifact compatibility-block claim withdrawn. Nativev2 still strengthens
++interface/native identity. Same Mistral owns full repair+guard+fresh root-only
++coupled packet preparation under new1500s/180turn authority, early180s checkpoint,
++remaining original240s check pool. NO numerical execution/admission authority.
++Future one-point proposal15000s child/15300outer,4GiB virtual cap,5GF/1system,
++50bE1/51breciprocal,onejob/thread; root separately adjudicates before issuance.
++Authority: C:\ANYworkspaceWork\anymarine-evidence\w5-native-coupled-20261011\repair-and-packet-authority.md
+
+
+Prospective W9 source-only next-slice selection - 2026-10-11
+While live nativepoint03c computes, root directly commissions Mistral Read of
+ANYmarine consumer workflows only;240s/24turns, no edits/tests/GUI/native/sibling
+work or acceptance. Question/competing outcomes/outcome boundary at C:\ANYworkspaceWork\anymarine-evidence\w9-nextslice-20261011\read-authority.md
+No numerical authority, pinned hydro files untouched; root adopts future work.
+
+
+Prospective W9 surface-editor outcome - 2026-10-11
+Root confirms missingGUIconsumer editor and adopts typed surfaceassignment
+creation/editing/selection/diagnostics/save/replay slice. Mistral owns boundedQt
+files/tests/newUSER_WORKFLOW only; nativeW5point03c remains sole numericaljob.
+Public domain/persistence/ANYhydro contracts unchanged, no physics/admission change.
+Authority: C:\ANYworkspaceWork\anymarine-evidence\w9-surface-editor-20261011\authority.md
+Preparation initially failed on absent optionaldocbaseline; null identity recorded,
+no worker/check/native launch occurred in failedpreparation.

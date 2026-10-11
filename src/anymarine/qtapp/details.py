@@ -8,6 +8,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QDoubleSpinBox,
     QCheckBox,
+    QDialog,
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
@@ -27,12 +28,14 @@ from ..domain import ProjectModel, ResultRecord
 from ..mass_properties import BodyMassProperties
 from ..mechanics import MechanicsError
 from ..services import ApplicationService
+from .surface_details import SurfaceAssignmentDialog, SurfaceForm
 
 _PAGE_EMPTY = 0
 _PAGE_BODY = 1
 _PAGE_EQUILIBRIUM = 2
 _PAGE_SETTINGS = 3
 _PAGE_RESULT = 4
+_PAGE_SURFACE = 5
 
 
 def _spin(value: float, decimals: int = 3, minimum: float = -1.0e9, maximum: float = 1.0e9) -> QDoubleSpinBox:
@@ -41,6 +44,15 @@ def _spin(value: float, decimals: int = 3, minimum: float = -1.0e9, maximum: flo
     box.setRange(minimum, maximum)
     box.setValue(float(value))
     return box
+
+
+def _scroll_page(page: QWidget) -> QScrollArea:
+    """Scrollable details page: fields stay reachable in narrow docks."""
+    scroll = QScrollArea()
+    scroll.setWidgetResizable(True)
+    scroll.setMinimumSize(160, 100)
+    scroll.setWidget(page)
+    return scroll
 
 
 class DetailsPanel(QWidget):
@@ -53,6 +65,10 @@ class DetailsPanel(QWidget):
     body_edited = Signal(str, dict)
     equilibrium_edited = Signal(dict)
     settings_edited = Signal(dict)
+    surface_edited = Signal(str, str, dict)
+    surface_remove_requested = Signal(str, str)
+    surface_create_requested = Signal(str, dict)
+    surface_create_failed = Signal(str)
 
     def __init__(self, service: ApplicationService, parent: Optional[QWidget] = None):
         super().__init__(parent)
@@ -112,6 +128,9 @@ class DetailsPanel(QWidget):
         self._mass_validate = QPushButton("Validate dry mechanics")
         body_form.addRow(self._mass_validate)
         self._mass_validate.clicked.connect(self._validate_mass_properties)
+        self._add_surface = QPushButton("Add hydrodynamic surface...")
+        body_form.addRow(self._add_surface)
+        self._add_surface.clicked.connect(self._add_surface_dialog)
         self._mass_enabled.toggled.connect(self._toggle_mass_properties)
         self._inertia_table.itemChanged.connect(self._emit_mass_properties)
         self._toggle_mass_properties(False)
@@ -122,6 +141,7 @@ class DetailsPanel(QWidget):
         body_page.layout().addStretch(1)
         self._mass_scroll = QScrollArea()
         self._mass_scroll.setWidgetResizable(True)
+        self._mass_scroll.setMinimumSize(160, 100)
         self._mass_scroll.setStyleSheet("QScrollArea, QWidget#qt_scrollarea_viewport, QWidget#massInputs { background: #f3f5f8; }")
         self._mass_scroll.setWidget(body_page)
         self._stack.addWidget(self._mass_scroll)
@@ -139,7 +159,7 @@ class DetailsPanel(QWidget):
         eq_page.setLayout(QVBoxLayout())
         eq_page.layout().addWidget(eq_box)
         eq_page.layout().addStretch(1)
-        self._stack.addWidget(eq_page)
+        self._stack.addWidget(_scroll_page(eq_page))
 
         # settings page
         set_box = QGroupBox("Analysis settings")
@@ -156,7 +176,7 @@ class DetailsPanel(QWidget):
         set_page.setLayout(QVBoxLayout())
         set_page.layout().addWidget(set_box)
         set_page.layout().addStretch(1)
-        self._stack.addWidget(set_page)
+        self._stack.addWidget(_scroll_page(set_page))
 
         # result page (read-only)
         res_box = QGroupBox("Result")
@@ -178,7 +198,13 @@ class DetailsPanel(QWidget):
         res_page.setLayout(QVBoxLayout())
         res_page.layout().addWidget(res_box)
         res_page.layout().addStretch(1)
-        self._stack.addWidget(res_page)
+        self._stack.addWidget(_scroll_page(res_page))
+
+        # surface page (one owned surface assignment)
+        self._surface_form = SurfaceForm()
+        self._surface_form.surface_edited.connect(self.surface_edited)
+        self._surface_form.surface_remove_requested.connect(self.surface_remove_requested)
+        self._stack.addWidget(_scroll_page(self._surface_form))
 
         # wire edits
         self._body_name.editingFinished.connect(self._emit_body)
@@ -271,6 +297,38 @@ class DetailsPanel(QWidget):
             self._mass_status.setText(f"Dry mechanics unavailable: {error}")
             return
         self._mass_status.setText("Dry mechanics inputs valid; nonlinear time integration is pending")
+
+    def show_surface(self, body_id: str, surface_id: str) -> None:
+        if self._project is None:
+            return
+        body = self._project.body(body_id)
+        if body is None:
+            return
+        assignment = next((s for s in body.hydro_surfaces
+                            if s.semantics.surface_id == surface_id), None)
+        if assignment is None:
+            return
+        self._current_body_id = None
+        self._surface_form.populate(
+            body.name, assignment, self._project,
+            self._service.producing_dataset_metadata(self._project))
+        self._stack.setCurrentIndex(_PAGE_SURFACE)
+
+    def _add_surface_dialog(self) -> None:
+        if self._project is None or self._current_body_id is None:
+            return
+        body = self._project.body(self._current_body_id)
+        if body is None:
+            return
+        dialog = SurfaceAssignmentDialog(body, self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        try:
+            spec = dialog.spec()
+        except (OSError, ValueError, KeyError) as error:
+            self.surface_create_failed.emit(str(error))
+            return
+        self.surface_create_requested.emit(body.body_id, spec)
 
     def show_equilibrium(self) -> None:
         if self._project is None:

@@ -23,11 +23,13 @@ from PySide6.QtWidgets import (
     QDialog,
     QDockWidget,
     QFileDialog,
+    QFrame,
     QLabel,
     QMainWindow,
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
+    QScrollArea,
     QSlider,
     QSizePolicy,
     QTableWidget,
@@ -144,7 +146,8 @@ class MainWindow(QMainWindow):
         self._waves = WavesPanel(self)
         wave_dock = QDockWidget('Waves', self)
         wave_dock.setObjectName('anymarine-dock-Waves')
-        wave_dock.setWidget(self._waves)
+        wave_dock.setMinimumWidth(240)
+        wave_dock.setWidget(self._scroll_dock_content(self._waves))
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, wave_dock)
         assessment_dock = next(d for d in self.findChildren(QDockWidget) if d.windowTitle() == 'Assessment')
         self.tabifyDockWidget(assessment_dock, wave_dock)
@@ -172,7 +175,7 @@ class MainWindow(QMainWindow):
         self._play_timer.setInterval(REPLAY_TICK_MS)
         self._play_timer.timeout.connect(self._advance_frame)
 
-        self.resize(1280, 800)
+        self.resize(1280, 720)
         self.statusBar().showMessage("Development preview — results are unqualified")
 
     def showEvent(self,event):  # noqa: N802
@@ -218,6 +221,16 @@ class MainWindow(QMainWindow):
 
     # ------------------------------------------------------------------ docks
 
+    @staticmethod
+    def _scroll_dock_content(widget: QWidget) -> QScrollArea:
+        """Scrollable dock content so panels stay usable in small windows."""
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setMinimumSize(160, 100)
+        scroll.setWidget(widget)
+        return scroll
+
     def _build_docks(self) -> None:
         # project tree
         tree_dock = QDockWidget("Project", self)
@@ -226,6 +239,7 @@ class MainWindow(QMainWindow):
         tree.setModel(self._tree_model)
         tree.clicked.connect(self._on_tree_clicked)
         tree_dock.setWidget(tree)
+        tree_dock.setMinimumWidth(180)
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, tree_dock)
         self._tree = tree
 
@@ -236,7 +250,13 @@ class MainWindow(QMainWindow):
         self._details.body_edited.connect(self._apply_body_edit)
         self._details.equilibrium_edited.connect(self._apply_equilibrium_edit)
         self._details.settings_edited.connect(self._apply_settings_edit)
+        self._details.surface_edited.connect(self._apply_surface_edit)
+        self._details.surface_remove_requested.connect(self._apply_surface_remove)
+        self._details.surface_create_requested.connect(self._apply_surface_create)
+        self._details.surface_create_failed.connect(
+            lambda message: self._notify_warning("Surface creation refused", message))
         details_dock.setWidget(self._details)
+        details_dock.setMinimumWidth(240)
         self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, details_dock)
 
         # jobs + diagnostics
@@ -253,7 +273,8 @@ class MainWindow(QMainWindow):
         jobs_layout.addWidget(self._jobs_table)
         jobs_layout.addWidget(QLabel("Diagnostics"))
         jobs_layout.addWidget(self._diagnostics)
-        jobs_dock.setWidget(jobs_host)
+        jobs_dock.setWidget(self._scroll_dock_content(jobs_host))
+        jobs_dock.setMinimumHeight(110)
         self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, jobs_dock)
 
         # replay
@@ -283,7 +304,8 @@ class MainWindow(QMainWindow):
         self._plot = TimeSeriesPlot()
         replay_layout.addWidget(controls)
         replay_layout.addWidget(self._plot)
-        replay_dock.setWidget(replay_host)
+        replay_dock.setWidget(self._scroll_dock_content(replay_host))
+        replay_dock.setMinimumHeight(110)
         self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, replay_dock)
 
         # assessment evidence (child-validated payloads; display only)
@@ -295,10 +317,14 @@ class MainWindow(QMainWindow):
         self._assessment_panel.pair_requested.connect(self._pair_dialog)
         self._assessment_panel.reopen_requested.connect(self._reopen_dialog)
         self._assessment_panel.replay_member_changed.connect(self._select_replay_member)
-        assessment_dock.setWidget(self._assessment_panel)
+        assessment_dock.setWidget(self._scroll_dock_content(self._assessment_panel))
+        assessment_dock.setMinimumWidth(240)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, assessment_dock)
-        self.resizeDocks([jobs_dock, replay_dock], [240, 240], Qt.Orientation.Vertical)
-        self.resizeDocks([tree_dock], [280], Qt.Orientation.Horizontal)
+        # Responsive workbench: bottom docks share one strip; side docks keep
+        # readable minimums and the model canvas takes the remaining space.
+        self.resizeDocks([jobs_dock, replay_dock], [200, 200], Qt.Orientation.Vertical)
+        self.resizeDocks([tree_dock, details_dock], [200, 300], Qt.Orientation.Horizontal)
+        self.resizeDocks([assessment_dock], [280], Qt.Orientation.Horizontal)
 
     def _build_menus(self) -> None:
         self._menu_bar = self.menuBar()
@@ -881,6 +907,93 @@ class MainWindow(QMainWindow):
             return
         self._mark_edited(project)
 
+    def _apply_surface_edit(self, body_id: str, surface_id: str, changes: dict) -> None:
+        """Atomic surface edit through public frozen records.
+
+        Identity (surface id, owner), role and mesh are locked; the public
+        constructors revalidate every field combination and a refusal keeps
+        the current project untouched (same input hash).
+        """
+        if self._project is None:
+            return
+        body = self._project.body(body_id)
+        if body is None:
+            return
+        assignment = next((s for s in body.hydro_surfaces
+                           if s.semantics.surface_id == surface_id), None)
+        if assignment is None:
+            return
+        try:
+            from .surface_details import edited_assignment
+            new_assignment = edited_assignment(assignment, changes)
+            new_body = body.with_edits(hydro_surfaces=tuple(
+                new_assignment if s.semantics.surface_id == surface_id else s
+                for s in body.hydro_surfaces))
+            project = self._project.with_edits(bodies=tuple(
+                new_body if item.body_id == body_id else item
+                for item in self._project.bodies))
+        except ValueError as error:
+            self._notify_warning("Surface edit refused", str(error))
+            self._details.show_surface(body_id, surface_id)
+            return
+        self._mark_edited(project)
+        self._details.show_surface(body_id, surface_id)
+
+    def _apply_surface_remove(self, body_id: str, surface_id: str) -> None:
+        """Explicit removal of one owned assignment; no reclassification."""
+        if self._project is None:
+            return
+        body = self._project.body(body_id)
+        if body is None:
+            return
+        if not any(s.semantics.surface_id == surface_id for s in body.hydro_surfaces):
+            return
+        try:
+            new_body = body.with_edits(hydro_surfaces=tuple(
+                s for s in body.hydro_surfaces
+                if s.semantics.surface_id != surface_id))
+            project = self._project.with_edits(bodies=tuple(
+                new_body if item.body_id == body_id else item
+                for item in self._project.bodies))
+        except ValueError as error:
+            self._notify_warning("Surface removal refused", str(error))
+            return
+        self._mark_edited(project)
+        self._details.show_body(body_id)
+
+    def _apply_surface_create(self, body_id: str, spec: dict) -> None:
+        """Create one owned assignment with an explicit role/kind/geometry.
+
+        The physical kind follows the explicit role; public validation
+        admits or refuses the combination. Surface ids are unique across
+        the whole project.
+        """
+        if self._project is None:
+            return
+        body = self._project.body(body_id)
+        if body is None:
+            return
+        surface_id = str(spec.get("surface_id", ""))
+        if any(s.semantics.surface_id == surface_id
+               for item in self._project.bodies for s in item.hydro_surfaces):
+            self._notify_warning(
+                "Surface creation refused",
+                f"duplicate surface id {surface_id!r}; surface ids are unique across the project",
+            )
+            return
+        try:
+            from .surface_details import new_assignment
+            assignment = new_assignment(body, spec)
+            new_body = body.with_edits(hydro_surfaces=body.hydro_surfaces + (assignment,))
+            project = self._project.with_edits(bodies=tuple(
+                new_body if item.body_id == body_id else item
+                for item in self._project.bodies))
+        except ValueError as error:
+            self._notify_warning("Surface creation refused", str(error))
+            return
+        self._mark_edited(project)
+        self._details.show_surface(body_id, surface_id)
+
     def _mark_edited(self, project: ProjectModel) -> None:
         """Adopt the edited project, flag dirt and refresh stale markers."""
 
@@ -956,7 +1069,7 @@ class MainWindow(QMainWindow):
             self._details.show_body(node.payload)
             self.viewer.set_highlight([node.payload])
         elif node.kind == 'surface':
-            self._details.show_body(node.payload[0])
+            self._details.show_surface(node.payload[0], node.payload[1])
             self.viewer.set_highlight([node.payload[0]])
             self.statusBar().showMessage(node.label + '; attached surfaces share their owning body motion')
         elif node.kind == 'morison-member':

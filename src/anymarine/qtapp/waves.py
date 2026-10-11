@@ -97,7 +97,11 @@ class WavesPanel(QWidget):
 
     def hide_layer(self):
         self.timer.stop()
-        self.window._fit_timer.stop();self.window._fit_pending=False
+        # Only an active wave layer owns a pending viewport fit (its show_layer
+        # scheduled one). Hiding/resetting with no wave present must leave a
+        # queued body/model fit intact, or cold software startup never fits.
+        if self.active or self.handle is not None:
+            self.window._fit_timer.stop();self.window._fit_pending=False
         if self.handle is not None:
             self.handle.remove();self.handle=None
         if self.saved_poses is not None:

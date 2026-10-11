@@ -1,20 +1,28 @@
-"""Launch the installed ANYmarine application (no source-path injection)."""
-import argparse
+"""Launch the installed ANYmarine application (no source-path injection).
+
+Thin compatibility shim: the launcher contract (arguments, missing-Qt
+diagnostic, lazy GUI import) lives in :mod:`anymarine.gui`, which also backs
+the public ``anymarine-gui`` console script and ``python -m anymarine.gui``.
+"""
+
+from __future__ import annotations
+
 import sys
 
-def main():
-    parser = argparse.ArgumentParser(description='ANYmarine development desktop')
-    parser.add_argument('--project', help='Saved project directory to open')
-    parser.add_argument('--viewer-backend', choices=('software', 'auto', 'gpu'),
-                        help='ANY3dView renderer; defaults to GPU-preferred auto or ANYMARINE_VIEWER_BACKEND')
-    args = parser.parse_args()
-    try:
-        from anymarine.qtapp import run_app
-    except ImportError as error:
-        print(f'ANYmarine GUI dependencies are unavailable: {error}. '
-              'Install ANYmarine[gui] and the tested ANY3dView Qt wheel into this Python environment.',file=sys.stderr)
-        return 2
-    return run_app(args.project, viewer_backend=args.viewer_backend)
 
-if __name__ == '__main__':
+def main(argv=None) -> int:
+    try:
+        from anymarine.gui import main as launch
+    except ImportError as error:
+        print(
+            f"ANYmarine is not importable in this environment: {error}. "
+            "Install the anymarine package (wheel) or launch through the "
+            "repository root run_gui.py for a checkout run.",
+            file=sys.stderr,
+        )
+        return 2
+    return launch(argv)
+
+
+if __name__ == "__main__":
     raise SystemExit(main())

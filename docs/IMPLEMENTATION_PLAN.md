@@ -1,6 +1,335 @@
+## Status amendment — discrete work diagnosis, 2026-10-11
+
+The retained diagnostic tool now has verified complex work-conjugate matrices,
+summed weighted-operator reciprocity, normalized mean-power spectra and
+mean/covariance/hull/lid flux decomposition.20 tests and independent root
+public-caller/field oracles pass. Within-panel covariance explains only about
+7.1% of the selected mechanical/far gap; the physical hull flux gap remains.
+Summed weighted-S asymmetry is about3.45% for the full operator and roundoff
+for its imaginary part. These are diagnostics, not new qualification.
+No symmetry-forcing/Galerkin repair is adopted; no evaluator-versus-discretization
+cause is proved. Next localize the asymmetry to panel pairs and obtain a matched
+independent integral/trace discriminator before another physical-source repair.
+All source-admission tolerances/gates remain unchanged; W5 NO_GO. Full goal,
+GUI/platform and release acceptance remain open. TASK.md records exact evidence,
+protected source, failed attempts and closed execution scopes.
+
+## Status amendment — retained closure diagnostic, 2026-10-11
+
+The retained03c audit is implemented and verified as read-only postprocessing:
+12 tests, immutable identity, recorded-power recovery, actual one-thread Linux
+runtime and1536MiB virtual cap. No new solve or physics change. Coordinate
+near/far discrepancies of1.35–2.15% and negative retained damping eigenvalue
+show that near-null cancellation is not a sufficient explanation. Saved
+trace/jump/force reconstruction is internally consistent but not an accuracy
+oracle. Next investigate the panel-mean enforcement/pressure-recovery discrete
+work relation from retained operators before choosing a source repair.
+W5 NO_GO and all scientific criteria remain unchanged; full GUI/platform/release
+gates remain open. Exact evidence, consumed scopes and restart are in TASK.md.
+
+## Status amendment — native03c terminal and Linux consumer, 2026-10-11
+
+Native03c completed and failed all registered added-mass/damping/mean-power
+predicates; W5 NO_GO/general admission false remain. Preserve the original
+criteria and consumed runs. Independent Mistral assessment leads to a bounded
+retained-field energy-closure investigation before any further expensive run.
+Proposed far normalization repair was analytically rejected; apparent native
+frequency difference is explicit gravity similarity. No physics/tolerance change
+or universal discretization-floor claim adopted. Reports/denials/partial review
+and root adjudication are retained; full roadmap remains active.
+
+Linux installed console/core/stored consumer and public native preparation now
+pass with exact compatible artifacts; real software desktop and Windows hardware
+GPU regression pass. Linux hardware gate remains unmet on llvmpipe, and Windows
+console.exe execution remains unmet. These do not complete W9/W10 or release.
+TASK.md/CHECKPOINT.md name exact evidence, frozen budgets and next bounded action.
+
+## Development status amendment — installed GUI consumer, 2026-10-11
+
+Windows installed-consumer evidence now covers fresh marine/hydro wheels,
+compatible current dependency wheels, saved-project/stored-result reproduction,
+real GPU/software desktop rendering and the packaged Python module launcher.
+Qt-free launcher and explicit ANY3dView qt/gpu extras are integrated. Public
+native Morison preparation is reproduced without a new simulation. This does
+not complete W9/W10 or qualify hydrodynamics. The Windows console executable
+is UNMET (OS WinError5); Linux and full release gates remain open. W5 remains
+NO_GO while the original consumed native03c admission runs its final operator.
+Exact evidence, failures, frozen budgets and next action are in TASK.md and
+CHECKPOINT.md. Existing scientific contracts and tolerances are unchanged.
+
+## Development evidence update - responsive Qt workbench 2026-10-11
+
+Source Qt workbench honours1280x720; scrollable panels preserve access to
+surface/member authoring, with GPU default and automatic startup framing.
+Real GPU/software cases and actual user scrolling verified. Root final36 QA/
+layout and42 integration checks pass; worker focused source checks recorded in
+TASK.md. Scientific/fullW9/W10/installed/Linux gates remain open; W5 NO_GO.
+Native03c continues under its consumed admission; no replay/new campaign.
+Evidence:.development-evidence/w9-responsive-layout-20261011/root-acceptance.json.
+
+## Development evidence update - 2026-10-11
+
+Source Windows Qt startup verified on hardware GPU and explicit software fallback;
+inactive wave reset/model-fit cancellation repaired. Surface/member authoring is
+integrated.45 focused tests and three real desktop consumer cases pass; thin-sheet
+identity/normal/side labels and stored synthetic replay checked. Full W9/W10 and
+scientific qualification remain open; W5 NO_GO. Native03c still running under its
+consumed admission; do not replay. Details and frozen scopes in TASK.md and
+.development-evidence/w9-desktop-current-20261011/root-acceptance.json.
+
+## Development status amendment - native Morison authoring 2026-10-11
+
+W9 now includes native member creation, selection-based editing/removal and
+explicit body-local attachment/ownership configuration, using the existing shared
+compiler. Pending numeric edits and exact values are preserved; rejected inputs
+and cancellation are transactional. Evidence22 authoring +15 selected regression
+passes and2 independently repaired counterexamples. This advances construction
+without scripting; it adds no force law or scientific qualification. Real desktop
+and installed-wheel gates remain open. Native03c is live at its second operator,
+with no coupled solve yet; W5 NO_GO and original criteria unchanged. TASK/CHECKPOINT
+retain the complete roadmap, live-run identity and frozen execution scopes.
+
+## Development status amendment - 2026-10-11 W9 surface editor
+
+The connected Qt surface-assignment consumer slice is implemented and checked:
+explicit creation/selection/edit/removal, exact numeric intent, readonly verified
+producing-dataset metadata, optional-backend diagnostics and stale producer replay.
+Evidence49 Qt tests and22 root integration tests; historical failures preserved.
+This advances staged Qt integration without admitting new hydrodynamic physics or
+replacing headless scientific acceptance. Current launcher reads checkout source.
+Full W9 desktop acceptance and W10 installed-wheel/desktop reproduction remain
+open. W5 NO_GO while the already-consumed point03c run computes under unchanged
+criteria; no repetition or new numerical authority follows from this amendment.
+Latest TASK.md and CHECKPOINT.md govern restart state and bounded next action.
+
 # ANYmarine Multibody Potential-Flow + Morison Implementation Plan
 
-### Published GUI/main handoff accepted; numerical work paused - 2026-10-10
+### Current status: native binding verified; full coupled point running - 2026-10-11
+
+Public v2 identity/caller/refusal checks111 pass,2 Windows symlink skips; actualLinux
+Path/symlink controls and independent before-body counterexamples pass. Full-case
+packet58/58 dry checks pass. Root reconciled exact CLI input paths in fresh03c;
+prior03b input-validation failure made no native calls and remains preserved.
+The corrected one-shot is running:43x1 micro passed, first864-panel operator
+computing under actual n1001/one-thread/float64/frozen-Prony settings. No complete
+coupled result or scientific admission yet. W5 NO_GO/general admission false.
+TASK.md/CHECKPOINT.md record consumed03c identity, live process/session, deadlines,
+remaining obligations and exact failed evidence. Do not replay the live command.
+Original scientific criteria, fullW5/W6-W10/thin-sheet and release gates remain.
+
+### Current development status: native-binding review repairs; full coupled packet pending - 2026-10-11
+
+The public native-binding v2 candidate and caller/refusal regressions are in place.
+Independent Mistral review findings are being repaired by the same Mistral owner;
+root owns contract adoption and final handoff checks. Repaired public tests106 pass
+and real import-only profile/metadata load passes. Private packet validation has
+nine preserved failures out of43 checks; it must be repaired and independently
+checked before numerical issuance. No full native coupled case has run here.
+
+The real evaluator Python maps already differ from the original producer; earlier
+claims that v1 blocks this artifact are withdrawn. v2 adds native-module identity
+and guarded-interface checks while supporting unchanged-source candidates through
+mock-tested contracts. Source-candidate verification is distinct from ANYhydro
+installed-wheel acceptance. W5 NO_GO and general admission false remain unchanged.
+TASK.md/CHECKPOINT.md record active ownership, limits, failed evidence and next work.
+
+### Current development status: isolated native accuracy passes frozen-input comparison - 2026-10-11
+
+The guarded native E1/tanh-sinh kernel builds and installs privately. Independent
+stored-array verification confirms all16 matched S/K components and4 transport
+checks, with original criteria unchanged. An input mismatch was resolved by binding
+the exact saved Prony coefficients through a public callback; previous failures
+remain. This is named-case development verification, not broad E1 admission or W5
+qualification. Domain-wide asymptotic bounds/stability remain unqualified.
+
+Next perform a separately bounded full coupled-case development check using the
+same artifact and frozen input identity. Do not rerun consumed historical packets,
+relax A/B/energy gates or infer full-case performance from12 matrix entries. W5
+NO_GO, general admission false; all original scientific gates, W6-W10/thin-sheet
+milestones and release obligations remain. TASK.md/CHECKPOINT.md hold exact
+authority, failed evidence, timeout/accounting limitations and restart commands.
+
+
+### Full matched assembly development outcome - 2026-10-11
+
+The two-pair full native assembly reconstruction and accurate-wave transport
+checks now pass independent stored-array adjudication. This supports an
+isolated native accuracy candidate; the full W5 coefficient/energy/response
+and boundary qualification gates remain open and unchanged. Next implement
+and build the private kernel with explicit case-domain/failure controls,
+capture source/input identities before execution, compare matched native
+entries and measure cost before scoping a full coupled run. Keep existing
+native I3 normalization; its earlier Python diagnostic error was corrected.
+The actual baseline is the patched f64 E1 source, not complex64. Combined
+E1/quadrature changes are not claimed as a pure angular effect. TASK.md and
+CHECKPOINT.md retain authority, evidence, failures and remaining limitations.
+
+
+### Current status: private angular accuracy candidate verified; full assembly next - 2026-10-11
+
+Goal remains ACTIVE; W5 NO_GO and general numerical admission false. Root
+directly coordinated Mistral; no Astra reviewer or additional agent was used.
+This scope delivered a private endpoint-aware real-wave candidate, corrected
+independent E1 series, independent graded angular reference, meaningful runner
+refusal tests, stored-pair verification and a text-only native proposal.
+
+Root independently adjudicated the immutable data-03 arrays: 96 elementary
+I1 components meet the prospective criteria; assembled real-wave potential
+and vertical derivative match the reference; actual FD errors 1.535e-13 and
+1.094e-12 also satisfy the original elementary tolerance (the runner's FD
+screen is looser). Wave-only transport residuals are 3.465e-16 and 2.080e-15;
+these are NOT reductions of the measured full-field error. Bottom wave
+cancellation is exact; radial FD covers only 16 dominant-pair components.
+The deep-image Laplace FD value is descriptive, not boundary qualification.
+All nine actual caller/refusal checks pass. All 226 public source/test/tool
+hashes remain unchanged. No product, GUI, native, runtime or Git publication
+change was made; the existing GUI capability claims remain unchanged.
+
+Root acceptance is limited to this private real-wave development candidate.
+Native proposal adoption is WITHHELD: unused i3 output divides by pi, whereas
+pinned native I3 is 2*integral(Re exp), not (2/pi)*integral(Re exp). Correct or
+remove it with an imaginary-normalization oracle. The tested finite-domain
+E1 series is not evidence of a general replacement for arbitrary arguments.
+Do not adopt a consistency-only derivative or reinterpret pole/pole_grad as
+real Rankine terms: those arrays are analytic imaginary-wave data.
+
+Next bounded Mistral outcome: correct the unused I3 normalization, establish
+admissible E1 domain/branch/failure controls, and connect actual native real
+Rankine analytic-panel and frozen-Prony definitions to the verified wave
+candidate. Demonstrate full pair transport and Robin/bottom controls using
+the same geometry and source normalization. Develop a source proposal before
+any separately scoped native build/solve. Root reserves scientific adoption;
+all original A/B/energy tolerances, physical signs, lid and qualification
+gates remain. No broad sweep or duplicate historical investigation is needed.
+
+All current scope authority is now FROZEN. Worker used 999.5872295999725/1000s
+(initial intentional interruption, failed root launcher, same-owner repair
+completed normally). Shared checks used 10.066987800091738/300s including
+root's failed schema read and repaired stored-only verification; no new root
+E1/reciprocal evaluations. Conservative mathematical reservations: 314663/
+500000 E1 arguments, 97465/200000 reciprocal arguments, 3/3 data launches.
+Unused headroom is not transferred. Failures selftest-01..03, runner-tests-01,
+data-01/02 and root-stored-verification-01 are preserved. Earlier GL node
+orders above the prospective <=64 clarification remain a scope ambiguity;
+they are not retroactively authorized. Old scopes stay frozen.
+
+Evidence: C:/Github/ANYhydro/.development-evidence/w5-angular-accuracy-20261011/
+(HANDOFF.md, RESULTS.md, native-patch-proposal.md and immutable attempts).
+Root adjudication and execution receipts:
+C:/ANYworkspaceWork/anymarine-evidence/w5-angular-accuracy-20261011/
+(root-verification.json, root-pending-review.md, worker receipts).
+Independent series basis: https://dlmf.nist.gov/6.6.E2 ; branch basis:
+https://docs.scipy.org/doc/scipy/reference/generated/scipy.special.exp1.html .
+
+
+### Current angular-integration diagnosis and candidate direction - 2026-10-11
+
+The derived angular reciprocal-quadrature prediction explains the dominant
+saved panel-entry discrepancy, with source-mapped mathematical recomputation
+also matching a weak control. This is two-entry development evidence; the
+full W5 energy imbalance and scientific acceptance remain unresolved.
+Next develop accurate endpoint-aware angular integration with controlled E1
+accuracy. Preserve the physical boundary-value problem; a derivative-only
+consistency replacement is not adopted. Native builds require a prepared
+source proposal and fresh prospective scope. All original gates and the full
+roadmap remain; no qualification or product/GUI capability is added here.
+TASK.md, CHECKPOINT.md and root adjudication retain counts, failures, source
+limitations and the corrected runner's actual Python 3.13 test evidence.
+
+
+### Historical gradient diagnosis and prospective transition - 2026-10-11
+
+Saved per-panel transport disagreement is independently reproduced; numerical
+cause remains unresolved. Actual no-table angular quadrature settings reject
+the initial tabulation explanation. Next use a bounded matched mathematical
+discriminant for angular quadrature identity versus approximate E1 derivative
+error, with unchanged scientific gates. No source correction is adopted yet.
+The diagnosis exceeded its reference count allowance and has timing/output
+preservation gaps; it is not fully accepted. TASK.md, CHECKPOINT.md and root
+adjudication retain exact counts, failures and fresh-scope requirements.
+All old authority remains frozen; W5 NO_GO and full roadmap remain open.
+
+
+### Historical cap-work discriminator completed - 2026-10-11
+
+Fixed original source solution cap work measured at Gauss2/4 is approximately
+-6.09/-6.22microW, opposite sign and<=.170% of required+3662.40microW.
+Independent saved-array/time-phase verification confirms it. At these sampling
+orders the cap work does not explain the interior energy imbalance; no rigorous
+global quadrature bound or qualification is asserted. Product unchanged.
+
+The available below-water gradient transport control retains a normalized
+.0027895 discrepancy even with the stored Simpson relation. Next localize
+real/imaginary per-source matrix consistency and source-mode/geometric effects,
+then inspect pinned Rankine/E1/Prony derivative conventions. Mistral owns the
+connected diagnostic/repair proposal; root adopts contracts and scientific
+changes. No new full solve/cap repeat or unconditional refinement follows.
+All scientific gates, failed evidence, frozen pools and W5NO_GO remain intact.
+TASK.md/CHECKPOINT.md/root cap adjudication bind actual evidence/resource state.
+
+### Historical boundary-source identity restart result - 2026-10-11
+
+The corrected stored-data boundary-source diagnostic and independent domain/
+scalar oracle pass;32 regression checks recorded. Under the existing correct
+negative-G/+half jump, each submerged lid is an internal source sheet within
+the wetted-box reference volume closed at z0. The physical interior balance
+still has -.003662397546916W residual; the exterior balance +.003715635484799W.
+This is a development failure, not qualification or a proven physical cause.
+Welding, jump reversal and lid relocation are not adopted. Product unchanged.
+
+Next discriminator measures the same stored source solution's free-surface-cap
+work at fixedGauss2/4, with optional receiverFD triples in a single packed call
+and no system solve. The needed cap work is +.003662397546915821W. Prepare the
+case/interpretation/dry validation and obtain fresh root hash-bound execution
+scope before running. Remaining roadmap/scientific tolerances/W5NO_GO unchanged.
+TASK.md/CHECKPOINT.md and root boundary adjudication record actual evidence,
+rejected proposals, protected failures, ownership and resource usage.
+
+### Historical: Robin discriminator completed - 2026-10-11
+
+The one-triangle free-surface/receiver-gradient micro diagnostic is complete:
+maximum normalized real Robin residual2.414325e-4, fixed-step FD2.104156e-6,
+imaginary Robin near roundoff. Independent stored-capture arithmetic verifies
+the metrics. This is descriptive development evidence, without a qualification
+threshold or a bound on the original coupled power imbalance. Product unchanged.
+The first launch's startup failure and all frozen authority remain preserved.
+
+Proceed through stored discrete Green/boundary-flux identity, oriented surface
+closure and auxiliary-boundary/quadrature discrimination before a new coupled
+run. Derive the relevant physical identity and a discriminating prediction;
+avoid repeating completed angular/source-pole/micro checks. Mistral owns bounded
+implementation, root owns contract adoption and acceptance. W5 NO_GO and all
+W5/W6-W10/thin-sheet gates remain unchanged. TASK.md/CHECKPOINT.md and the latest
+root adjudication bind actual evidence, budgets and restart state.
+
+### Stored-energy restart slice verified - 2026-10-11
+
+Stored diagnostics now reproduce candidate and reference force/power identities;
+root independently verifies harmonic work. Pointwise residual work explains only
+7.064% of the constructed far/near imbalance; the remaining0.0037325354 W is
+unresolved. This is development evidence, not a new acceptance criterion or
+qualification. W5 NO_GO and all original W5/W6-W10 requirements remain intact.
+Next perform stored source-pole/full-source/weighted-S/boundary-flux balance with
+the same Mistral owner before new native execution. No paired lid-at-z0 rerun is
+adopted: current candidate explicitly refuses that geometry. HAMS frequency
+similarity verified; reference auxiliary BC equivalence remains unproven. Current
+scope, remaining budgets and authoritative corrections in TASK.md/CHECKPOINT.md
+and the linked root adjudication. No source/GUI capability or publication change.
+
+### Historical: development restarted - 2026-10-11
+
+The user resumed the roadmap. Canonical repositories ANYmarine and ANYhydro
+remain at published baselines e412932 and049ef06. Preserve the accepted GUI and
+source-CI evidence; W5 remains NO_GO and no numerical qualification is implied.
+The next bounded slice diagnoses existing failed coupled-energy arrays and
+physical/reference, lid/projection and energy-accounting contracts. It must
+produce an actionable discriminating check before new native execution is
+adopted. Consumed requests and frozen historical budgets are not revived.
+Root coordinates Mistral directly; no Astra. Current action and prospective
+bounds are in TASK.md; evidence w5-stored-case-diagnosis-20261011.
+
+
+### Historical: Published GUI/main handoff accepted; numerical work paused - 2026-10-10
 
 The application reflects latest available workflows and W5's failed/unqualified
 state. Source is on main in both canonical repositories; clean GitHub CI passed

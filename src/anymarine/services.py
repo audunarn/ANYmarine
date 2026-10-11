@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import base64
 from collections.abc import Mapping
+from dataclasses import dataclass
 import json
 import os
 from pathlib import Path
@@ -54,7 +55,7 @@ from .linear_assessment import (
     read_case_artifact as _read_case_artifact,
     read_report_artifact as _read_report_artifact,
 )
-from .persistence import ProjectStore, resolve_sidecar, sha256_bytes
+from .persistence import ProjectStore, UnsafePathError, resolve_sidecar, sha256_bytes
 from .synthetic import generate_synthetic_replay
 
 JOB_INPUT_SCHEMA_VERSION = 1
@@ -62,6 +63,40 @@ JOB_INPUT_SCHEMA_VERSION = 1
 
 class ServiceError(Exception):
     """Actionable service-layer error."""
+
+
+@dataclass(frozen=True)
+class ProducingDatasetMetadata:
+    """Read-only producing-dataset display metadata; never a qualification.
+
+    ``available`` is true only when the exact content-addressed dataset
+    sidecar under the active project root was read, matched the expected
+    raw sha256 and loaded through the public neutral loader. Attributes the
+    producing dataset does not store stay ``None`` and must be displayed as
+    unavailable; ``diagnostic`` carries the actionable reason whenever
+    ``available`` is false.
+    """
+
+    available: bool
+    diagnostic: str = ""
+    pressure_jump_convention: str | None = None
+    source_capability_status: str | None = None
+    sheet_source_backend: str | None = None
+    pressure_jump_contract_sign: str | None = None
+
+
+def _stored_json_attr(value) -> Mapping | None:
+    """Decode one stored dataset attribute without inventing content."""
+
+    if isinstance(value, Mapping):
+        return value
+    if isinstance(value, str):
+        try:
+            decoded = json.loads(value)
+        except ValueError:
+            return None
+        return decoded if isinstance(decoded, Mapping) else None
+    return None
 
 
 class ApplicationService:
@@ -380,6 +415,114 @@ class ApplicationService:
                 )
             )
         return roles
+
+    def producing_dataset_metadata(
+        self, project: ProjectModel | None
+    ) -> ProducingDatasetMetadata:
+        """Public read-only producing-dataset metadata for display.
+
+        Reads the exact content-addressed ``dataset_sidecar`` under the
+        active project root (``resolve_sidecar``) and checks it against the
+        expected ``dataset_raw_sha256`` before the public neutral loader
+        ``load_hydro_dataset`` reads the stored JSON attributes. Never
+        falls back to the unverified external ``dataset_source_path``;
+        never runs provenance verification, derived reconstruction or any
+        solver; never mutates the project. A missing root or sidecar,
+        mutated bytes or an absent optional neutral package produce an
+        actionable unavailable diagnostic instead of metadata.
+        """
+
+        provenance = (
+            getattr(project, "hydro_provenance", None)
+            if project is not None
+            else None
+        )
+        if provenance is None:
+            return ProducingDatasetMetadata(
+                False,
+                "no bound ANYhydro dataset is stored in this project; import "
+                "hydrodynamic inputs to bind a producing dataset",
+            )
+        if self.root is None:
+            return ProducingDatasetMetadata(
+                False,
+                "the project root holding the authoritative dataset sidecar "
+                "is unknown; load or save the project so the stored producing "
+                "dataset can be displayed",
+            )
+        reference = provenance.dataset_sidecar
+        try:
+            source = resolve_sidecar(self.root, reference)
+        except UnsafePathError as error:
+            return ProducingDatasetMetadata(
+                False,
+                f"the stored dataset sidecar reference {reference!r} cannot "
+                f"be used under the project root {self.root}: {error}",
+            )
+        try:
+            payload = source.read_bytes()
+        except OSError as error:
+            return ProducingDatasetMetadata(
+                False,
+                f"cannot read the authoritative dataset sidecar {reference!r} "
+                f"under the project root {self.root}: {error}",
+            )
+        if sha256_bytes(payload) != provenance.dataset_raw_sha256:
+            return ProducingDatasetMetadata(
+                False,
+                f"the dataset sidecar {reference!r} does not match the stored "
+                "raw sha256; the producing dataset is unavailable (re-import "
+                "the hydrodynamic inputs to rebind an authoritative dataset)",
+            )
+        try:
+            from .surface_assignments import neutral_api
+
+            import tempfile
+
+            neutral = neutral_api()
+            loader = getattr(neutral, "load_hydro_dataset", None)
+            if loader is None:
+                raise ValueError(
+                    "the installed ANYhydro lacks the public load_hydro_dataset "
+                    "loader; install the tested wheel"
+                )
+            # The public loader must read the already hash-verified bytes, not
+            # the mutable original sidecar path: an external mutation between
+            # the hash check and the load can never change what is validated.
+            # The isolated temporary snapshot is removed afterwards; the
+            # authoritative project bytes are never modified.
+            suffix = Path(reference).suffix or ".nc"
+            with tempfile.TemporaryDirectory(prefix="anymarine-dataset-") as folder:
+                snapshot = Path(folder) / ("producing-dataset-snapshot" + suffix)
+                snapshot.write_bytes(payload)
+                dataset = loader(snapshot)
+        except ValueError as error:
+            return ProducingDatasetMetadata(
+                False,
+                f"the stored producing dataset cannot be displayed: {error}",
+            )
+        except Exception as error:
+            return ProducingDatasetMetadata(
+                False,
+                f"the stored dataset sidecar {reference!r} failed the public "
+                f"neutral load/validation contract: {error}",
+            )
+        source_provenance = _stored_json_attr(
+            dataset.attrs.get("sheet_source_provenance")
+        )
+        contract = _stored_json_attr(dataset.attrs.get("pressure_jump_contract"))
+        return ProducingDatasetMetadata(
+            True,
+            "",
+            pressure_jump_convention=(source_provenance or {}).get(
+                "pressure_jump_convention"
+            ),
+            source_capability_status=(source_provenance or {}).get(
+                "source_capability_status"
+            ),
+            sheet_source_backend=(source_provenance or {}).get("backend"),
+            pressure_jump_contract_sign=(contract or {}).get("sign"),
+        )
 
     def load(self, root: os.PathLike | str) -> ProjectModel:
         store = ProjectStore(root)

@@ -62,7 +62,8 @@ tests/             focused pytest suite
 
 ## Running
 
-Start `python run_gui.py` from this checkout. With no `--project` argument,
+Start `python run_gui.py` from this checkout. For an installed environment,
+use `python -m anymarine.gui`; see [installation and launch](docs/INSTALLATION.md). With no `--project` argument,
 the desktop opens a bundled two-body example with a stored 20-second synthetic
 replay. Press **Play**, scrub the frame slider, or select a channel to inspect
 its plot. **File â†’ Load example (two-body replay)** reopens the example.
