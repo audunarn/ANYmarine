@@ -1,3 +1,106 @@
+## Current restart — weak hull testing measured; self jump checked, 2026-10-11
+
+Goal ACTIVE, development in C:/Github/ANYmarine and C:/Github/ANYhydro; root
+coordinates Mistral directly. This turn made PROGRESS: implemented and verified
+a coherent potential-tested physical-hull Neumann experiment, repaired guards,
+executed final retained case, and eliminated a specific self-jump explanation.
+Full plan remains incomplete; W5 NO_GO/general admission false. No owned worker
+or numerical job active. This candidate is not adopted as a production repair.
+
+ANYhydro main456292a97edf2862e4526c43ed611381263f4617 published and remote
+verified. New tools/solve_retained_weak_neumann.py, focused tests and documentation
+are experimental. Existing public/native physics and GUI sources unchanged;
+all153 protected pre-existing hydro files retain exact hashes. Earlier verified
+Qt startup/GPU/example/authoring updates remain published (marine4cd9a6c;
+checkpoint066a4a2). Linux hardwareGPU/Windows console.exe gates still unmet.
+
+Candidate preserves full12DOF source/cross-body fields, original source basis,
+stored half jump, artificial-lid mean constraints and physical hull pressure
+forces. Only hull testing changes to hull-source potential functions. At the
+same operators/quadrature, near power changes0.00086462138 to0.00228404494W;
+far0.00488087633 to0.00411853731W. Frozen near/far relative gap improves82.3%
+to44.5% but still FAILS unchanged3%+abs1e-8/floor1e-8 criterion. Physical
+hull flux0.00227312978W; hull residual-work-1.09151546e-5W, all-panel residual
+work-2.07665217e-5W. Full unclipped damping still has four negative directions,
+minimum-0.00142948445; retained4coordinate block is positive. Unit-coordinate
+closure passes for original/candidate, but the frozen rate fails. No numerical
+qualification or source admission, no clipping/normalization/forced symmetry.
+
+28 focused tests pass on Windows and Linux. Root independent hand-computed
+complex fixture verifies conjugation, interleaved row ordering, full coupling
+and unchanged lid means. Main refusals now preserve exact input/old-output
+bytes and inventory, including symlinks. Parent summary identity, physical
+constants/dispersion/frozen rate and fixed actual controls are guarded. Final
+positive CLI marks completed_unqualified/source_admission false/qualification
+false and reproduces prior numerical diagnostics exactly. Original eight case
+hashes match independent trusted retained artifact; parent summary unchanged.
+Root acceptance: C:/Github/ANYhydro/.development-evidence/w5-weak-neumann-candidate-20261011/root-acceptance.json
+Final report: same directory/root-final-case-02/candidate-solve.json.
+
+Mistral owns central assembly/solve/recovery/tests/guards/docs. Initial Read
+design had false physical-lid/commutator/positivity inferences; root rejected
+them with an algebraic counterexample, retained outputs and adopted a reversible
+development experiment only. Corrective Read timed out without final report:
+360.3787311/360s scope closed. Edit01 delivered first candidate/15tests/actual
+case. Edit02 repaired caller-level failure writes and trust guards,28tests/docs,
+but ended without a new final handoff. Root independently verified actual
+artifacts and final production path; did not infer acceptance from worker exit.
+All failed tests, first-run bare completed status and partial reports preserved.
+
+Experiment scopes closed/frozen: worker558.7210978000076/900s;
+checks23.34117220004555/180s; root share3.493361700006062/60s. Exactly2 retained
+linear solves, no new Green evaluation or kernel assembly. No unused authority
+from closed scopes available for new execution.
+
+Independent stored self-trace check: all576 axis-aligned vertical hull panels
+at four receiver nodes have real K_diagonal=0.5 exactly; principal defect zero,
+imaginary defect<3.64e-21. This rules out a duplicate/missing half jump on those
+panels, not all kernel/jump errors. Source-plane rounding up to2.22e-16m did
+not affect that result. Bound one-thread Linux/1536MiB; no Green/solve.
+Evidence: C:/ANYworkspaceWork/anymarine-evidence/w5-self-trace-sanity-20261011/result.json
+Its check scope0.30125250000855885/20s closed/frozen.
+
+Next concrete source action: a small matched-source physical Green-field
+discriminator, checking Laplace behavior away from sources, actual free-surface
+and seabed conditions, and outgoing-radiation phase/amplitude. Use the exact
+bound runtime/evaluator and prospective source/call/tolerance criteria, including
+existing internal probes in counts. No full retained-scale refinement or
+alternative test-space sweep until results change the decision. Mistral owns
+connected implementation; root adopts physical contracts and scientific result.
+The current experiment cannot exclude sampling/evaluator/other test-space error.
+Flux=work+residual is algebraic decomposition, not a conservation oracle. All
+source/W5-W10/thin-sheet scientific and release gates remain intact/incomplete.
+Earlier notes below are historical and cannot renew execution authority.
+
+## Prospective self-trace discriminator — 2026-10-11
+
+Potential-tested hull candidate is implemented/verified but physicalclosure FAIL.
+Before another Green run, root checks whether stored vertical-panel principal
+normal self-traces are zero before the prescribed half jump. Exact source-plane
+symmetry provides an independent local check. Competing explanations: double or
+missing self jump versus remaining sampling/evaluator error. One stored-array
+process<=20s, no new Green/kernel/solve; abs1e-10 diagnostic criterion, thread1,
+1536MiB virtual cap. FAIL requires matched self-trace investigation; PASS proceeds
+to small physical PDE/outgoing checks. No automatic source correction. Scope:
+C:/ANYworkspaceWork/anymarine-evidence/w5-self-trace-sanity-20261011/.
+
+## Active development experiment — potential-tested hull Neumann, 2026-10-11
+
+Previous turn PROGRESS: panel reference diagnostic verified/published. A new
+bounded Mistral source-contract review delivered candidate designs; root rejected
+physical-lid and universal commutator/positivity assertions. Correction timed out
+without final handoff; raw evidence retained and Read scope360.3787311/360s closed.
+Root adopts an unqualified Petrov-Galerkin experiment using physical hull
+potential tests and unchanged mean auxiliary-lid constraints at the SAME frozen
+field operators. Question: does this test-space change reduce actual hull/radiative
+work discrepancy? Failure remains a discriminator; no symmetry/clipping/physics
+repair or W5 acceptance is presumed. Mistral owns coherent new tool/tests/docs.
+Contract, authority, budgets and preserved source:
+C:/ANYworkspaceWork/anymarine-evidence/w5-weak-neumann-candidate-20261011/.
+New scope worker900s; checks180s/worker120/root60; <=2retained linear solves,
+no new Green/native/BEM/HAMS/Prony evaluation; one numerical child/native thread1
+and1536MiB Linux virtual cap. All older scopes frozen. GUI/main updates preserved.
+
 ## Current restart — panel reference obstruction resolved, 2026-10-11
 
 Development ACTIVE in C:/Github/ANYmarine and C:/Github/ANYhydro; root

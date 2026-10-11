@@ -1,3 +1,24 @@
+## Status amendment — physical-hull test-space experiment, 2026-10-11
+
+The retained potential-tested hull Neumann experiment is implemented/verified
+(28 focused tests on Windows/Linux and independent root equation/refusal checks).
+It keeps the original source basis, full12DOF coupling, jump, auxiliary lid means
+and physical pressure force; it changes the test space at the same quadrature.
+The frozen closure gap improves82.3% to44.5% and still FAILS the unchanged3%
+criterion. Full damping still has negative directions. No production repair,
+source admission, conservation guarantee, coefficient forcing or qualification.
+
+An independent stored-data check rules out duplicate/missing self half jumps
+on all576 axis-aligned vertical hull panels at all four receiver nodes. Next
+establish a small matched Green-field physical PDE, free-surface/seabed and
+outgoing-radiation discriminator before another large source campaign. Prospective
+criteria/call accounting and a new bounded scope are required; all prior scopes
+are closed. Do not infer a universal defect cause from asymmetry or successful
+work/residual algebra, and do not silently treat an internal lid as wetted hull.
+Mistral owns the connected candidate; root keeps physical adoption/acceptance.
+W5 NO_GO/full W5–W10/thin-sheet and release gates remain open. TASK/CHECKPOINT
+record precise evidence, failed attempts, source/Git identities and resources.
+
 ## Status amendment — matched panel references, 2026-10-11
 
 The independent retained panel-pair discriminator is verified (25 focused
