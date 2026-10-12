@@ -49,6 +49,38 @@ def mooring_hydrodynamic_project():
         settings=AnalysisSettings(duration=.03,dt=.01),native_inputs=NativeMechanicalInputs.from_dict(data))
 
 
+def regular_wave_mooring_project():
+    """Two moored cubes forced only by one regular Airy wave; loading never solves.
+
+    The wave/current mooring example with the current removed, the wave set
+    to amplitude 0.3 m and omega 2 rad/s (heading 0, phase 0), bodies starting
+    at rest at their reference positions and line rest lengths equal to the
+    initial anchor-node-fairlead spans (no pretension). Members and lines use
+    the same saved environment, so the displayed incident wave is the exact
+    forcing wave. Ten seconds at dt 0.04 s. Development, unqualified.
+    """
+    project=mooring_hydrodynamic_project();data=project.native_inputs.to_dict()
+    dt,steps=.04,250
+    data['run_spec'].update(dt=dt,steps=steps)
+    for env in (data['morison']['environment'],data['mooring']['data']['environment']):
+        env['components']=[dict(amplitude=.3,omega=2.,direction_degrees=0.,phase=0.)]
+        env['current']=dict(depths=[0.,env['water_depth']],velocities=[[0.,0.,0.],[0.,0.,0.]])
+    position={body.body_id:[float(x) for x in body.reference_position] for body in project.bodies}
+    for bid,state in data['initial_states'].items():state['position']=list(position[bid])
+    nodes=data['mooring']['initial_nodes']['positions']
+    def span(p,q):return sum((a-b)**2 for a,b in zip(p,q))**.5
+    for line in data['mooring']['data']['lines']:
+        anchor,node,fairlead=line['endpoints']
+        n=nodes[node['node_index']]
+        f=[a+b for a,b in zip(position[fairlead['body_id']],fairlead['point_body'])]
+        line['rest_lengths']=[span(n,anchor['position']),span(f,n)]
+    bodies=tuple(body.with_edits(name='Moored cube '+('A' if i==0 else 'B'))
+                 for i,body in enumerate(project.bodies))
+    return project.with_edits(name='Two moored cubes in a regular wave — development, unqualified',
+        bodies=bodies,settings=AnalysisSettings(duration=dt*steps,dt=dt),
+        native_inputs=NativeMechanicalInputs.from_dict(data))
+
+
 def mooring_two_body_project():
     """Load two bodies/three anchored lines; three development steps, no solve."""
     project=dry_two_body_project();data=project.native_inputs.to_dict()

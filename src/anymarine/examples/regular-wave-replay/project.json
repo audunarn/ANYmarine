@@ -1,0 +1,40 @@
+{
+  "bodies": {
+    "native-demo-body-a": {
+      "sha256": "6b2033878cc2e6aa39f8307ef5ef09a319bbf756b1823d242c84cac8eb256830",
+      "sidecar": "bodies/6b2033878cc2e6aa39f8307ef5ef09a319bbf756b1823d242c84cac8eb256830.json"
+    },
+    "native-demo-body-b": {
+      "sha256": "7af455786df98e596120349e1bed4535b092485cdbf2bed252834a978e3ddbe7",
+      "sidecar": "bodies/7af455786df98e596120349e1bed4535b092485cdbf2bed252834a978e3ddbe7.json"
+    }
+  },
+  "body_order": [
+    "native-demo-body-a",
+    "native-demo-body-b"
+  ],
+  "equilibrium": {
+    "description": "",
+    "source": "synthetic",
+    "waterline_z": 0.0
+  },
+  "name": "Two moored cubes in a regular wave \u2014 development, unqualified",
+  "native_inputs": {
+    "sha256": "922da48d90d97a343d5a68aceaefce636346c141fb0bcd460eaf1b3148d2c85f",
+    "sidecar": "native_inputs/922da48d90d97a343d5a68aceaefce636346c141fb0bcd460eaf1b3148d2c85f.json"
+  },
+  "results": [
+    {
+      "result_id": "regular-wave-moored-cubes",
+      "sha256": "1871a55218f59236c7fcb7e35f947d835136f2e8f60bdf75d2857ea132a76aa9",
+      "sidecar": "results/1871a55218f59236c7fcb7e35f947d835136f2e8f60bdf75d2857ea132a76aa9.json"
+    }
+  ],
+  "schema_version": 5,
+  "settings": {
+    "dt": 0.04,
+    "duration": 10.0,
+    "wave_amplitude": 0.8,
+    "wave_period": 6.0
+  }
+}

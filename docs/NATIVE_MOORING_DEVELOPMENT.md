@@ -54,9 +54,10 @@ added-mass kinetic energy. The producing snapshot remains authoritative for
 stale results. Seeded sea-state regeneration updates line and member waves
 together with the potential-flow excitation realization.
 
-**Waves dock → Mechanical incident waves (saved realization)** displays the actual
+**Waves dock → Saved incident waves (matched to result)** displays the actual
 declared producing environment through ANY3dView. With a stored result, wave time
-follows its selected replay frame. Turning the layer off preserves the displayed
+follows its selected replay frame and is selected automatically when the result
+is shown; Play keeps running. Turning the layer off preserves the displayed
 body/line frame. Fixed-body calculated disturbance previews remain a separate
 development display; moving-body disturbance is not inferred from incident waves.
 

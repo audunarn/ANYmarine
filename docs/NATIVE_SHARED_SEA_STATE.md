@@ -10,19 +10,20 @@ and phase seed. Confirming creates a new saved realization and updates excitatio
 and Morison wave components together. Reopening preserves materialized phases;
 it never draws new random phases. Save the project through the File menu.
 
-In the Waves dock choose **Mechanical incident waves (saved realization)**. This
+In the Waves dock choose **Saved incident waves (matched to result)**. This
 renders that project's exact wave components using public ANYloads surface
 elevation and public ANY3dView mesh interfaces. Manual single-wave preview fields
-are disabled in this mode. The initial example has Hs=0.02 m, so visible elevation
+are hidden in this mode. The initial example has Hs=0.02 m, so visible elevation
 is small relative to the bodies; display geometry is not exaggerated.
 
 **Jobs → Run native mechanical job…** submits an immutable input snapshot to an
 isolated child. Editing while it runs creates a different project hash; its result
 remains associated with its producing project. Select the saved result in the
 project tree to replay stored body transforms and authoritative diagnostic arrays.
-Opening shared waves at a selected frame starts paused at its stored time. Explicit
-wave animation is a fixed-body preview; selecting a different replay frame resets
-the layer. Renderer changes preserve playback state and captured body transforms.
+Showing the result selects the shared waves automatically at the replay time;
+**Play** moves bodies and waves together and frame changes keep the layer. The
+manual single-wave preview modes remain fixed-body previews that a frame change
+resets. Renderer changes preserve playback state and body transforms.
 
 This fixture has synthetic coupled coefficients, six saved wave components,
 Morison members and a linear link; it is a three-step development example, not a

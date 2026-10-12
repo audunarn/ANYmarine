@@ -341,6 +341,9 @@ class MainWindow(QMainWindow):
         example_action = QAction("Load &example (two-body replay)", self)
         example_action.triggered.connect(self.load_example)
         file_menu.addAction(example_action)
+        regular_wave_action = QAction('Load moored bodies in a regular wave (solved replay)', self)
+        regular_wave_action.triggered.connect(self.load_regular_wave_example)
+        file_menu.addAction(regular_wave_action)
         native_example_action = QAction('Load native dry two-body example', self)
         native_example_action.triggered.connect(self.load_native_example)
         file_menu.addAction(native_example_action)
@@ -641,6 +644,27 @@ class MainWindow(QMainWindow):
         self._diagnostics.appendPlainText(
             "Loaded bundled two-body example with stored synthetic replay. "
             "Not BEM output or dynamics integration; unqualified demonstration."
+        )
+
+    def load_regular_wave_example(self) -> None:
+        """Open stored bodies solved in a regular wave; waves follow the replay."""
+        if not self._confirm_discard():
+            return
+        try:
+            project = self._service.load_regular_wave_example()
+        except (ProjectError, ServiceError, OSError) as error:
+            self._notify_critical("Example load failed", str(error))
+            return
+        self._project_root = None
+        self._set_project(project)
+        self._set_result(project.results[0])
+        self._wave_dock.raise_()
+        self.setWindowTitle("ANYmarine — moored bodies in a regular wave (unsaved copy)")
+        self.statusBar().showMessage("Stored solved replay — press Play: bodies and their forcing wave move together")
+        self._diagnostics.appendPlainText(
+            "Loaded two moored cubes solved natively in one regular Airy wave (0.3 m, 2 rad/s), "
+            "Morison members and dynamic lines, 10 s. The Waves panel shows that saved wave at the "
+            "replay time. No solve while loading; development, unqualified."
         )
 
     def _set_project(self, project: ProjectModel) -> None:
@@ -1896,7 +1920,7 @@ class MainWindow(QMainWindow):
             status if status is not None else self._result_status_text(result, stale)
         )
         self._apply_frame(0)
-        if mechanical_waves:self._waves.mode.setCurrentIndex(3)
+        if not self._waves.match_result(result) and mechanical_waves:self._waves.mode.setCurrentIndex(3)
 
     def _on_slider_moved(self, value: int) -> None:
         self._apply_frame(value)
@@ -1930,7 +1954,7 @@ class MainWindow(QMainWindow):
     def _apply_frame(self, frame: int) -> None:
         """Push one stored frame to the viewer via handle.set_transform only."""
 
-        if self._waves.active and (self._waves.field is None or self._waves.field.get('kind')!='mechanical_incident'):
+        if self._waves.active and not self._waves.follows_replay:
             self._waves.reset()
         self._current_frame = frame
         if self._current_result is None:

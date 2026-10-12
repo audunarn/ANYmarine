@@ -83,6 +83,29 @@ class ProducingDatasetMetadata:
     source_capability_status: str | None = None
     sheet_source_backend: str | None = None
     pressure_jump_contract_sign: str | None = None
+    #: Identity-verified ``excitation_source_contract`` (version, conventions,
+    #: backend and dataset binding checked by ANYhydro); ``None`` when absent
+    #: or refused, with the reason in ``excitation_source_diagnostic``.
+    excitation_source_contract: Mapping | None = None
+    excitation_source_diagnostic: str = ""
+
+
+def _verified_declaration(neutral, dataset) -> tuple[Mapping | None, str]:
+    """Identity-verified excitation-source declaration, or (None, reason)."""
+
+    if dataset.attrs.get("excitation_source_contract") is None:
+        return None, ""
+    verifier = getattr(neutral, "verify_excitation_source_declaration", None)
+    if verifier is None:
+        return None, (
+            "the installed ANYhydro cannot verify excitation-source declarations; "
+            "install the tested wheel"
+        )
+    try:
+        contract, _request = verifier(dataset)
+    except Exception as error:  # refused declaration: report, never use
+        return None, f"the producing dataset's excitation-source declaration is refused: {error}"
+    return contract, ""
 
 
 def _stored_json_attr(value) -> Mapping | None:
@@ -314,6 +337,19 @@ class ApplicationService:
         self.store = None
         return project
 
+    def load_regular_wave_example(self) -> ProjectModel:
+        """Load two moored cubes with their stored solved regular-wave replay.
+
+        The stored result was produced from exactly these saved inputs
+        (tools/build_regular_wave_example.py); loading never solves and
+        Save cannot overwrite package resources. Development, unqualified.
+        """
+        example_root = Path(__file__).parent / "examples" / "regular-wave-replay"
+        project = ProjectStore(example_root).load()
+        self.root = None
+        self.store = None
+        return project
+
     def save(self, project: ProjectModel, root: os.PathLike | str | None = None) -> Path:
         store = ProjectStore(root) if root is not None else self.store
         if store is None:
@@ -496,6 +532,7 @@ class ApplicationService:
                 snapshot = Path(folder) / ("producing-dataset-snapshot" + suffix)
                 snapshot.write_bytes(payload)
                 dataset = loader(snapshot)
+                declaration, declaration_diagnostic = _verified_declaration(neutral, dataset)
         except ValueError as error:
             return ProducingDatasetMetadata(
                 False,
@@ -522,7 +559,83 @@ class ApplicationService:
             ),
             sheet_source_backend=(source_provenance or {}).get("backend"),
             pressure_jump_contract_sign=(contract or {}).get("sign"),
+            excitation_source_contract=declaration,
+            excitation_source_diagnostic=declaration_diagnostic,
         )
+
+    def result_recorded_wave(self, project: ProjectModel | None, result: ResultRecord):
+        """The forcing-wave selection recorded by a linear result's producing inputs.
+
+        The producing inputs are the result's hash-bound surface snapshot, or
+        the project's current linear inputs when they reproduce the result's
+        input hash. Returns ``(inputs_details, wave)``; ``wave`` is None when
+        the producing inputs recorded no wave. Refuses when the producing
+        inputs are unavailable.
+        """
+        from .wave_match import recorded_wave
+
+        if result is None or result.kind != RESULT_KIND_LINEAR:
+            raise ServiceError("only linear results record a regular forcing wave")
+        if result.surface_snapshot is not None:
+            # Hash-bound to result.input_hash by ResultRecord itself.
+            inputs = LinearDevelopmentInputs.from_dict(
+                _jsonable_value(result.surface_snapshot)["linear_inputs"]
+            )
+        else:
+            inputs = None if project is None else project.linear_inputs
+            if inputs is None or linear_input_hash(inputs) != result.input_hash:
+                raise ServiceError(
+                    "the project's linear inputs are not this result's producing "
+                    "inputs and the result stores no producing snapshot; its "
+                    "forcing wave cannot be shown"
+                )
+        details = inputs.provenance.details
+        details = None if details is None else _jsonable_value(details)
+        try:
+            return details, recorded_wave(details)
+        except ValueError as error:
+            raise ServiceError(str(error)) from error
+
+    def result_incident_wave(self, project: ProjectModel | None, result: ResultRecord):
+        """The exact regular wave that forced a stored linear result.
+
+        Uses the recorded wave of the result's producing inputs
+        (:meth:`result_recorded_wave`). Depth and gravity come from the
+        identity-verified excitation-source declaration of the project's bound
+        dataset, read from the hash-verified sidecar, which must be the
+        producing dataset. Display only; refuses rather than guesses.
+        """
+        from .wave_match import RegularIncidentWave, incident_request
+
+        details, wave = self.result_recorded_wave(project, result)
+        if wave is None:
+            raise ServiceError("this linear result was not forced by an incident wave")
+        provenance = None if project is None else project.hydro_provenance
+        if provenance is None or provenance.dataset_content_hash != details.get(
+            "dataset_content_hash"
+        ):
+            raise ServiceError(
+                "the project's bound hydrodynamic dataset is not this result's "
+                "producing dataset; its forcing-wave depth cannot be read"
+            )
+        metadata = self.producing_dataset_metadata(project)
+        if not metadata.available:
+            raise ServiceError(metadata.diagnostic)
+        if metadata.excitation_source_contract is None:
+            raise ServiceError(
+                metadata.excitation_source_diagnostic
+                or "the producing dataset declares no excitation-source request; "
+                "its water depth and gravity are unknown"
+            )
+        try:
+            depth, gravity = incident_request(metadata.excitation_source_contract)
+            return RegularIncidentWave(
+                amplitude=wave["amplitude"], omega=wave["omega"],
+                heading=wave["heading"], phase=wave["phase"],
+                water_depth=depth, gravity=gravity,
+            )
+        except (TypeError, ValueError) as error:
+            raise ServiceError(f"the forcing wave cannot be reconstructed: {error}") from error
 
     def load(self, root: os.PathLike | str) -> ProjectModel:
         store = ProjectStore(root)

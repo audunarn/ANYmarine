@@ -1,0 +1,649 @@
+{
+  "gravity_world": null,
+  "initial_states": {
+    "native-demo-body-a": {
+      "position": [
+        -2.0,
+        0.0,
+        0.0
+      ],
+      "rotation": [
+        [
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "velocity_world": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    "native-demo-body-b": {
+      "position": [
+        2.0,
+        0.0,
+        0.0
+      ],
+      "rotation": [
+        [
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "velocity_world": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    }
+  },
+  "links": [
+    {
+      "axes_a": [
+        [
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "axes_b": [
+        [
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "body_a": "native-demo-body-a",
+      "body_b": "native-demo-body-b",
+      "damping": [
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ],
+      "link_id": "native-demo-axial-link",
+      "preload": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rest_rotation": [
+        [
+          1.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          1.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "rest_translation": [
+        4.0,
+        0.0,
+        0.0
+      ],
+      "rho_a": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "rho_b": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "stiffness": [
+        [
+          10.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      ]
+    }
+  ],
+  "mooring": {
+    "data": {
+      "api_version": "marine_mooring_hydrodynamics_v1",
+      "body_ids": [
+        "native-demo-body-a",
+        "native-demo-body-b"
+      ],
+      "environment": {
+        "acceleration_convention": "eulerian_local",
+        "api_version": "marine_loads_v1",
+        "components": [
+          {
+            "amplitude": 0.3,
+            "direction_degrees": 0.0,
+            "omega": 2.0,
+            "phase": 0.0
+          }
+        ],
+        "current": {
+          "depths": [
+            0.0,
+            10.0
+          ],
+          "velocities": [
+            [
+              0.0,
+              0.0,
+              0.0
+            ],
+            [
+              0.0,
+              0.0,
+              0.0
+            ]
+          ]
+        },
+        "density": 1025.0,
+        "gravity": 9.81,
+        "still_water_level": 0.0,
+        "water_depth": 10.0
+      },
+      "fluid_density": 1025.0,
+      "gravity_world": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "lines": [
+        {
+          "axial_damping": [
+            1.0,
+            1.0
+          ],
+          "axial_rigidity": [
+            40.0,
+            40.0
+          ],
+          "displaced_area": [
+            0.001,
+            0.001
+          ],
+          "endpoints": [
+            {
+              "position": [
+                -6.0,
+                -2.0,
+                -4.0
+              ],
+              "type": "fixed"
+            },
+            {
+              "node_index": 0,
+              "type": "node"
+            },
+            {
+              "body_id": "native-demo-body-a",
+              "point_body": [
+                0.0,
+                -1.0,
+                -1.0
+              ],
+              "type": "rigid"
+            }
+          ],
+          "hydrodynamics": [
+            {
+              "added_mass_normal": 1.0,
+              "added_mass_tangential": 0.05,
+              "diameter": 0.035,
+              "drag_normal": 1.0,
+              "drag_tangential": 0.02,
+              "inertia_normal": 2.0,
+              "inertia_tangential": 0.05
+            },
+            {
+              "added_mass_normal": 1.0,
+              "added_mass_tangential": 0.05,
+              "diameter": 0.035,
+              "drag_normal": 1.0,
+              "drag_tangential": 0.02,
+              "inertia_normal": 2.0,
+              "inertia_tangential": 0.05
+            }
+          ],
+          "line_id": "demo-line-0",
+          "mass_per_length": [
+            2.0,
+            2.0
+          ],
+          "rest_lengths": [
+            2.5495097567963922,
+            2.5495097567963922
+          ]
+        },
+        {
+          "axial_damping": [
+            1.0,
+            1.0
+          ],
+          "axial_rigidity": [
+            40.0,
+            40.0
+          ],
+          "displaced_area": [
+            0.001,
+            0.001
+          ],
+          "endpoints": [
+            {
+              "position": [
+                -6.0,
+                2.0,
+                -4.0
+              ],
+              "type": "fixed"
+            },
+            {
+              "node_index": 1,
+              "type": "node"
+            },
+            {
+              "body_id": "native-demo-body-a",
+              "point_body": [
+                0.0,
+                1.0,
+                -1.0
+              ],
+              "type": "rigid"
+            }
+          ],
+          "hydrodynamics": [
+            {
+              "added_mass_normal": 1.0,
+              "added_mass_tangential": 0.05,
+              "diameter": 0.035,
+              "drag_normal": 1.0,
+              "drag_tangential": 0.02,
+              "inertia_normal": 2.0,
+              "inertia_tangential": 0.05
+            },
+            {
+              "added_mass_normal": 1.0,
+              "added_mass_tangential": 0.05,
+              "diameter": 0.035,
+              "drag_normal": 1.0,
+              "drag_tangential": 0.02,
+              "inertia_normal": 2.0,
+              "inertia_tangential": 0.05
+            }
+          ],
+          "line_id": "demo-line-1",
+          "mass_per_length": [
+            2.0,
+            2.0
+          ],
+          "rest_lengths": [
+            2.5495097567963922,
+            2.5495097567963922
+          ]
+        },
+        {
+          "axial_damping": [
+            1.0,
+            1.0
+          ],
+          "axial_rigidity": [
+            40.0,
+            40.0
+          ],
+          "displaced_area": [
+            0.001,
+            0.001
+          ],
+          "endpoints": [
+            {
+              "position": [
+                6.0,
+                0.0,
+                -4.0
+              ],
+              "type": "fixed"
+            },
+            {
+              "node_index": 2,
+              "type": "node"
+            },
+            {
+              "body_id": "native-demo-body-b",
+              "point_body": [
+                0.0,
+                0.0,
+                -1.0
+              ],
+              "type": "rigid"
+            }
+          ],
+          "hydrodynamics": [
+            {
+              "added_mass_normal": 1.0,
+              "added_mass_tangential": 0.05,
+              "diameter": 0.035,
+              "drag_normal": 1.0,
+              "drag_tangential": 0.02,
+              "inertia_normal": 2.0,
+              "inertia_tangential": 0.05
+            },
+            {
+              "added_mass_normal": 1.0,
+              "added_mass_tangential": 0.05,
+              "diameter": 0.035,
+              "drag_normal": 1.0,
+              "drag_tangential": 0.02,
+              "inertia_normal": 2.0,
+              "inertia_tangential": 0.05
+            }
+          ],
+          "line_id": "demo-line-2",
+          "mass_per_length": [
+            2.0,
+            2.0
+          ],
+          "rest_lengths": [
+            2.5,
+            2.5
+          ]
+        }
+      ],
+      "node_count": 3,
+      "still_water_level": 0.0
+    },
+    "initial_nodes": {
+      "positions": [
+        [
+          -4.0,
+          -1.5,
+          -2.5
+        ],
+        [
+          -4.0,
+          1.5,
+          -2.5
+        ],
+        [
+          4.0,
+          0.0,
+          -2.5
+        ]
+      ],
+      "velocities": [
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0
+        ],
+        [
+          0.0,
+          0.0,
+          0.0
+        ]
+      ]
+    },
+    "version": "native_mooring_inputs_v1"
+  },
+  "morison": {
+    "api_version": "marine_morison_development_v1",
+    "contribution_id": "morison-members-development",
+    "environment": {
+      "acceleration_convention": "eulerian_local",
+      "api_version": "marine_loads_v1",
+      "components": [
+        {
+          "amplitude": 0.3,
+          "direction_degrees": 0.0,
+          "omega": 2.0,
+          "phase": 0.0
+        }
+      ],
+      "current": {
+        "depths": [
+          0.0,
+          10.0
+        ],
+        "velocities": [
+          [
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0
+          ]
+        ]
+      },
+      "density": 1025.0,
+      "gravity": 9.81,
+      "still_water_level": 0.0,
+      "water_depth": 10.0
+    },
+    "members": [
+      {
+        "end_a": {
+          "body_id": "native-demo-body-a",
+          "point_body": [
+            0.0,
+            0.0,
+            0.5
+          ]
+        },
+        "end_b": {
+          "body_id": "native-demo-body-a",
+          "point_body": [
+            0.0,
+            0.0,
+            -3.0
+          ]
+        },
+        "member_id": "vertical-member-a",
+        "ownership": {
+          "bem_included": false,
+          "buoyancy_owner": "none",
+          "drag_correction": false,
+          "primary_role": "morison_full"
+        },
+        "quadrature_order": 4,
+        "section": {
+          "added_mass_coefficient": 1.0,
+          "diameter": 0.06,
+          "drag_coefficient": 1.0
+        }
+      },
+      {
+        "end_a": {
+          "body_id": "native-demo-body-a",
+          "point_body": [
+            0.0,
+            0.0,
+            -1.5
+          ]
+        },
+        "end_b": {
+          "body_id": "native-demo-body-b",
+          "point_body": [
+            0.0,
+            0.0,
+            -2.0
+          ]
+        },
+        "member_id": "spanning-member-ab",
+        "ownership": {
+          "bem_included": false,
+          "buoyancy_owner": "none",
+          "drag_correction": false,
+          "primary_role": "morison_full"
+        },
+        "quadrature_order": 4,
+        "section": {
+          "added_mass_coefficient": 1.0,
+          "diameter": 0.06,
+          "drag_coefficient": 1.0
+        }
+      }
+    ]
+  },
+  "run_spec": {
+    "dt": 0.04,
+    "line_search": true,
+    "max_newton_iterations": 20,
+    "residual_tolerance": 1e-10,
+    "steps": 250
+  },
+  "version": "native_mechanical_inputs_v1",
+  "world_wrenches": []
+}

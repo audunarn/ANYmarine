@@ -386,6 +386,22 @@ Choose **Incident waves (without disturbance)** to view/animate the selected
 linear Airy wave immediately. Set amplitude, angular frequency, propagation
 heading and water depth; **Pause waves** controls animation.
 
+**Matched waves.** When the shown result was solved in waves, the Waves tab
+switches to **Saved incident waves (matched to result)** automatically and shows
+that exact wave at the replay time, so **Play** moves bodies and waves together.
+Native mechanical results use the member/line environment of their producing
+snapshot, also after later project edits. Hydro linear results use the forcing
+wave (amplitude, frequency, heading, phase) recorded by their producing inputs
+(the result's surface snapshot, or the project's linear inputs when they
+reproduce the result hash), with the depth and gravity of the identity-verified
+excitation-source declaration of the project's bound dataset, which must be the
+producing dataset. Anything else is refused with a status message, and choosing
+this mode for a result not solved in waves is refused. Only the undisturbed
+incident field is drawn. **File → Load moored bodies in a regular
+wave (solved replay)** opens a stored 10 s native solve of two moored cubes in
+one 0.3 m, 2 rad/s wave (development, unqualified; regenerate with
+`tools/build_regular_wave_example.py`).
+
 Click **Calculate body disturbance** to queue a separate child-process
 calculation. On successful validation, **Incident + body disturbance** shows
 the incident wave plus the actual Capytaine diffraction elevation. Toggle the
@@ -435,7 +451,7 @@ ownership, approximations and remaining gates. No BEM attempt is made by loading
 ## Coupled saved-wave example
 
 Choose **File â†’ Load coupled seeded-wave example**, **Jobs â†’ Edit shared sea stateâ€¦**
-and **Waves â†’ Mechanical incident waves (saved realization)**. The same saved
+and **Waves â†’ Saved incident waves (matched to result)**. The same saved
 components drive development excitation, Morison kinematics and incident display.
 See [saved shared-sea-state workflow](docs/NATIVE_SHARED_SEA_STATE.md) for loading,
 replay, immutable runs and limitations. Standard local wheel build/install and

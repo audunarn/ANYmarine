@@ -7,6 +7,11 @@ from any3dview import MeshArrays
 from ..wave_jobs import preview_request
 from ..hashing import input_hash
 
+#: Saved incident fields whose time is the replayed result's time.
+REPLAY_WAVE_KINDS=('mechanical_incident','linear_regular_incident')
+MATCHED_NOTE=('Saved incident waves that drove the shown result, at the replay time: Play moves bodies and waves together. '
+    'Undisturbed incident field; diffraction and radiation are not drawn. Development preview — unqualified.')
+
 class WavesPanel(QWidget):
     def __init__(self,window):
         super().__init__(window)
@@ -15,7 +20,7 @@ class WavesPanel(QWidget):
         self.job_id=None;self.time=0.;self.mechanical_environment=None
         layout=QVBoxLayout(self)
         self.mode=QComboBox()
-        self.mode.addItems(['Off','Incident waves (without disturbance)','Incident + body disturbance','Mechanical incident waves (saved realization)',
+        self.mode.addItems(['Off','Incident waves (without disturbance)','Incident + body disturbance','Saved incident waves (matched to result)',
             'Stored HAMS: incident','Stored HAMS: total (incident + disturbance)','Stored HAMS: scattered only','Stored HAMS: prescribed-motion radiation'])
         self.mode.model().item(2).setEnabled(False)
         for i in range(4,8):self.mode.model().item(i).setEnabled(False)
@@ -79,6 +84,55 @@ class WavesPanel(QWidget):
     def active(self):
         return self.saved_poses is not None
 
+    @property
+    def follows_replay(self):
+        """True for a saved incident field driven by the replay time."""
+        return self.field is not None and self.field.get('kind') in REPLAY_WAVE_KINDS
+
+    @staticmethod
+    def _saved_environment(project):
+        native=None if project is None else project.native_inputs
+        if native is None:return None
+        return (native.mooring.data['environment'] if native.mooring is not None and native.mooring.has_hydrodynamics
+                else native.morison.data['environment'] if native.morison is not None else None)
+
+    def _solved_in_waves(self,result):
+        if result.kind=='linear_development':
+            from ..services import ServiceError
+            try:return self.window._service.result_recorded_wave(self.window._project,result)[1] is not None
+            except ServiceError:return True  # producing inputs unknown: attempt and report the refusal
+        if result.kind=='mechanical_development':
+            env=self._saved_environment(self.window._replay_project or self.window._project)
+            return env is not None and len(env['components'])>0
+        return False
+
+    def match_result(self,result):
+        """Show the saved incident waves that drove *result*, synced to replay.
+
+        Returns True when the result was solved in waves (a refusal is shown
+        in the status line); False leaves the panel unchanged.
+        """
+        if result is None or not self._solved_in_waves(result):return False
+        if self.mode.currentIndex()==3:self.set_mode(3)
+        else:self.mode.setCurrentIndex(3)
+        return True
+
+    def _surface_grid(self,project):
+        """Display grid around the shown bodies (the preview request's extent rule)."""
+        points=[]
+        for body in project.bodies:
+            handle=self.window._handles.get(body.body_id)
+            matrix=np.eye(4) if handle is None else np.asarray(handle.transform,dtype=float)
+            points.append(np.asarray(body.mesh.positions,dtype=float)@matrix[:3,:3].T+matrix[:3,3])
+        if not points:raise ValueError('Load a project with bodies first')
+        points=np.concatenate(points);low=points.min(axis=0);high=points.max(axis=0)
+        padding=max(6.,.5*float(np.max(high[:2]-low[:2])));nx,ny=33,25
+        x,y=np.meshgrid(np.linspace(low[0]-padding,high[0]+padding,nx),np.linspace(low[1]-padding,high[1]+padding,ny))
+        vertices=np.column_stack((x.ravel(),y.ravel(),np.zeros(x.size)))
+        i=np.arange((ny-1)*nx).reshape(ny-1,nx)[:,:-1].ravel()
+        triangles=np.vstack((np.column_stack((i,i+1,i+nx)),np.column_stack((i+1,i+nx+1,i+nx))))
+        return vertices,triangles
+
     def request(self):
         w=self.window
         project=w._replay_project or w._project
@@ -91,7 +145,8 @@ class WavesPanel(QWidget):
     def freeze(self):
         if not self.active:
             w=self.window
-            w._play_timer.stop();w._play_button.setText('Play')
+            if not (self.follows_replay and w._current_result is not None):
+                w._play_timer.stop();w._play_button.setText('Play')
             self.saved_poses={bid:np.array(h.transform,copy=True) for bid,h in w._handles.items()}
             self.saved_view=w.viewer.export_view_state()
 
@@ -158,38 +213,54 @@ class WavesPanel(QWidget):
         if index==3:
             self.cancel();self.job_id=None
             try:
-                from anyloads import WaveRealization
-                project=self.window._replay_project or self.window._project
-                if project is None or project.native_inputs is None:
-                    raise ValueError('Load a project with a saved marine environment first')
-                native=project.native_inputs
-                env=(native.mooring.data['environment'] if native.mooring is not None and native.mooring.has_hydrodynamics
-                     else native.morison.data['environment'] if native.morison is not None else None)
-                if env is None:raise ValueError('No saved member/line marine environment')
-                waves=None if native.wave_realization is None else WaveRealization.from_dict(native.wave_realization.to_dict())
-                from anyloads.marine import environment_from_dict
-                from ..native_inputs import _plain
-                self.mechanical_environment=environment_from_dict(_plain(env))
-                request=self.request();xmin,xmax,ymin,ymax=request['bounds']
-                x,y=np.meshgrid(np.linspace(xmin,xmax,request['nx']),np.linspace(ymin,ymax,request['ny']))
-                points=np.column_stack((x.ravel(),y.ravel(),np.zeros(x.size)))
-                i=np.arange((request['ny']-1)*request['nx']).reshape(request['ny']-1,request['nx'])[:,:-1].ravel()
-                triangles=np.vstack((np.column_stack((i,i+1,i+request['nx'])),
-                                     np.column_stack((i+1,i+request['nx']+1,i+request['nx']))))
-                self.field=dict(kind='mechanical_incident',vertices=points,triangles=triangles,
-                    wave_realization_hash=None if waves is None else waves.content_hash,project_input_hash=input_hash(project))
                 result=self.window._current_result
+                project=self.window._replay_project or self.window._project
+                if project is None:raise ValueError('Load a project with saved incident waves first')
+                if result is not None and result.kind not in ('linear_development','mechanical_development'):
+                    raise ValueError('The shown result was not solved in saved incident waves; '
+                                     'clear the replay to preview the project waves')
+                if result is not None and result.kind=='linear_development':
+                    from ..services import ServiceError
+                    try:wave=self.window._service.result_incident_wave(self.window._project,result)
+                    except ServiceError as error:raise ValueError(str(error)) from error
+                    self.mechanical_environment=wave
+                    identity=dict(kind='linear_regular_incident',result_input_hash=result.input_hash)
+                    depth='deep water' if wave.water_depth==float('inf') else f'depth {wave.water_depth:.4g} m'
+                    status=(f'Result forcing wave — amplitude {wave.amplitude:.4g} m, {wave.omega:.4g} rad/s, '
+                            f'heading {np.rad2deg(wave.heading):.4g}°, {depth}; no body disturbance')
+                else:
+                    from anyloads import WaveRealization
+                    if project.native_inputs is None:
+                        raise ValueError('Load a project with a saved marine environment first')
+                    native=project.native_inputs
+                    env=self._saved_environment(project)
+                    if env is None:raise ValueError('No saved member/line marine environment')
+                    waves=None if native.wave_realization is None else WaveRealization.from_dict(native.wave_realization.to_dict())
+                    from anyloads.marine import environment_from_dict
+                    from ..native_inputs import _plain
+                    self.mechanical_environment=environment_from_dict(_plain(env))
+                    identity=dict(kind='mechanical_incident',
+                        wave_realization_hash=None if waves is None else waves.content_hash,project_input_hash=input_hash(project))
+                    count=len(self.mechanical_environment.components)
+                    status=f'Saved mechanical incident waves — {count} component{"" if count==1 else "s"}; no body disturbance'
+                vertices,triangles=self._surface_grid(project)
+                self.field=dict(vertices=vertices,triangles=triangles,**identity)
                 self.time=(result.times[min(max(self.window._current_frame,0),result.frame_count()-1)]
                            if result is not None else 0.)
                 self.hide_layer();self.freeze();self.show_layer()
                 if result is not None:
-                    self.timer.stop();self.play.setText('Play waves')
+                    self.timer.stop();self.play.setText('Wave time follows replay')
                 self.compute.setEnabled(False)
-                self.status.setText(f'Saved mechanical incident waves — {len(self.mechanical_environment.components)} components; no body disturbance')
+                self.status.setText(status)
+                self.note.setText(MATCHED_NOTE if result is not None else
+                    'Saved incident waves on their own clock; bodies keep their captured poses. No body disturbance. Development preview — unqualified.')
             except Exception as error:
                 self.reset();self.status.setText(str(error))
             return
         self.compute.setEnabled(True)
+        if self.follows_replay:
+            # Leaving saved waves: their display grid is not the preview grid.
+            self.hide_layer();self.field=None
         self.mechanical_environment=None
         try:
             from anyhydro.wave_preview import incident_field,request_hash
@@ -208,7 +279,7 @@ class WavesPanel(QWidget):
 
     def positions(self):
         if self.field['kind']=='stored_hams_points':return self.field['replay'].positions(self._stored_component(),self.time,**self._stored_selection())
-        if self.field['kind']=='mechanical_incident':
+        if self.follows_replay:
             points=np.array(self.field['vertices'],copy=True)
             points[:,2]=self.mechanical_environment.surface_elevation(points[:,:2],self.time)
             return points
@@ -216,13 +287,13 @@ class WavesPanel(QWidget):
         return positions_at_time(self.field,self.time,disturbed=self.mode.currentIndex()==2)
 
     def elevation_values(self,points):
-        datum=self.mechanical_environment.still_water_level if self.field['kind']=='mechanical_incident' else 0.
+        datum=self.mechanical_environment.still_water_level if self.follows_replay else 0.
         return points[:,2]-datum
 
     def elevation_bound(self):
         if self.field['kind']=='stored_hams_points':
             bound=float(np.max(np.abs(self.field['replay'].response(self._stored_component(),**self._stored_selection()))))
-        elif self.field['kind']=='mechanical_incident':
+        elif self.follows_replay:
             bound=sum(abs(c.amplitude) for c in self.mechanical_environment.components)
         else:
             incident=np.asarray(self.field['incident_real'])+1j*np.asarray(self.field['incident_imag'])
@@ -257,7 +328,7 @@ class WavesPanel(QWidget):
             self.status.setText('Static continuation has no wave time.')
             return
         # Body replay is suspended while showing a fixed-pose diffraction field.
-        if self.field['kind']!='mechanical_incident':
+        if not self.follows_replay:
             for bid,pose in self.saved_poses.items():
                 if bid in self.window._handles:self.window._handles[bid].set_transform(pose)
         elif self.window._current_result is not None:
@@ -271,7 +342,7 @@ class WavesPanel(QWidget):
         self.handle.update_node_scalars(self.elevation_values(points))
 
     def toggle_play(self):
-        if self.field is not None and self.field.get('kind')=='mechanical_incident' and self.window._current_result is not None:
+        if self.follows_replay and self.window._current_result is not None:
             self.timer.stop();self.play.setText('Wave time follows replay');return
         if self.timer.isActive():
             self.timer.stop();self.play.setText('Play waves')
@@ -327,15 +398,18 @@ class WavesPanel(QWidget):
                 self.timer.stop();self.play.setText('Play waves')
 
     def set_replay_time(self,time):
-        if self.field is not None and self.field.get('kind')=='mechanical_incident' and self.handle is not None:
+        if self.follows_replay and self.handle is not None:
             self.timer.stop();self.time=time
             self.saved_poses={bid:np.array(h.transform,copy=True) for bid,h in self.window._handles.items()}
             self.advance(step=False);self.play.setText('Wave time follows replay')
 
     def _stored_controls(self,enabled):
         self.stored_box.setVisible(enabled)
-        for control in (self.omega,self.heading,self.depth):
-            control.setVisible(not enabled);self.regular_form.labelForField(control).setVisible(not enabled)
+        # Saved incident waves carry their own parameters: hide the manual ones.
+        regular=self.mode.currentIndex()!=3
+        for control in (self.amplitude,self.omega,self.heading,self.depth):
+            shown=regular and (control is self.amplitude or not enabled)
+            control.setVisible(shown);self.regular_form.labelForField(control).setVisible(shown)
         for control in (self.stored_frequency,self.stored_heading,self.stored_dof,self.stored_phase,self.stored_displacement):control.setEnabled(enabled)
         self.save_stored.setEnabled(self.field is not None and self.field.get('kind')=='stored_hams_points')
         self.save_stored.setVisible(self.field is not None and self.field.get('kind')=='stored_hams_points')
