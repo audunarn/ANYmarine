@@ -1,3 +1,42 @@
+## Current — W5 free-surface failure attributed and repaired, 2026-10-12
+
+Pushed earlier: ANYhydro 36cd502, ANYmarine 76a6c0b (user approved). New ANYhydro
+commit 81c04c6 (see below). Evidence:
+C:/ANYworkspaceWork/anymarine-evidence/w5-prony-attribution-20261012 (ATTRIBUTION.md,
+john-oracle-02.json, refit/native confirmation scripts and results, low-kh tail and
+box impact studies, codex-review-02..04).
+
+Attribution: independent John eigenfunction-series oracle
+(ANYhydro tools/check_finite_depth_john_oracle.py, no Capytaine) reproduces the native
+real S and dS/dz at all 11 base receivers of both sources to ~1e-13 as
+exact - Prony-error field + Rankine centroid/Gauss mixing. The four Robin failures equal
+that prediction to ~1e-12; the frozen 4-term Prony fit (Capytaine default: first fit with
+MSE < 1e-4 on a randomized grid; max pointwise error 0.07) is 97-100 % of them. Frozen-fit
+field error vs exact: ~1 % far field, up to 31 % at deep receivers. Reviewed by GPT 6 Astra
+high (sound; normalization, non-circularity and Fortran mixing rules confirmed).
+
+Native confirmation (pinned E1 core 6648b6c5..., WSL, two 2-source evaluations): frozen
+control bitwise equal to the record; refit (15-18 terms) Robin ratios hull 0.0005/0.0018,
+lid 0.090/0.053 (unchanged criterion met), field error 1.3e-5.
+
+Repair (ANYhydro 81c04c6): anyhydro.prony_fit deterministic validated decomposition
+(max pointwise error target 1e-4, accept 5e-4, else CapabilityError; decimal pole; asymptotic
+kh >= 1e5/omega=inf); production Capytaine backend uses it (adapter 0.3.0, cache identity
+records the method). Reviews: GPT 6.1 Sol high x2 (one medium oracle finding, one low; both
+fixed). Tests: 47 new/related pass; full-suite failure set identical to baseline (9 failed /
+71 errors, pre-existing HAMS/env/order); portable CI classification fixed (CI had been red
+since the retained panel-pair slice only for unclassified modules).
+
+Impact: BEM added mass/damping of a 10x5x2 m box at h=150 change by 1e-4..2e-3 relative.
+This fixes a real accuracy defect but cannot by itself explain a large coupled energy gap.
+Known limits: kh < ~8 algebraic remainder tail (field error <= ~2e-4, near-surface Robin
+ratio 1.0-1.3 at kh=1-3); kh <= 0.3 refused; the artifact-bound W5 reference still binds the
+frozen producer coefficients by design.
+
+W5 status: free-surface discriminator failure explained and repairable; W5 remains NO_GO
+until the coupled energy point is re-run with the validated kernel. Next: re-run the coupled
+energy diagnostic with the validated decomposition and compare with the frozen-fit result.
+
 ## Current — development resumed by Claude, 2026-10-11
 
 User resumed development and handed the goal to Claude; Codex is the independent

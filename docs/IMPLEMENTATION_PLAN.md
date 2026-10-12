@@ -1,3 +1,12 @@
+## Status amendment — finite-depth Prony attribution and repair, 2026-10-12
+
+The W5 free-surface Robin failure is fully attributed (independent John-series oracle,
+~1e-12 agreement) to Capytaine's default finite-depth Prony fit plus a small Rankine
+quadrature-mixing term. ANYhydro 81c04c6 adds a validated deterministic decomposition used
+by the production backend; native confirmation meets the unchanged criterion. Coefficient
+impact on a box is 1e-4..2e-3, so the coupled energy gap needs its own re-run with the
+validated kernel. W5 remains NO_GO; other criteria and release restrictions unchanged.
+
 ## Development resumed — Claude takeover, 2026-10-11
 
 The user resumed development and handed ANYmarine/ANYhydro to Claude (Codex as
