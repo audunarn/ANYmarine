@@ -2611,6 +2611,30 @@ error is the spectral norm of V^T (S(C) - S(R)) V over the cluster's smallest ei
 change on the fine mesh's energetic modes (not sorted eigenvalues) and needs panel counts
 showing the linear ratio; retained coefficient sets must be complete and unique.
 
+#### W5 kernel reconstruction criteria K1-K3 (adopted by the owner, 2026-10-12)
+
+These replace, for gate line 1 ("reconstructing the frequency response from the kernel
+and stored A_inf reproduces A and B"), the per-coefficient tolerance
+`|X_rec - X| <= 0.05 + 0.01 max|X|` registered in the first physical case. That form is
+dominated by small inter-body coupling coefficients whose ~2 % finite-mesh Kramers-Kronig
+inconsistency in the BEM data itself cannot be removed by any kernel setting (evidence
+anymarine-evidence/w5-physical-20261012b). The failed record is retained.
+
+At every source frequency in the declared window, with data X (derived retained A, B),
+reconstruction X_rec from the kernel and its stored A_inf, Z = B + i omega A:
+- K1 full block: ||Z_rec - Z||_F <= 0.02 ||Z||_F, ||A_rec - A||_F <= 0.02 ||A||_F,
+  ||B_rec - B||_F <= 0.02 ||B||_F.
+- K2 energetic modes: for A and for B, with the eigenpairs of S(X) at that frequency and
+  the R2 energetic threshold and 1 % clustering, |v^T S(X_rec) v - lambda| <= 0.02 lambda
+  (cluster: spectral-norm form).
+- K3 reporting: weak modes, per-coefficient errors and the difference between the stored
+  time-domain A_inf and the computed (omega = inf) A_inf are reported, not gated.
+The time-domain A_inf may be the band-consistent (Ogilvie) value
+`A_inf_eff = A_inf + mean over a declared calibration band below the window of
+(A - A_rec)`; the calibration band must not overlap the evaluation window, and the
+computed A_inf and the difference are recorded. Tolerances were fixed before evaluation of
+any case registered under them. W5 stays NO_GO until every gate line passes.
+
 ---
 
 W4/W5 extension integration: attached plates use the existing owning-body
