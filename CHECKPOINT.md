@@ -10,8 +10,7 @@ numerical admission false; full W5–W10, thin-sheet and release requirements op
 
 ## Source and Git state
 
-- ANYhydro main 81c04c6 (validated Prony fit, John oracle, portable CI classification)
-  on top of pushed 36cd502.
+- ANYhydro main 8299047 (validated Prony, exact imaginary kernel, criteria checker, John oracle).
 - ANYmarine: records on top of pushed 76a6c0b. GUI unchanged from verified 4cd9a6c.
 - Superseded worker component oracle archived (not in repo):
   C:/ANYworkspaceWork/anymarine-evidence/w5-free-surface-repair-20261011/superseded-component-oracle.
@@ -23,8 +22,9 @@ C:/ANYworkspaceWork/anymarine-evidence/w5-prony-attribution-20261012/ATTRIBUTION
 
 ## Next action
 
-Awaiting owner decision on W5 energy/coefficient criteria and passivity route
-(see TASK.md top and w5-route-comparison-20261012/REPORT.md). Then: matched-discretization
-study of the negative near-field damping eigenvalue. W5 NO_GO.
+W5 criteria adopted (R1-R8). Production Capytaine route with anyhydro.green_function
+(ANYhydro 8299047, adapter 0.4.0) passes R1-R4, R6, R8 on the 03c configuration; R5
+needs a HAMS weak-mode uncertainty; R7 needs the time-domain radiation model and free
+decay. See TASK.md top. W5 NO_GO.
 Tests on Windows: runtime python with PYTHONPATH=C:/Github/ANYhydro/src and a writable
 --basetemp. Linux native runtime: /var/tmp/anyhydro-e1-installed-repair-20261011.

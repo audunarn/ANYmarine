@@ -1,3 +1,29 @@
+## Current — W5 criteria adopted; exact imaginary kernel, 2026-10-12
+
+Owner adopted W5 retained-block criteria R1-R8 (plan, Gate W5 subsection; ANYmarine
+2268598 + clarification bcd39b0). Checker: ANYhydro tools/check_retained_block_criteria.py
+(7604a0d; two Sol reviews, all findings fixed). Retained custom 03c point: R1-R4 pass,
+R5-R8 unresolved.
+
+Root cause of indefinite near-field damping found: Capytaine's tabulated imaginary wave
+term (two-box near-null eigenvalue -0.011, unchanged by refinement or a finer table;
+untabulated +0.0015 = far field, but ~140x slower). ANYhydro 8299047 adds
+anyhydro.green_function: validated Prony + exact propagating imaginary part
+-(k/2D) Z Z J0(kr); production backend adapter 0.4.0. Astra-reviewed: formula, signs and
+paths sound; upstream z=0 self-panel sign flip replaced by the continuous exact value
+(< 0.03 % on damping with realistic lids); block-wise memory; ~1.3x matrix cost.
+
+Production route on the 03c configuration (quad meshes 864/1944, lid z=-0.1, HAMS
+reference; criteria-capytaine-route-03.json): R1 A 2.2 %, B 0.5 %, Z 2.1 %; R2 worst 2.8 %;
+R3, R4 pass; R6 near/far 1.0/0.9/0.6 % (was failing at 4 %); R8 <= 0.8 %. R5 unresolved
+(candidate 0.0028 vs HAMS 0.00115 on the weak mode; HAMS value unconverged, far-field
+converges to ~+0.0015, HAMS uncertainty not established). R7 unresolved (time-domain
+radiation model and free decay not yet run). W5 NO_GO.
+
+Next: R5 needs a quantified HAMS weak-mode uncertainty (HAMS refinement or an accepted
+independent reference); R7 and the remaining Gate W5 lines need the time-domain radiation
+kernel reconstruction, free decay and RAO comparison built on adapter-0.4.0 coefficients.
+
 ## Current — 03c energy predicate conditioning, 2026-10-12
 
 Evidence: C:/ANYworkspaceWork/anymarine-evidence/w5-route-comparison-20261012/REPORT.md
