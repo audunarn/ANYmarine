@@ -22,7 +22,9 @@ from PySide6.QtWidgets import (QComboBox, QFileDialog, QHBoxLayout, QLabel, QPus
 
 _TABLE_KEYS = ('artifact', 'case_hash', 'project_input_hash', 'dof_keys', 'entries', 'table_hash')
 _REPORT_KEYS = ('artifact', 'case_hash', 'table_hash', 'category', 'checks', 'runs', 'verdict', 'report_hash')
-_SUCCESS = {'rao-prepare': (0,), 'rao-table': (0,), 'rao-run': (0, 2)}   # 2 = nogo, a valid outcome
+_SUCCESS = {'rao-prepare': (0,), 'rao-table': (0,), 'rao-run': (0, 3)}   # 3 = nogo (2 = usage error)
+_CASE_ID_CHARACTERS = frozenset('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-')
+_CHECK_KEYS = ('name', 'value', 'limit', 'passed')
 
 
 class RaoResultError(ValueError):
@@ -73,8 +75,16 @@ def load_results(directory):
             raise RaoResultError('rao_report.json fails its hash verification')
         if report['table_hash'] != table['table_hash'] or report['case_hash'] != case.case_hash:
             raise RaoResultError('rao_report.json is not bound to this table and case')
-        if not all(isinstance(r, dict) and len(r.get('rao', ())) == len(table['dof_keys']) for r in report['runs']):
-            raise RaoResultError('rao_report.json runs are malformed')
+        runs, checks = report['runs'], report['checks']
+        expected = len(case.omegas) * len(case.headings_degrees) * len(case.amplitudes)
+        if not isinstance(runs, list) or len(runs) != expected or not all(
+                isinstance(r, dict) and len(r.get('rao', ())) == len(table['dof_keys']) for r in runs):
+            raise RaoResultError(f'rao_report.json runs do not cover the case grid ({expected} runs expected)')
+        if not isinstance(checks, list) or not checks or not all(
+                isinstance(c, dict) and all(k in c for k in _CHECK_KEYS) for c in checks):
+            raise RaoResultError('rao_report.json checks are missing or malformed')
+        if not isinstance(report['verdict'], str) or not isinstance(report['category'], str):
+            raise RaoResultError('rao_report.json verdict/category are malformed')
     return case, table, report
 
 
@@ -222,7 +232,7 @@ class RaoPanel(QWidget):
             if not spec_path:
                 return
             case_id = str(json.loads(Path(spec_path).read_text(encoding='utf-8'))['case_id'])
-            if not case_id or not all(c.isalnum() or c in '._-' for c in case_id) or case_id[0] in '.-':
+            if not case_id or not all(c in _CASE_ID_CHARACTERS for c in case_id) or case_id[0] in '.-':
                 raise ValueError('case_id must use letters, digits, ".", "_" or "-" only')
             cases = (root / 'rao' / 'cases').resolve()
             target = (cases / f'{case_id}-{_stamp()}.json').resolve()
@@ -248,7 +258,8 @@ class RaoPanel(QWidget):
     def _launch(self, arguments):
         process = QProcess(self)
         process.setProgram(sys.executable)
-        process.setArguments(['-X', 'utf8', '-m', 'anymarine.cli', *arguments])
+        # -P: the working directory is not prepended to sys.path, so it cannot shadow the package.
+        process.setArguments(['-P', '-X', 'utf8', '-m', 'anymarine.cli', *arguments])
         environment = QProcessEnvironment.systemEnvironment()
         # The child must import exactly what this process imported (a source checkout
         # started through run_gui.py extends sys.path without PYTHONPATH).
@@ -303,10 +314,10 @@ class RaoPanel(QWidget):
         self._enable()
 
     def cancel(self):
+        """Kill the child without blocking the GUI thread; ``finished`` resets the dock."""
         if self.process is not None:
             self.process.kill()
-            self.process.waitForFinished(3000)
-            self.status.setText('Cancelled; partial evidence stays in the output directory.')
+            self.status.setText('Cancelling; partial evidence stays in the output directory.')
 
     # --------------------------------------------------------------- results
     def open_results_dialog(self):
@@ -337,10 +348,21 @@ class RaoPanel(QWidget):
             self.refresh()
             self._fill_checks()
         except (KeyError, TypeError, ValueError, IndexError) as error:
-            self.case = self.table = self.report = None
+            self._clear()
             self.status.setText(f'results could not be displayed: {error}')
             return
         self.results_loaded.emit(str(directory))
+
+    def _clear(self):
+        self.case = self.table = self.report = self._directory = None
+        for combo in (self.dof, self.point):
+            combo.blockSignals(True)
+            combo.clear()
+            combo.blockSignals(False)
+        self.plot.set_data('', [], [])
+        self.forces.setRowCount(0)
+        self.checks.setRowCount(0)
+        self.case_label.setText('No RAO results shown.')
 
     def project_changed(self):
         """Recompute the detached label for the window's current project inputs."""
@@ -373,11 +395,12 @@ class RaoPanel(QWidget):
         for e in self.table['entries']:
             if e['heading_degrees'] != heading:
                 continue
-            label = e['source'] + ('' if e.get('amplitude') is None else f" a={e['amplitude']:g}")
-            lines.setdefault(label, []).append((e['omega'], complex(*e['rao'][k])))
+            # Curves are identified by the exact source and amplitude, not by a rounded label.
+            lines.setdefault((e['source'], e.get('amplitude')), []).append((e['omega'], complex(*e['rao'][k])))
         series = []
-        for label, pts in lines.items():
+        for (source, amplitude), pts in lines.items():
             pts = sorted(pts, key=lambda p: p[0])
+            label = source + ('' if amplitude is None else f' a={amplitude!r}')
             series.append((label, [w for w, _ in pts], [v for _, v in pts]))
         markers = []
         if self.report is not None:

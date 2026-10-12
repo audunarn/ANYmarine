@@ -26,8 +26,8 @@ STATIC_FORCE_LIMIT_N = 1e-8 + 1e-8 * 100.0     # equilibrium_jobs DEFAULT_SPEC a
 STATIC_MOMENT_LIMIT_NM = 1e-8 + 1e-8 * 100.0
 DRAG_BALANCE_TOLERANCE = 1e-8      # relative change of the response between harmonic-balance iterates
 DRAG_BALANCE_ITERATIONS = 200
-#: Declared validity margin of the taut-line linearization: along the sampled predicted
-#: orbit every segment keeps at least this fraction of the smallest static tension.
+#: Declared validity margin of the taut-line linearization: along the predicted orbit
+#: every segment keeps at least this fraction of its own static tension.
 TAUT_ORBIT_MARGIN = 0.05
 NO_EVIDENCE = 1e300                # finite (JSON) sentinel for a check without evidence; always fails
 
@@ -208,9 +208,11 @@ class _Linear:
             # derivative of the drag fundamental (body DOFs only), with backtracking.
             zr = np.block([[z.real, -z.imag], [z.imag, z.real]])
             current = residual(q)
+            size = lambda v: float(np.max(np.abs(v), initial=0.0))   # max-norm: no underflow
+
             for iteration in range(1, DRAG_BALANCE_ITERATIONS + 1):
-                balance = max(np.linalg.norm(total), np.linalg.norm(z @ q), 1e-300)
-                if np.linalg.norm(current) <= 1e-4 * DRAG_BALANCE_TOLERANCE * balance:
+                balance = max(size(total), size(z @ q))
+                if size(current) == 0.0 or (balance > 0 and size(current) <= 1e-4 * DRAG_BALANCE_TOLERANCE * balance):
                     break               # start already balanced far below tolerance (e.g. exact q = 0)
                 scale = max(float(np.max(np.abs(q[:nb]))), 1e-9)
                 jac = zr.copy()
@@ -230,16 +232,16 @@ class _Linear:
                     except ValueError:              # chart/bounds refusal: shorten the step
                         factor *= 0.5
                         continue
-                    if np.linalg.norm(trial_residual) < np.linalg.norm(current):
+                    if size(trial_residual) < size(current):
                         accepted = True
                         break
                     factor *= 0.5
                 if not accepted:
                     raise RaoReportError(f'drag harmonic balance line search failed at omega {omega}')
                 q, current = trial, trial_residual
-                balance = max(np.linalg.norm(total), np.linalg.norm(z @ q), 1e-300)
-                if (np.linalg.norm(factor * delta) <= DRAG_BALANCE_TOLERANCE * max(np.linalg.norm(q), 1e-300)
-                        and np.linalg.norm(current) <= DRAG_BALANCE_TOLERANCE * balance):
+                balance = max(size(total), size(z @ q))
+                if (size(factor * delta) <= DRAG_BALANCE_TOLERANCE * size(q)
+                        and (size(current) == 0.0 or size(current) <= DRAG_BALANCE_TOLERANCE * balance)):
                     break
             else:
                 raise RaoReportError(f'drag harmonic balance did not converge at omega {omega}, amplitude {amplitude}')
@@ -279,8 +281,8 @@ def features(project, spec):
                 # Linearization valid only while every segment stays taut along the predicted
                 # orbit at the largest amplitude (public assembly at moving states: finite
                 # rotation and axial damping included).
-                floor = TAUT_ORBIT_MARGIN * float(np.min(lin.linear.mooring_tension))
-                if rl.mooring_orbit_min_tension(lin.model, lin.states, lin.nodes, q, omega) <= floor:
+                orbit = rl.mooring_orbit_tensions(lin.model, lin.states, lin.nodes, q, omega)
+                if np.any(orbit <= TAUT_ORBIT_MARGIN * lin.linear.mooring_tension):
                     taut = False
             for i in range(len(lin.model.body_ids)):
                 # Peak vector magnitude of Re{Q exp(-iwt)} is bounded by ||Q|| (all phases).

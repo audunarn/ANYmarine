@@ -242,3 +242,10 @@ def test_m8_non_finite_power_arithmetic_fails():
     report = rr.compare(c, table(c, BASE), [extraction(0.1, BASE, response=q, forces=huge),
                                             extraction(0.05, BASE, forces=huge)])
     assert 'power_closure_relative' in names(report, False)
+
+
+# ---------------------------------------------------------------- round 5
+def test_p6_case_id_is_ascii_only():
+    for bad in ('é', '١', 'naïve-case'):
+        with pytest.raises(rc.RaoCaseError, match='case_id'):
+            case(case_id=bad)

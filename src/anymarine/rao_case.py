@@ -39,6 +39,7 @@ PROPOSED_MAXIMA = {
 #: Case-declared positive scales without a ceiling.
 DECLARED_SCALES = ('nearzero_amplitude_absolute', 'small_angle_bound_rad', 'small_excursion_m')
 CRITERIA_KEYS = frozenset(GOVERNING_MAXIMA) | frozenset(PROPOSED_MAXIMA) | frozenset(DECLARED_SCALES)
+_CASE_ID_CHARACTERS = frozenset('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-')
 _ADOPTED = True  # owner adoption 2026-10-12 (IMPLEMENTATION_PLAN, RAO reporting criteria)
 
 _CASE_KEYS = ('schema_version', 'case_id', 'project_input_hash', 'linearization_point',
@@ -134,7 +135,7 @@ def prepare_rao_case(spec, *, project_input_hash, features, created_utc=''):
                                  'scope', 'created_utc'}
     _require(set(spec) == allowed, f'spec needs exactly the fields {sorted(allowed)}')
     _require(isinstance(spec['case_id'], str) and 0 < len(spec['case_id']) <= 120
-             and all(c.isalnum() or c in '._-' for c in spec['case_id']) and spec['case_id'][0] not in '.-',
+             and all(c in _CASE_ID_CHARACTERS for c in spec['case_id']) and spec['case_id'][0] not in '.-',
              'case_id must be 1-120 characters of letters, digits, ".", "_" or "-" (it names files)')
     _require(isinstance(project_input_hash, str) and len(project_input_hash) == 64
              and all(c in '0123456789abcdef' for c in project_input_hash), 'project_input_hash must be sha256 hex')

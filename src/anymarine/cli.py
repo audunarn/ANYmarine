@@ -788,6 +788,15 @@ def _rao_out_dir(path):
     return out
 
 
+def _write_case_snapshot(out, case):
+    """The validated case object itself (never a re-read of the possibly changed source file)."""
+    (out / 'case.json').write_text(json.dumps(dict(case=case.to_dict(), case_hash=case.case_hash), indent=2,
+                                              sort_keys=True), encoding='utf-8')
+
+
+RAO_NOGO_EXIT = 3     # distinct from argparse usage errors (2)
+
+
 def _cmd_rao_prepare(args) -> int:
     from . import rao_case, rao_report
     project = ApplicationService().load(args.project)
@@ -811,7 +820,7 @@ def _cmd_rao_table(args) -> int:
         case = rao_case.read_case_artifact(args.case)
         table = rao_report.fd_table(project, case)
         out = _rao_out_dir(args.out_dir)
-        (out / 'case.json').write_text(Path(args.case).read_text(encoding='utf-8'), encoding='utf-8')
+        _write_case_snapshot(out, case)
         (out / 'rao_table.json').write_text(json.dumps(table, indent=1), encoding='utf-8')
         rao_report.write_csv(out, table)
     except (OSError, ValueError) as error:
@@ -839,7 +848,7 @@ def _cmd_rao_run(args) -> int:
                 (runs / f'{kind}-{counter[kind]:03d}.json').write_text(json.dumps(payload), encoding='utf-8')
 
         try:
-            (out / 'case.json').write_text(Path(args.case).read_text(encoding='utf-8'), encoding='utf-8')
+            _write_case_snapshot(out, case)
             (out / 'rao_table.json').write_text(json.dumps(table, indent=1), encoding='utf-8')
             runs.mkdir()
             records, extractions = rao_report.run_campaign(
@@ -855,7 +864,7 @@ def _cmd_rao_run(args) -> int:
         raise ServiceError(f'RAO run refused: {error}') from error
     print(f'RAO report {report["report_hash"]}: category={report["category"]} verdict={report["verdict"]}')
     print(f'failed checks: {sorted(set(report["failed"])) or "none"}')
-    return 2 if report['verdict'] == 'nogo' else 0
+    return RAO_NOGO_EXIT if report['verdict'] == 'nogo' else 0
 
 
 def _cmd_inspect_wave_bundle(args):

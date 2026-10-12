@@ -474,12 +474,13 @@ def harmonic_drag(contribution, model, states, response, omega, *, samples=64):
     return 2.0 * total / samples
 
 
-def mooring_orbit_min_tension(model, states, nodes, response, omega, *, samples=256):
-    """Smallest segment tension along the predicted orbit ``q(t) = Re{q exp(-i w t)}``.
+def mooring_orbit_tensions(model, states, nodes, response, omega, *, samples=256, refine=48):
+    """Per-segment smallest tension along the predicted orbit ``q(t) = Re{q exp(-i w t)}``.
 
     The public assembly is evaluated at moving body/node states (positions and
-    rates), so finite rotations and axial damping are included; a value <= 0 means
-    a segment goes slack and the taut linearization does not hold.
+    rates), so finite rotations and axial damping are included. Each segment's
+    sampled minimum is refined by golden-section search between its neighbouring
+    samples, so a minimum falling between samples is not missed.
     """
     _, rigid = _solver()
     from anysolver.marine_mooring import MooringNodeState
@@ -489,9 +490,10 @@ def mooring_orbit_min_tension(model, states, nodes, response, omega, *, samples=
     nodes = stationary_nodes(nodes)
     q = np.asarray(response, dtype=complex)
     n = 6 * len(body_ids)
-    lowest = math.inf
-    for k in range(samples):
-        e = np.exp(-1j * omega * 2.0 * math.pi / omega * k / samples)
+    period = 2.0 * math.pi / omega
+
+    def tensions(t):
+        e = np.exp(-1j * omega * t)
         pos, vel = (q * e).real, (-1j * omega * q * e).real
         moving = {bid: rigid.RigidBodyState(position=np.asarray(base[bid].position) + pos[6 * i:6 * i + 3],
                                             rotation_vector=pos[6 * i + 3:6 * i + 6], velocity=vel[6 * i:6 * i + 6],
@@ -499,5 +501,30 @@ def mooring_orbit_min_tension(model, states, nodes, response, omega, *, samples=
                   for i, bid in enumerate(body_ids)}
         node_state = MooringNodeState(np.asarray(nodes.positions) + pos[n:].reshape(-1, 3),
                                       vel[n:].reshape(-1, 3), np.zeros_like(np.asarray(nodes.positions)))
-        lowest = min(lowest, float(np.min(mooring.evaluate(moving, node_state, time=0.0).tensions)))
+        return np.asarray(mooring.evaluate(moving, node_state, time=0.0).tensions, dtype=float)
+
+    dt = period / samples
+    table = np.array([tensions(k * dt) for k in range(samples)])
+    lowest = table.min(axis=0)
+    golden = (math.sqrt(5.0) - 1.0) / 2.0
+    for segment in range(table.shape[1]):
+        k = int(np.argmin(table[:, segment]))
+        a, b = (k - 1) * dt, (k + 1) * dt
+        c, d = b - golden * (b - a), a + golden * (b - a)
+        fc, fd = tensions(c)[segment], tensions(d)[segment]
+        for _ in range(refine):
+            if fc < fd:
+                b, d, fd = d, c, fc
+                c = b - golden * (b - a)
+                fc = tensions(c)[segment]
+            else:
+                a, c, fc = c, d, fd
+                d = a + golden * (b - a)
+                fd = tensions(d)[segment]
+        lowest[segment] = min(lowest[segment], fc, fd)
     return lowest
+
+
+def mooring_orbit_min_tension(model, states, nodes, response, omega, *, samples=256):
+    """Smallest tension of any segment along the predicted orbit (see mooring_orbit_tensions)."""
+    return float(np.min(mooring_orbit_tensions(model, states, nodes, response, omega, samples=samples)))

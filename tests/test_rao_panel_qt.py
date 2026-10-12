@@ -124,3 +124,21 @@ def test_child_environment_start_failure_and_exit_codes(window):
     panel._command, panel.process, panel._pending_case = 'rao-prepare', Finished(), tmp_path / 'never.json'
     panel._finished(2, QProcess.ExitStatus.NormalExit)
     assert panel.case_path is None and 'failed' in panel.status.text()
+
+
+def test_incomplete_report_is_refused(tmp_path):
+    from anymarine.qtapp import rao_panel
+    from anymarine.rao_report import _hash
+    from test_rao_review_fixes import case, table, BASE
+    c = case()
+    t = table(c, BASE)
+    t.update(artifact='anymarine_rao_table', project_input_hash=c.project_input_hash)
+    t['table_hash'] = _hash(t)
+    (tmp_path / 'case.json').write_text(json.dumps(dict(case=c.to_dict(), case_hash=c.case_hash)), encoding='utf-8')
+    (tmp_path / 'rao_table.json').write_text(json.dumps(t), encoding='utf-8')
+    report = dict(artifact='anymarine_rao_report', case_hash=c.case_hash, table_hash=t['table_hash'],
+                  category=c.category, checks=[], runs=[], verdict='pass')
+    report['report_hash'] = _hash(report)
+    (tmp_path / 'rao_report.json').write_text(json.dumps(report), encoding='utf-8')
+    with pytest.raises(rao_panel.RaoResultError, match='case grid'):
+        rao_panel.load_results(tmp_path)
