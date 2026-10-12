@@ -2611,6 +2611,41 @@ error is the spectral norm of V^T (S(C) - S(R)) V over the cluster's smallest ei
 change on the fine mesh's energetic modes (not sorted eigenvalues) and needs panel counts
 showing the linear ratio; retained coefficient sets must be complete and unique.
 
+#### W5 R5 weak-mode uncertainty protocol (adopted by the owner, 2026-10-12)
+
+Fixed before any new solve; it defines U_k for R5 on the retained 03c point (two
+1 x 1 x 0.5 m boxes at x = +/-2 m, retained surge/heave, omega = 1.5 rad/s, h = 150 m).
+Existing HAMS levels 4/6 show the weak damping eigenvalue moving from -9.2e-5 to +1.15e-3;
+A has no weak mode there (retained eigenvalues 350-445), so R5 currently concerns B only.
+
+- Reference series: pinned HAMS-MREL first-slice decks (anyhydro
+  prepare_hams_first_slice_reference, numerical waterplane on) at subdivisions s = 6, 9, 14
+  (linear ratios r21 = 1.5, r32 = 14/9). HAMS runs at the Froude-scaled native frequency of
+  the manifest (same wavenumber), so no frequency-mismatch term applies.
+- Mode measure: fine basis. v_k are the weak eigenvectors of S(R_14); at every level
+  lambda_k(s) = v_k^T S(R_s) v_k (no eigenvalue sorting). The reference value is lambda_k(14).
+- Discretization uncertainty (grid-convergence index, Celik et al. 2008, index 1 = finest):
+  e21 = lambda(9) - lambda(14), e32 = lambda(6) - lambda(9), r21 = 14/9, r32 = 1.5.
+  Monotone when e21 * e32 > 0; then the observed order p solves
+  p = |ln|e32/e21| + q(p)| / ln r21, q(p) = ln((r21^p - s)/(r32^p - s)), s = sign(e32/e21),
+  by fixed-point iteration from q = 0. If monotone and 0.5 <= p <= 4:
+  U_disc = 1.25 |e21| / (r21^p - 1); otherwise U_disc = 3 |e21|.
+- Output rounding: U_print = ||E_14||_2, the spectral norm of the HAMS print-rounding bound
+  of the retained block at s = 14 (Weyl bound; also bounds the fixed-basis Rayleigh value).
+- U_k = U_disc + U_print.
+- Independent route: production Capytaine route (adapter 0.5.0) far-field Kochin damping
+  B_far = (4 pi rho k/(omega D)) Re int H^* H^T dtheta (analytic constant) on the same
+  first-slice hulls at s = 6, 9, 14, measured in the same fine HAMS basis v_k, with its own
+  U_far from the same GCI rule (no print term).
+- Guards (both required for a pass/fail verdict, otherwise R5 is "unresolved"):
+  (G1) sign: U_k < |lambda_k(14)|; (G2) consistency:
+  |lambda_far,k(14) - lambda_k(14)| <= U_k + U_far,k.
+- Verdict: |v_k^T S(C) v_k - lambda_k(14)| <= U_k, with C the stored fine candidate
+  (matrices.fine) of w5-route-comparison-20261012/criteria-capytaine-route-03.json
+  (production route, quad meshes, lid z = -0.1; sha256 142777ad3c5b4028...), unchanged.
+
+Failed or unresolved outcomes are recorded as such; nothing here is changed after evaluation.
+
 #### W5 kernel reconstruction criteria K1-K3 (adopted by the owner, 2026-10-12)
 
 These replace, for gate line 1 ("reconstructing the frequency response from the kernel
