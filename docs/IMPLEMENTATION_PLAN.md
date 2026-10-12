@@ -2569,6 +2569,41 @@ Start with direct convolution and fixed time step.
 - Two-body off-diagonal radiation forces are observable in the force decomposition.
 - Zero, finite and infinite frequency treatment is explicitly reported.
 
+#### W5 retained-block coefficient and energy criteria (adopted by the owner, 2026-10-12)
+
+These replace the registered single-point 03c criterion "mean power at the frozen rate
+within 3 % of HAMS" as a gate. That predicate measured the near-null damping eigenvector
+(lambda_min/lambda_max = 5.6e-6) and is too ill-conditioned to be a sole accuracy gate
+(evidence: anymarine-evidence/w5-route-comparison-20261012/REPORT.md). Its failed record is
+retained unchanged. The gate lines above remain in force.
+
+Notation, per frequency: retained matrices X in {A, B}, candidate C, reference R (HAMS
+unless stated), S(X) = (X + X^T)/2, eigenpairs (lambda_k, v_k) of S(R) in decreasing order,
+rho = lambda_1. Mode k is energetic when lambda_k >= 1e-3 rho, otherwise weak.
+Impedance Z = B + i omega A.
+
+- R1 full block: ||C - R||_F <= 0.03 ||R||_F for A, B and Z.
+- R2 energetic modes: |v_k^T S(C) v_k - lambda_k| <= 0.03 lambda_k for every energetic k,
+  for A and for B.
+- R3 inter-body coupling: for the off-diagonal body-to-body sub-block, ||C_ab - R_ab||_F
+  <= 0.03 ||R_ab||_F for A and B whenever ||R_ab||_F >= 1e-3 ||R||_F (else reported only).
+- R4 symmetry: ||X - X^T||_F <= 0.02 ||X||_F for A and B of the candidate (reference reported).
+- R5 weak modes: |v_k^T S(C) v_k - lambda_k| <= U_k, where U_k is the documented
+  uncertainty of the weak eigenvalue from matched refinement and an independent route.
+  Until U_k is established the weak-mode verdict is "unresolved", which does not pass W5.
+- R6 near/far consistency of the candidate route: for every energetic mode u of S(B_C),
+  |u^T B_C u - u^T B_far u| <= 0.03 u^T B_C u, with B_far = (4 pi rho k/(omega D))
+  Re int H^* H^T d theta (analytic constant, never fitted), D = tanh kh + kh sech^2 kh.
+- R7 passivity: the damping used by the time-domain model has S(B) positive semidefinite
+  at every frequency, and discrete free decay never gains energy (gate line 2). The method
+  is selected after the matched near-field study; eigenvalue clipping without a documented
+  physical basis stays disallowed.
+- R8 convergence: R1/R2 energetic measures of the candidate change by <= 1 % between two
+  matched refinements with linear panel-size ratio >= 1.5.
+
+Tolerances come from the plan's existing 2-3 % range and were fixed before evaluation.
+A criterion with missing evidence is "unresolved", never "passed".
+
 ---
 
 W4/W5 extension integration: attached plates use the existing owning-body
