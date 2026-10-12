@@ -91,7 +91,7 @@ def test_refusals():
     with pytest.raises((rr.RaoReportError, rc.RaoCaseError), match='drag'):
         rr.prepare_case(dragged, spec())            # drag present: declare its linearization
     from anymarine.native_examples import mooring_two_body_project
-    with pytest.raises(rr.RaoReportError, match='mooring'):
+    with pytest.raises(rc.RaoCaseError, match='audited'):   # lines not in equilibrium with the bodies
         rr.prepare_case(mooring_two_body_project(), spec(radiation_source='none'))
     # large response -> not small motion -> nonlinear_reported
     big = rr.prepare_case(project, spec(amplitudes=[50.0, 25.0]))
