@@ -151,3 +151,65 @@ def test_n4_campaign_is_bound_to_the_case_project():
     c = rr.prepare_case(oscillator_with_cylinder(), spec())
     with pytest.raises(rr.RaoReportError, match='different project'):
         rr.run_campaign(oscillator_project(), c, solve=lambda *a, **k: pytest.fail('solver reached'))
+
+
+# ---------------------------------------------------------------- round 3
+@requires_solver
+def test_r1_node_residuals_are_audited():
+    from anymarine.native_inputs import NativeMechanicalInputs
+    from test_rao_mooring import taut_project, spec as mooring_spec
+    p = taut_project()
+    data = p.native_inputs.to_dict()
+    data['mooring']['data']['lines'][0]['rest_lengths'][0] = 2.3     # node no longer in equilibrium
+    unbalanced = p.with_edits(native_inputs=NativeMechanicalInputs.from_dict(data))
+    with pytest.raises(rc.RaoCaseError, match='audited'):
+        rr.prepare_case(unbalanced, mooring_spec())
+
+
+@requires_solver
+def test_r2_orbit_slack_is_predicted():
+    from test_rao_mooring import taut_project, spec as mooring_spec
+    c = rr.prepare_case(taut_project(), mooring_spec(amplitudes=[400.0, 200.0],
+                                                     criteria={**mooring_spec()['criteria'], 'small_excursion_m': 10.0,
+                                                               'small_angle_bound_rad': 1.0}))
+    assert c.features['mooring_taut'] is False and c.category == 'nonlinear_reported'
+
+
+def test_r3_observed_slack_demotes():
+    c = case()
+    report = rr.compare(c, table(c, BASE), [extraction(0.1, BASE, min_tension=0.0), extraction(0.05, BASE, min_tension=0.5)])
+    assert report['verdict'] == 'nogo' and any('slack' in d for d in report['demoted'])
+
+
+def test_r5_unresolved_window_change_gates_nonlinear_cases():
+    spec_keys = ('case_id', 'linearization_point', 'radiation_source', 'omegas', 'headings_degrees', 'amplitudes',
+                 'phase', 'windows', 'fit_controls', 'criteria', 'execution_limits')
+    spec = {k: v for k, v in case().to_dict().items() if k in spec_keys}
+    spec['drag_linearization'] = 'equivalent_harmonic'
+    c = rc.prepare_rao_case(spec, project_input_hash='c' * 64, features=dict(LINEAR, any_drag=True))
+    assert c.category == 'linearized_nonlinear'
+    first = BASE * 0.1
+    first[3] = 0.01                                        # unresolved DOF changes by 0.01 m between windows
+    report = rr.compare(c, table(c, BASE), [extraction(0.1, BASE, response_first=first), extraction(0.05, BASE)])
+    assert 'steady_absolute' in names(report, False) and report['verdict'] == 'nogo'
+
+
+def test_r7_r8_power_closure_evidence_and_roundoff():
+    c = case()
+    missing = rr.compare(c, table(c, BASE), [extraction(0.1, BASE, forces={}), extraction(0.05, BASE)])
+    assert 'power_closure_relative' in names(missing, False)
+    f = np.zeros(N, complex)
+    f[0] = 1.0                                             # conservative (in phase with q): zero mean power
+    tiny = dict(x=dict(phasor=f), dry=dict(phasor=f + 1e-17))
+    ok = rr.compare(c, table(c, BASE), [extraction(0.1, BASE, forces=tiny), extraction(0.05, BASE, forces=tiny)])
+    assert 'power_closure_relative' in names(ok, True)
+
+
+def test_r9_csv_keeps_the_incident_amplitude(tmp_path):
+    import csv
+    c = case()
+    t = table(c, BASE)
+    t['entries'] = [dict(t['entries'][0], amplitude=a) for a in (0.1, 0.05)]
+    rr.write_csv(tmp_path, t)
+    rows = list(csv.reader((tmp_path / 'rao_table.csv').open(encoding='utf-8')))
+    assert rows[0][2] == 'incident_amplitude' and {r[2] for r in rows[1:]} == {'0.1', '0.05'}

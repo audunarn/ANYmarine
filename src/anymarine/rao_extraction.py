@@ -108,3 +108,13 @@ def extract_run(record, *, omega, amplitude, anchors, transient_seconds, window_
                 higher_absolute=higher + second.residual_rms,
                 harmonic_distortion=second.harmonic_distortion(), condition=second.condition,
                 body_peaks=peaks, forces=forces)
+
+
+def min_segment_tension(record, windows):
+    """Smallest stored segment tension over the steady windows, or None without lines."""
+    keys = [k for k in record.channels if k.startswith('mooring[') and k.endswith('/tensions')]
+    if not keys:
+        return None
+    times = np.asarray(record.times, dtype=float)
+    inside = (times >= windows[0][0] - 1e-9) & (times <= windows[-1][1] + 1e-9)
+    return float(min(np.min(np.asarray(record.channels[k], dtype=float)[inside]) for k in keys))

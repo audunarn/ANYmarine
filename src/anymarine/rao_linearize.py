@@ -472,3 +472,32 @@ def harmonic_drag(contribution, model, states, response, omega, *, samples=64):
         result = contribution.evaluate_trial_with_context(contributions.CommittedHistory(), moving, layout, info)
         total += _morison_drag(result) * np.conj(e)
     return 2.0 * total / samples
+
+
+def mooring_orbit_min_tension(model, states, nodes, response, omega, *, samples=64):
+    """Smallest segment tension along the predicted orbit ``q(t) = Re{q exp(-i w t)}``.
+
+    The public assembly is evaluated at moving body/node states (positions and
+    rates), so finite rotations and axial damping are included; a value <= 0 means
+    a segment goes slack and the taut linearization does not hold.
+    """
+    _, rigid = _solver()
+    from anysolver.marine_mooring import MooringNodeState
+    mooring = model.mooring
+    body_ids = tuple(model.body_ids)
+    base = stationary_states({bid: states[bid] for bid in body_ids})
+    nodes = stationary_nodes(nodes)
+    q = np.asarray(response, dtype=complex)
+    n = 6 * len(body_ids)
+    lowest = math.inf
+    for k in range(samples):
+        e = np.exp(-1j * omega * 2.0 * math.pi / omega * k / samples)
+        pos, vel = (q * e).real, (-1j * omega * q * e).real
+        moving = {bid: rigid.RigidBodyState(position=np.asarray(base[bid].position) + pos[6 * i:6 * i + 3],
+                                            rotation_vector=pos[6 * i + 3:6 * i + 6], velocity=vel[6 * i:6 * i + 6],
+                                            anchor=base[bid].anchor)
+                  for i, bid in enumerate(body_ids)}
+        node_state = MooringNodeState(np.asarray(nodes.positions) + pos[n:].reshape(-1, 3),
+                                      vel[n:].reshape(-1, 3), np.zeros_like(np.asarray(nodes.positions)))
+        lowest = min(lowest, float(np.min(mooring.evaluate(moving, node_state, time=0.0).tensions)))
+    return lowest

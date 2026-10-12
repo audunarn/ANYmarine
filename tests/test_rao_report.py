@@ -67,7 +67,7 @@ def test_case_table_campaign_and_comparison(tmp_path):
     assert all(c['passed'] for c in report['checks']), [c for c in report['checks'] if not c['passed']]
     out = rr.write_csv(tmp_path / 'csv', table, report)
     rows = list(csv.reader((out / 'rao_table.csv').open(encoding='utf-8')))
-    assert rows[0][:4] == ['omega', 'heading_deg', 'source', 'dof'] and len(rows) == 1 + 12
+    assert rows[0][:5] == ['omega', 'heading_deg', 'incident_amplitude', 'source', 'dof'] and len(rows) == 1 + 12
     assert (out / 'comparison.csv').exists() and (out / 'contribution_forces.csv').exists()
     assert report['report_hash'] == rr._hash(report) and table['table_hash'] == rr._hash(table)
 

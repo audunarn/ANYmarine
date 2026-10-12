@@ -26,6 +26,7 @@ STATIC_FORCE_LIMIT_N = 1e-8 + 1e-8 * 100.0     # equilibrium_jobs DEFAULT_SPEC a
 STATIC_MOMENT_LIMIT_NM = 1e-8 + 1e-8 * 100.0
 DRAG_BALANCE_TOLERANCE = 1e-8      # relative change of the response between harmonic-balance iterates
 DRAG_BALANCE_ITERATIONS = 200
+NO_EVIDENCE = 1e300                # finite (JSON) sentinel for a check without evidence; always fails
 
 
 class RaoReportError(ValueError):
@@ -54,7 +55,7 @@ def _supported(project):
             raise RaoReportError('seabed contact switches branches: not linearized (reported only, later slice)')
         if native.mooring.has_hydrodynamics:
             for line in native.mooring.data['lines']:
-                for section in line['hydrodynamics']:
+                for section in line.get('hydrodynamics') or []:
                     if section['drag_normal'] != 0 or section['drag_tangential'] != 0:
                         raise RaoReportError('line drag needs a declared linearization (RAO design slice 8)')
     return native
@@ -127,7 +128,10 @@ class _Linear:
         self.linear = rl.linearize(model, states, dt=spec.dt, nodes=self.nodes)
         self.node_positions = None if self.nodes is None else np.asarray(self.nodes.positions)
         force = self.linear.static_force
-        self.static_force = float(max(np.max(np.abs(force[i * 6:i * 6 + 3])) for i in range(len(model.body_ids))))
+        nb = 6 * len(model.body_ids)
+        node_force = float(np.max(np.abs(force[nb:]), initial=0.0))     # free mooring nodes (N)
+        self.static_force = max(node_force, float(max(np.max(np.abs(force[i * 6:i * 6 + 3]))
+                                                      for i in range(len(model.body_ids)))))
         self.static_moment = float(max(np.max(np.abs(force[i * 6 + 3:i * 6 + 6])) for i in range(len(model.body_ids))))
         self.audited = self.static_force <= STATIC_FORCE_LIMIT_N and self.static_moment <= STATIC_MOMENT_LIMIT_NM
         self.anchors = {bid: (np.asarray(states[bid].position), np.asarray(states[bid].anchor))
@@ -220,14 +224,16 @@ class _Linear:
                     except ValueError:              # chart/bounds refusal: shorten the step
                         factor *= 0.5
                         continue
-                    if np.linalg.norm(trial_residual) <= np.linalg.norm(current) or factor < 1e-3:
+                    if np.linalg.norm(trial_residual) < np.linalg.norm(current):
                         accepted = True
                         break
                     factor *= 0.5
                 if not accepted:
                     raise RaoReportError(f'drag harmonic balance line search failed at omega {omega}')
                 q, current = trial, trial_residual
-                if np.linalg.norm(factor * delta) <= DRAG_BALANCE_TOLERANCE * max(np.linalg.norm(q), 1e-300):
+                balance = max(np.linalg.norm(total), np.linalg.norm(z @ q), 1e-300)
+                if (np.linalg.norm(factor * delta) <= DRAG_BALANCE_TOLERANCE * max(np.linalg.norm(q), 1e-300)
+                        and np.linalg.norm(current) <= DRAG_BALANCE_TOLERANCE * balance):
                     break
             else:
                 raise RaoReportError(f'drag harmonic balance did not converge at omega {omega}, amplitude {amplitude}')
@@ -256,9 +262,7 @@ def features(project, spec):
                     mooring_taut=None if native.mooring is None else False, contact_branch_risk=False,
                     small_motion=False, linearization_audited=False), lin
     if native.mooring is not None:
-        tension = lin.linear.mooring_tension
-        taut = bool(np.all(tension > 0))
-        gradient = rl.mooring_tension_gradient(lin.model, lin.states, lin.nodes) if taut else None
+        taut = bool(np.all(lin.linear.mooring_tension > 0))
     for omega in spec['omegas']:
         for heading in spec['headings_degrees']:
             # Without potential flow no radiation block exists, whatever the source label.
@@ -266,9 +270,10 @@ def features(project, spec):
             q, _ = lin.response(omega, heading, spec['phase'], source, amplitude=max(spec['amplitudes']))
             q = q * max(spec['amplitudes'])
             if taut:
-                # Linearization valid only while every segment stays taut: the predicted
-                # tension amplitude at the largest amplitude must stay below the static tension.
-                if np.any(np.abs(gradient @ q) >= lin.linear.mooring_tension):
+                # Linearization valid only while every segment stays taut along the predicted
+                # orbit at the largest amplitude (public assembly at moving states: finite
+                # rotation and axial damping included).
+                if rl.mooring_orbit_min_tension(lin.model, lin.states, lin.nodes, q, omega) <= 0:
                     taut = False
             for i in range(len(lin.model.body_ids)):
                 # Peak vector magnitude of Re{Q exp(-iwt)} is bounded by ||Q|| (all phases).
@@ -425,7 +430,7 @@ def run_campaign(project, case, *, solve=solve_record, progress=None, store=None
                                     harmonics=fit['harmonics'], intercept=fit['intercept'], drift=fit['drift'],
                                     max_condition=case.criteria['max_condition'], nodes=lin.node_positions)
                 ex.update(heading_degrees=heading, run_input_hash=input_hash(derived), result_id=record.result_id,
-                          omega_dt=omega * lin.dt)
+                          omega_dt=omega * lin.dt, min_tension=rx.min_segment_tension(record, ex['windows']))
                 records.append(record)
                 extractions.append(ex)
                 if progress is not None:
@@ -508,9 +513,10 @@ def compare(case, table, extractions):
                                                                initial=0)), crit['fit_rms_relative'], label))
         checks.append(_check('harmonic_distortion', float(np.max(thd[resolved], initial=0)),
                              crit['harmonic_distortion'], label))
-        checks.append(_check('unresolved_content_absolute',
-                             float(np.max(np.concatenate((higher[~resolved], change[~resolved])), initial=0)),
-                             nz, label + ' (higher harmonics, residual and window change of unresolved DOFs)'))
+        checks.append(_check('steady_absolute', float(np.max(change[~resolved], initial=0)), nz,
+                             label + ' (window-to-window fundamental change of unresolved DOFs)'))
+        checks.append(_check('unresolved_content_absolute', float(np.max(higher[~resolved], initial=0)), nz,
+                             label + ' (higher harmonics and residual of unresolved DOFs)'))
         checks.append(_check('max_omega_dt', ex['omega_dt'], crit['max_omega_dt'], label))
         trans = max(p[0] for p in ex['body_peaks'])
         rot = max(p[1] for p in ex['body_peaks'])
@@ -520,11 +526,25 @@ def compare(case, table, extractions):
             checks.append(check)
             if not check['passed']:
                 demotions.append(f'{name} {value:.4g} > {limit:.4g} ({label})')
-        power = _power(ex['forces'], response, ex['omega'], 6 * len(ex['body_peaks']))
-        scale = sum(abs(v) for v in power.values())
-        closure = abs(sum(power.values())) / scale if scale > 0 else 0.0
-        checks.append(_check('power_closure_relative', closure, crit['power_closure_relative'],
-                             label + ' (sum of mean contribution powers incl. dry inertia)'))
+        n_body = 6 * len(ex['body_peaks'])
+        forces = ex['forces']
+        note = ' (sum of mean contribution powers incl. dry inertia)'
+        if not forces or 'dry' not in forces:
+            closure, note = NO_EVIDENCE, ' (no contribution/dry force evidence: not a measured closure)'
+        else:
+            power = _power(forces, response, ex['omega'], n_body)
+            velocity = np.linalg.norm(ex['omega'] * np.asarray(response)[:n_body])
+            reference = 0.5 * velocity * sum(np.linalg.norm(np.asarray(f['phasor'])[:n_body]) for f in forces.values())
+            scale = max(sum(abs(v) for v in power.values()), 1e-6 * reference)
+            # Zero forces at zero power close exactly; roundoff is measured against the force-velocity scale.
+            closure = abs(sum(power.values())) / scale if scale > 0 else 0.0
+        checks.append(_check('power_closure_relative', closure, crit['power_closure_relative'], label + note))
+        if ex.get('min_tension') is not None:
+            slack = dict(name='observed_min_tension_n', value=float(ex['min_tension']), limit=0.0,
+                         passed=bool(ex['min_tension'] > 0), detail=label + ' (stored segment tensions, steady windows)')
+            checks.append(slack)
+            if not slack['passed']:
+                demotions.append(f"segment slack observed (min tension {ex['min_tension']:.4g} N) ({label})")
         by_point.setdefault(key, []).append(ex)
     for key, runs in by_point.items():
         runs = sorted(runs, key=lambda r: -r['amplitude'])
@@ -541,7 +561,8 @@ def compare(case, table, extractions):
     failed = [c for c in checks if not c['passed']]
     # Linearized-nonlinear cases gate on convergence and balance only (design section 3);
     # RAO differences, amplitude dependence and harmonic content are reported.
-    gating_nonlinear = ('steady_relative', 'power_closure_relative', 'max_omega_dt')
+    gating_nonlinear = ('steady_relative', 'steady_absolute', 'power_closure_relative', 'max_omega_dt',
+                        'observed_min_tension_n')
     if not rc.criteria_adopted():
         verdict = 'not_adjudicated'
     elif category == 'nonlinear_reported':
@@ -584,18 +605,22 @@ def write_csv(directory, table, report=None):
     keys = table['dof_keys']
     with (root / 'rao_table.csv').open('w', newline='', encoding='utf-8') as f:
         w = csv.writer(f)
-        w.writerow(['omega', 'heading_deg', 'source', 'dof', 'amplitude_per_m', 'phase_deg', 're', 'im'])
+        w.writerow(['omega', 'heading_deg', 'incident_amplitude', 'source', 'dof', 'amplitude_per_m', 'phase_deg',
+                    're', 'im'])
         for e in table['entries']:
             for key, (re, im) in zip(keys, e['rao']):
                 z = complex(re, im)
-                w.writerow([e['omega'], e['heading_degrees'], e['source'], key, abs(z), math.degrees(math.atan2(im, re)), re, im])
+                w.writerow([e['omega'], e['heading_degrees'], e.get('amplitude', 'linear'), e['source'], key, abs(z),
+                            math.degrees(math.atan2(im, re)), re, im])
     with (root / 'contribution_forces.csv').open('w', newline='', encoding='utf-8') as f:
         w = csv.writer(f)
-        w.writerow(['omega', 'heading_deg', 'source', 'contribution', 'dof', 'fd_re', 'fd_im', 'power_fd_w'])
+        w.writerow(['omega', 'heading_deg', 'incident_amplitude', 'source', 'contribution', 'dof', 'fd_re', 'fd_im',
+                    'power_fd_w'])
         for e in table['entries']:
             for cid, values in e['forces'].items():
                 for key, (re, im) in zip(keys, values):
-                    w.writerow([e['omega'], e['heading_degrees'], e['source'], cid, key, re, im, e['power_fd'][cid]])
+                    w.writerow([e['omega'], e['heading_degrees'], e.get('amplitude', 'linear'), e['source'], cid, key,
+                                re, im, e['power_fd'][cid]])
     if report is not None:
         with (root / 'rao_td.csv').open('w', newline='', encoding='utf-8') as f:
             w = csv.writer(f)
