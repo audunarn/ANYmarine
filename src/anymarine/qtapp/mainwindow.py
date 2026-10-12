@@ -153,6 +153,16 @@ class MainWindow(QMainWindow):
         self.tabifyDockWidget(assessment_dock, wave_dock)
         wave_dock.raise_()
         self._wave_dock = wave_dock
+        from .rao_panel import RaoPanel
+        self._rao = RaoPanel(self)
+        rao_dock = QDockWidget('RAO', self)
+        rao_dock.setObjectName('anymarine-dock-RAO')
+        rao_dock.setMinimumWidth(240)
+        rao_dock.setWidget(self._scroll_dock_content(self._rao))
+        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, rao_dock)
+        self.tabifyDockWidget(assessment_dock, rao_dock)
+        wave_dock.raise_()
+        self._rao_dock = rao_dock
         self._build_menus()
         self._viewer_backend_label = QLabel()
         self._viewer_backend_label.setToolTip('Change renderer under View > Renderer')
