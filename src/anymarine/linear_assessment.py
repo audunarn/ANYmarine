@@ -1722,7 +1722,8 @@ def load_hydro_spectrum(case: AssessmentCase, inputs: LinearDevelopmentInputs,
                 "the exact stored sample indices do not match the "
                 "provenance's recorded wave selection indices"
             )
-        if str(artifact.settings.correction_policy) == "reciprocal_average":
+        if str(artifact.settings.correction_policy) in (
+                "reciprocal_average", "reciprocal_average_far_field_weak_modes"):
             f_hat_case = _case_source_phasor(case, f_hat_source)
             sensitivity = hydro_reciprocal_sensitivity(
                 artifact, inputs, case.omega, omega_index, f_hat_case,
