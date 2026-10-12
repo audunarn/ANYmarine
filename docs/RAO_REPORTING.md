@@ -120,12 +120,20 @@ The category is derived from the inputs at case registration and cannot be chose
 
 ## 4. Artifacts and entry points
 
-- Modules (Qt-free): `rao_case.py` (closed-world hash-bound case), `rao_linearize.py`,
-  `harmonic_fit.py`, `rao_extraction.py`, `rao_compare.py`, `rao_jobs.py`
-  (`rao_table` and `rao_campaign` kinds; sealed child outputs like the assessment jobs).
-- Service: `prepare_rao_case`, table and campaign snapshots, `load_rao_job_output`
-  (re-admits every run and recomputes extraction/comparison; any disagreement is
-  refused), `save_rao_artifacts`.
+- Modules (Qt-free), as implemented: `rao_case.py` (closed-world hash-bound case),
+  `rao_linearize.py` (calm-water tangents, potential-flow/Morison/mooring terms),
+  `harmonic_fit.py`, `rao_extraction.py` and `rao_report.py` (features/category, FD table,
+  campaign, comparison, CSV). Child-process job transport for the GUI (`rao_jobs.py`) is
+  part of slice 9.
+- Comparison safeguards (review round 1): the table must belong to the case and the
+  campaign must cover the case grid exactly once; unresolved DOFs (FD reference below the
+  declared near-zero amplitude) get absolute checks on their higher harmonics, residual and
+  window change; linearity compares every run with the largest-amplitude run (order
+  independent); predicted motion uses vector magnitudes; observed peak excursion/rotation
+  outside the small-motion bounds demotes the case (verdict nogo); mean contribution powers
+  (dry inertia included) must close. Each run's record, partial or failed evidence is stored
+  as soon as it exists; the per-run wall limit is enforced through the solver's cancel hook.
+- Service (with slice 9): table/campaign snapshots and output re-admission for the GUI job.
 - CLI: `rao-prepare`, `rao-table`, `rao-run`, `rao-export-csv`, `rao-adjudicate`; nonzero
   exit for nogo or refusal.
 - Artifacts: `rao_table.json`, `rao_extraction.json` per run and `rao_report.json`

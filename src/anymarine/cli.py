@@ -826,14 +826,26 @@ def _cmd_rao_run(args) -> int:
         case = rao_case.read_case_artifact(args.case)
         table = rao_report.fd_table(project, case)
         out = _rao_out_dir(args.out_dir)
-        records, extractions = rao_report.run_campaign(
-            project, case, progress=lambda n: print(f'run {n} extracted', flush=True))
-        report = rao_report.compare(case, table, extractions)
+        (out / 'rao_table.json').write_text(json.dumps(table, indent=1), encoding='utf-8')
         runs = out / 'runs'
         runs.mkdir()
-        for record in records:
-            (runs / f'{record.result_id}.json').write_text(json.dumps(record.to_dict()), encoding='utf-8')
-        (out / 'rao_table.json').write_text(json.dumps(table, indent=1), encoding='utf-8')
+        counter = {'partial': 0, 'failure': 0}
+
+        def store(kind, payload):
+            # Evidence is written as soon as it exists; a later failure keeps it.
+            if kind == 'record':
+                (runs / f'{payload.result_id}.json').write_text(json.dumps(payload.to_dict()), encoding='utf-8')
+            else:
+                counter[kind] += 1
+                (runs / f'{kind}-{counter[kind]:03d}.json').write_text(json.dumps(payload), encoding='utf-8')
+
+        try:
+            records, extractions = rao_report.run_campaign(
+                project, case, progress=lambda n: print(f'run {n} extracted', flush=True), store=store)
+        except (OSError, ValueError) as error:
+            (out / 'failure.json').write_text(json.dumps(dict(error=str(error))), encoding='utf-8')
+            raise
+        report = rao_report.compare(case, table, extractions)
         (out / 'rao_report.json').write_text(json.dumps(report, indent=1), encoding='utf-8')
         rao_report.write_csv(out, table, report)
     except (OSError, ValueError) as error:

@@ -11,6 +11,7 @@ import csv
 import hashlib
 import json
 import math
+import time
 from pathlib import Path
 
 import numpy as np
@@ -166,8 +167,9 @@ def features(project, spec):
             q, _ = lin.response(omega, heading, spec['phase'], source)
             q = q * max(spec['amplitudes'])
             for i in range(len(lin.model.body_ids)):
-                if np.max(np.abs(q[6 * i:6 * i + 3])) > criteria['small_excursion_m'] \
-                        or np.max(np.abs(q[6 * i + 3:6 * i + 6])) > criteria['small_angle_bound_rad']:
+                # Peak vector magnitude of Re{Q exp(-iwt)} is bounded by ||Q|| (all phases).
+                if np.linalg.norm(q[6 * i:6 * i + 3]) > criteria['small_excursion_m'] \
+                        or np.linalg.norm(q[6 * i + 3:6 * i + 6]) > criteria['small_angle_bound_rad']:
                     small = False
     return dict(potential_flow=native.potential_flow is not None, any_drag=False, current=bool(current),
                 links=bool(native.links), mooring=False, mooring_taut=None, contact_branch_risk=False,
@@ -240,8 +242,12 @@ def run_steps(case, lin, omega):
     return transient, steps
 
 
-def solve_record(project, *, wall_seconds):
-    """Headless native solve through the worker's admission path."""
+def solve_record(project, *, wall_seconds, store=None):
+    """Headless native solve through the worker's admission path, with a deadline.
+
+    A run that does not complete (deadline or solver stop) is handed to ``store``
+    as partial evidence before the typed refusal.
+    """
     from .services import ApplicationService
     from .native_jobs import project_from_snapshot, record_from_evidence
     from .mechanics import prepare_native_nodes
@@ -250,16 +256,34 @@ def solve_record(project, *, wall_seconds):
     snapshot = ApplicationService().native_input_snapshot(project, max_frames=steps + 1, wall_seconds=wall_seconds)
     produced = project_from_snapshot(snapshot)
     model, states, spec = _prepare(produced)
-    result = solver.solve_marine_mechanical(model, states, spec, initial_nodes=prepare_native_nodes(produced))
+    start = time.monotonic()
+    deadline = lambda: time.monotonic() - start > float(wall_seconds)
+    try:
+        result = solver.solve_marine_mechanical(model, states, spec, cancel=deadline,
+                                                initial_nodes=prepare_native_nodes(produced))
+    except solver.MarineMechanicalSolveError as error:
+        if store is not None:
+            store('failure', dict(input_hash=snapshot['input_hash'], error=str(error)))
+        raise RaoReportError(f'native run failed: {error}') from error
+    evidence = solver.result_to_dict(result)
     if result.status != 'completed':
-        raise RaoReportError(f'native run did not complete: {result.status}')
-    return record_from_evidence(solver.result_to_dict(result), snapshot,
+        if store is not None:
+            store('partial', dict(input_hash=snapshot['input_hash'], status=result.status,
+                                  timed_out=deadline(), evidence=evidence))
+        raise RaoReportError(f'native run did not complete: {result.status}'
+                             + (' (wall limit reached)' if deadline() else ''))
+    return record_from_evidence(evidence, snapshot,
                                 result_id=hashlib.sha256(snapshot['input_hash'].encode()).hexdigest()[:32],
                                 note='RAO campaign run; development, unqualified', created_utc='')
 
 
-def run_campaign(project, case, *, solve=solve_record, progress=None):
-    """TD runs and extractions over the case grid; returns (records, extractions)."""
+def run_campaign(project, case, *, solve=solve_record, progress=None, store=None):
+    """TD runs and extractions over the case grid; returns (records, extractions).
+
+    ``store(kind, payload)`` receives every record as soon as it exists
+    ('record'), partial or failed runs ('partial'/'failure'), so a later
+    failure never discards earlier evidence.
+    """
     lin = _Linear(project)
     records, extractions = [], []
     fit = case.fit_controls
@@ -269,7 +293,9 @@ def run_campaign(project, case, *, solve=solve_record, progress=None):
             for amplitude in case.amplitudes:
                 derived = run_project(project, omega=omega, heading_degrees=heading, amplitude=amplitude,
                                       phase=case.phase, steps=steps)
-                record = solve(derived, wall_seconds=case.execution_limits['wall_seconds_per_run'])
+                record = solve(derived, wall_seconds=case.execution_limits['wall_seconds_per_run'], store=store)
+                if store is not None:
+                    store('record', record)
                 ex = rx.extract_run(record, omega=omega, amplitude=amplitude, anchors=lin.anchors,
                                     transient_seconds=transient, window_cycles=case.windows['window_cycles'],
                                     harmonics=fit['harmonics'], intercept=fit['intercept'], drift=fit['drift'],
@@ -287,10 +313,32 @@ def _check(name, value, limit, detail=''):
     return dict(name=name, value=float(value), limit=float(limit), passed=bool(value <= limit), detail=detail)
 
 
+def _power(forces, response, omega, n_body):
+    """Mean power per contribution 1/2 Re(F . conj(v)), v = -i w q (body DOFs)."""
+    v = -1j * omega * np.asarray(response)[:n_body]
+    return {cid: float(0.5 * np.real(np.vdot(v, np.asarray(f['phasor'])[:n_body]))) for cid, f in forces.items()}
+
+
 def compare(case, table, extractions):
-    """Checks per run against the category's FD reference; verdict per the case."""
+    """Checks per run against the category's FD reference; verdict per the case.
+
+    Refuses a table of another case and an incomplete or duplicated campaign. A
+    DOF is resolved when its FD reference response reaches the declared near-zero
+    amplitude; unresolved DOFs get absolute checks on everything they contain.
+    Observed motion outside the small-motion bounds demotes the case (matched/
+    advisory verdicts become nogo); it is never silently re-categorized.
+    """
+    if table['case_hash'] != case.case_hash:
+        raise RaoReportError('the FD table belongs to a different case')
+    expected = sorted((w, h, a) for w in case.omegas for h in case.headings_degrees for a in case.amplitudes)
+    got = sorted((x['omega'], x['heading_degrees'], x['amplitude']) for x in extractions)
+    if got != expected:
+        raise RaoReportError('the campaign does not cover the case grid exactly once per run')
+    if any(list(x['dof_keys']) != list(table['dof_keys'])[:len(x['dof_keys'])] for x in extractions):
+        raise RaoReportError('extraction DOF keys differ from the FD table')
     crit = case.criteria
     category = case.category
+    nz = crit['nearzero_amplitude_absolute']
     reference_source = {'matched_linearized': ('dataset', 'mechanical'),
                         'kernel_consistency_only': ('kernel_discrete',),
                         'linearized_nonlinear': ('dataset', 'kernel_discrete', 'mechanical'),
@@ -302,52 +350,80 @@ def compare(case, table, extractions):
     advisory = category in ('linearized_nonlinear', 'nonlinear_reported')
     amp_limit = crit['advisory_amplitude_relative'] if advisory else crit['rao_amplitude_relative']
     phase_limit = crit['advisory_phase_deg'] if advisory else crit['rao_phase_deg']
-    checks = []
-    by_point = {}
+    checks, by_point, demotions = [], {}, []
     for ex in extractions:
         key = (ex['omega'], ex['heading_degrees'])
-        ref = fd[key]
+        n = len(ex['dof_keys'])
+        ref = fd[key][:n]
         td = np.asarray(ex['rao'])
-        label = f"omega={ex['omega']} heading={ex['heading_degrees']} a={ex['amplitude']}"
-        resolved = np.abs(ref) * ex['amplitude'] >= crit['nearzero_amplitude_absolute']
-        amp_err = np.where(resolved, np.abs(np.abs(td) - np.abs(ref)) / np.where(resolved, np.abs(ref), 1), 0.0)
-        phase_err = np.where(resolved, np.abs(np.degrees(np.angle(td / np.where(resolved, ref, 1)))), 0.0)
-        near = np.where(~resolved, np.abs(td - ref) * ex['amplitude'], 0.0)
-        checks.append(_check('rao_amplitude_relative', amp_err.max(), amp_limit, label))
-        checks.append(_check('rao_phase_deg', phase_err.max(), phase_limit, label))
-        checks.append(_check('nearzero_amplitude_absolute', near.max(), crit['nearzero_amplitude_absolute'], label))
-        response = np.abs(np.asarray(ex['response']))
-        significant = response >= crit['nearzero_amplitude_absolute']
-        checks.append(_check('steady_relative', float(np.max(np.asarray(ex['steadiness'])[significant], initial=0)),
-                             crit['steady_relative'], label))
-        rms = np.asarray(ex['residual_rms'])[significant] / response[significant] if significant.any() else np.zeros(1)
-        checks.append(_check('fit_rms_relative', float(rms.max(initial=0)), crit['fit_rms_relative'], label))
-        hd = np.asarray(ex['harmonic_distortion'])[significant]
-        checks.append(_check('harmonic_distortion', float(np.max(hd, initial=0)), crit['harmonic_distortion'], label))
+        a = ex['amplitude']
+        label = f"omega={ex['omega']} heading={ex['heading_degrees']} a={a}"
+        resolved = np.abs(ref) * a >= nz
+        safe = np.where(resolved, ref, 1.0)
+        amp_err = np.where(resolved, np.abs(np.abs(td) - np.abs(ref)) / np.abs(safe), 0.0)
+        phase_err = np.where(resolved, np.abs(np.degrees(np.angle(td / safe))), 0.0)
+        checks.append(_check('rao_amplitude_relative', amp_err.max(initial=0), amp_limit, label))
+        checks.append(_check('rao_phase_deg', phase_err.max(initial=0), phase_limit, label))
+        checks.append(_check('nearzero_amplitude_absolute',
+                             float(np.max(np.where(~resolved, np.abs(td - ref) * a, 0.0), initial=0)), nz, label))
+        response = np.asarray(ex['response'])
+        steady = np.asarray(ex['steadiness'])
+        rms = np.asarray(ex['residual_rms'])
+        thd = np.asarray(ex['harmonic_distortion'])
+        higher = np.asarray(ex['higher_absolute'])
+        change = np.abs(response - np.asarray(ex['response_first']))
+        checks.append(_check('steady_relative', float(np.max(steady[resolved], initial=0)), crit['steady_relative'], label))
+        checks.append(_check('fit_rms_relative', float(np.max((rms / np.maximum(np.abs(response), nz))[resolved],
+                                                               initial=0)), crit['fit_rms_relative'], label))
+        checks.append(_check('harmonic_distortion', float(np.max(thd[resolved], initial=0)),
+                             crit['harmonic_distortion'], label))
+        checks.append(_check('unresolved_content_absolute',
+                             float(np.max(np.concatenate((higher[~resolved], change[~resolved])), initial=0)),
+                             nz, label + ' (higher harmonics, residual and window change of unresolved DOFs)'))
         checks.append(_check('max_omega_dt', ex['omega_dt'], crit['max_omega_dt'], label))
+        trans = max(p[0] for p in ex['body_peaks'])
+        rot = max(p[1] for p in ex['body_peaks'])
+        for name, value, limit in (('observed_excursion_m', trans, crit['small_excursion_m']),
+                                   ('observed_rotation_rad', rot, crit['small_angle_bound_rad'])):
+            check = _check(name, value, limit, label)
+            checks.append(check)
+            if not check['passed']:
+                demotions.append(f'{name} {value:.4g} > {limit:.4g} ({label})')
+        power = _power(ex['forces'], response, ex['omega'], 6 * len(ex['body_peaks']))
+        scale = sum(abs(v) for v in power.values())
+        closure = abs(sum(power.values())) / scale if scale > 0 else 0.0
+        checks.append(_check('power_closure_relative', closure, crit['power_closure_relative'],
+                             label + ' (sum of mean contribution powers incl. dry inertia)'))
         by_point.setdefault(key, []).append(ex)
     for key, runs in by_point.items():
-        raos = [np.asarray(r['rao']) for r in runs]
-        base = raos[0]
-        resolved = np.abs(base) * runs[0]['amplitude'] >= crit['nearzero_amplitude_absolute']
-        for other, run in zip(raos[1:], runs[1:]):
-            change = np.abs(other - base)[resolved] / np.abs(base)[resolved] if resolved.any() else np.zeros(1)
-            checks.append(_check('linearity_relative', float(change.max(initial=0)), crit['linearity_relative'],
-                                 f'omega={key[0]} heading={key[1]} a={run["amplitude"]} vs a={runs[0]["amplitude"]}'))
+        runs = sorted(runs, key=lambda r: -r['amplitude'])
+        top = runs[0]
+        base = np.asarray(top['rao'])
+        for run in runs[1:]:
+            other = np.asarray(run['rao'])
+            both = (np.abs(np.asarray(top['response'])) >= nz) & (np.abs(np.asarray(run['response'])) >= nz)
+            rel = np.abs(other - base)[both] / np.abs(base)[both]
+            detail = f'omega={key[0]} heading={key[1]} a={run["amplitude"]} vs a={top["amplitude"]}'
+            checks.append(_check('linearity_relative', float(np.max(rel, initial=0)), crit['linearity_relative'], detail))
+            checks.append(_check('linearity_absolute', float(np.max((np.abs(other - base) * run['amplitude'])[~both],
+                                                                     initial=0)), nz, detail))
     failed = [c for c in checks if not c['passed']]
+    advisory_names = ('rao_amplitude_relative', 'rao_phase_deg')
     if not rc.criteria_adopted():
         verdict = 'not_adjudicated'
     elif category == 'nonlinear_reported':
         verdict = 'reported_only'
+    elif demotions:
+        verdict = 'nogo'
     elif advisory:
-        gating = [c for c in failed if c['name'] not in ('rao_amplitude_relative', 'rao_phase_deg')]
-        verdict = 'pass' if not gating else 'nogo'
+        verdict = 'pass' if not [c for c in failed if c['name'] not in advisory_names] else 'nogo'
     else:
         verdict = 'pass' if not failed else 'nogo'
     report = dict(artifact='anymarine_rao_report', schema_version=REPORT_VERSION, case_hash=case.case_hash,
                   table_hash=table['table_hash'], category=category, reference_sources=list(reference_source),
-                  criteria_adopted=rc.criteria_adopted(), checks=checks, failed=[c['name'] for c in failed],
-                  verdict=verdict, runs=[_jsonable_extraction(x) for x in extractions],
+                  criteria_adopted=rc.criteria_adopted(), demoted=demotions, checks=checks,
+                  failed=[c['name'] for c in failed], verdict=verdict,
+                  runs=[_jsonable_extraction(x) for x in extractions],
                   scope=dict(development_only=True, scientific_qualification=False))
     report['report_hash'] = _hash(report)
     return report
@@ -357,7 +433,7 @@ def _jsonable_extraction(ex):
     out = {}
     for key, value in ex.items():
         if key == 'forces':
-            out[key] = {cid: dict(phasor=_c(v['phasor']), mean=np.asarray(v['mean']).tolist())
+            out[key] = {cid: dict(phasor=_c(v['phasor']), mean=np.asarray(v.get('mean', [])).tolist())
                         for cid, v in value.items()}
         elif isinstance(value, np.ndarray) and np.iscomplexobj(value):
             out[key] = _c(value)

@@ -5,7 +5,8 @@ Tangents come from the same public ANYsolver calls the time-domain solver uses
 evaluated at a stationary linearization point; nothing is re-derived by hand.
 Convention: chart coordinates about the anchor, ``x(t) = Re{X exp(-i w t)}``,
 so ``Z(w) = K - i w C - w^2 M`` and ``Z q = X``. Qt-free; ANYsolver is
-imported lazily. Mooring lines are not linearized yet (refused).
+imported lazily. Mooring lines add 3 DOFs per free node after the body block,
+with the assembler's exact sparse tangents (MooringLineAssembler.evaluate).
 """
 from dataclasses import dataclass
 import importlib
@@ -31,6 +32,7 @@ class LinearModel:
     static_force: np.ndarray
     contributions: dict
     dry: dict
+    mooring_tension: np.ndarray = None
 
     @property
     def size(self):
@@ -123,13 +125,33 @@ def _evaluate(contributions_module, body_ids, items, states, dt):
         owner.abort_step(step)
 
 
-def linearize(model, states, *, dt):
-    """Tangents of the native model at the stationary point ``states``.
+def stationary_nodes(nodes):
+    """Mooring node state with zero rates (refused otherwise)."""
+    if nodes is None:
+        raise RaoLinearizationError('a mooring model needs its node state at the linearization point')
+    if np.any(np.asarray(nodes.velocities)) or np.any(np.asarray(nodes.accelerations)):
+        raise RaoLinearizationError('mooring nodes are not stationary at the linearization point')
+    return nodes
+
+
+def _pad(matrix, size):
+    out = np.zeros((size, size) if np.ndim(matrix) == 2 else (size,))
+    n = np.shape(matrix)[0]
+    if np.ndim(matrix) == 2:
+        out[:n, :n] = matrix
+    else:
+        out[:n] = matrix
+    return out
+
+
+def linearize(model, states, *, dt, nodes=None):
+    """Tangents of the native model at the stationary point ``states`` (and ``nodes``).
 
     ``dt`` is the run time step (the initialization phase is time zero).
     """
-    if getattr(model, 'mooring', None) is not None:
-        raise RaoLinearizationError('mooring lines are not linearized yet (design slice 7)')
+    mooring = getattr(model, 'mooring', None)
+    if mooring is not None:
+        nodes = stationary_nodes(nodes)
     contributions, _ = _solver()
     body_ids = tuple(model.body_ids)
     states = stationary_states({bid: states[bid] for bid in body_ids})
@@ -147,16 +169,13 @@ def linearize(model, states, *, dt):
             per[cid] = dict(stiffness=np.array(trial.stiffness), damping=np.array(trial.damping),
                             mass=np.array(trial.mass), force=np.array(trial.external_force))
     stiffness, damping, mass = (np.array(total.stiffness), np.array(total.damping), np.array(total.mass))
-    # The static residual excludes wave excitation: the initialization trial
-    # evaluates the potential-flow excitation at t = 0 (its own diagnostic
-    # component), which is removed here; tangents never contain it.
+    # Calm water only: the potential-flow pullback carries the excitation into
+    # its geometric stiffness (-dD^T/dq X), so a live excitation would make the
+    # tangents wave-dependent. Linearize the wave-free copy (wave_free_project).
     force = np.array(total.external_force)
-    for cid, block in per.items():
-        components = total.diagnostics.get(cid, {}).get('components', {}) if cid == POTENTIAL_FLOW_ID else {}
-        if 'excitation' in components:
-            excitation = np.asarray(components['excitation'], dtype=float)
-            force = force - excitation
-            block['force'] = block['force'] - excitation
+    excitation = total.diagnostics.get(POTENTIAL_FLOW_ID, {}).get('components', {}).get('excitation')
+    if excitation is not None and np.any(np.asarray(excitation, dtype=float)):
+        raise RaoLinearizationError('the potential-flow excitation is active: linearize the wave-free project')
     dry = {}
     for i, body in enumerate(model.bodies):
         tangents = body.dry_tangents(states[body.body_id])
@@ -168,7 +187,24 @@ def linearize(model, states, *, dt):
         dry[body.body_id] = dict(stiffness=np.array(tangents.stiffness), damping=np.array(tangents.damping),
                                  mass=np.array(tangents.mass))
     dof_keys = tuple(f'{bid}::{name}' for bid in body_ids for name in DOF_NAMES)
-    return LinearModel(body_ids, dof_keys, stiffness, damping, mass, force, per, dry)
+    tension = None
+    if mooring is not None:
+        size = mooring.size
+        stiffness, damping, mass, force = (_pad(stiffness, size), _pad(damping, size), _pad(mass, size),
+                                           _pad(force, size))
+        for block in per.values():
+            for key in ('stiffness', 'damping', 'mass', 'force'):
+                block[key] = _pad(block[key], size)
+        assembly = mooring.evaluate(states, nodes, time=0.0)
+        per['mooring'] = dict(stiffness=assembly.stiffness.toarray(), damping=assembly.damping.toarray(),
+                              mass=assembly.mass.toarray(), force=np.asarray(assembly.force, dtype=float))
+        stiffness = stiffness + per['mooring']['stiffness']
+        damping = damping + per['mooring']['damping']
+        mass = mass + per['mooring']['mass']
+        force = force + per['mooring']['force']
+        tension = np.asarray(assembly.tensions, dtype=float)
+        dof_keys += tuple(f'node{i}::{axis}' for i in range(mooring.node_count) for axis in 'xyz')
+    return LinearModel(body_ids, dof_keys, stiffness, damping, mass, force, per, dry, tension)
 
 
 # --------------------------------------------------------------- potential flow
@@ -278,16 +314,29 @@ def potential_flow_excitation(contribution, states, omega):
 
 # ------------------------------------------------------------ wave-free model
 def wave_free_project(project):
-    """Copy of a native project whose member/line waves have zero amplitude.
+    """Copy of a native project in calm water (every wave amplitude zero).
 
-    Calm-water tangents must not contain wave-kinematics gradient terms (second
-    order in a linearization about calm water). A single-omega potential-flow
-    excitation is zeroed as well; a shared-wave excitation series cannot be
-    (its binding is re-proved), and :func:`linearize` removes it from the static
-    force while tangents never contain it.
+    Calm-water tangents must contain no wave-dependent term: wave-kinematics
+    gradients (Morison/lines) and the potential-flow pullback of the excitation
+    are second order in a linearization about calm water. Member/line components
+    and a single-omega excitation are zeroed; a shared wave realization is
+    replaced by the same components with zero amplitude and its excitation series
+    is rebuilt from the bound source, so the calm project stays self-consistent
+    (Morison components equal the realization) and its excitation is exactly zero.
     """
     from .native_inputs import NativeMechanicalInputs
     data = project.native_inputs.to_dict()
+    if data.get('wave_realization') is not None:
+        from anyloads import AiryComponent, WaveRealization
+        from anyhydro import UNIT_INCIDENT_AMPLITUDE, build_excitation_series
+        from anyhydro.fixtures import make_two_body_fixture
+        saved = WaveRealization.from_dict(data['wave_realization'])
+        calm = WaveRealization(tuple(AiryComponent(0.0, c.omega, c.direction_degrees, c.phase)
+                                     for c in saved.components))
+        data['wave_realization'] = calm.to_dict()
+        data['potential_flow']['excitation_series'] = build_excitation_series(
+            make_two_body_fixture(), calm, amplitude_normalization=UNIT_INCIDENT_AMPLITUDE,
+            phase_origin_xy=(0., 0.)).to_dict()
     environments = []
     if data.get('morison') is not None:
         environments.append(data['morison']['environment'])
@@ -327,5 +376,49 @@ def stateless_wave_excitation(contribution, model, states, omega):
         return np.asarray(result.external_force, dtype=float)
 
     f0, f1, f2 = at(0), at(1), at(2)
+    mean = 0.5 * (f0 + f2)
+    return (f0 - mean) + 1j * (f1 - mean)
+
+
+# ------------------------------------------------------------------- mooring
+def _perturbed(states, nodes, body_ids, q):
+    """Body/node state displaced by the chart increment q (stationary)."""
+    _, rigid = _solver()
+    from anysolver.marine_mooring import MooringNodeState
+    out = {}
+    for i, bid in enumerate(body_ids):
+        base = states[bid]
+        out[bid] = rigid.RigidBodyState(position=np.asarray(base.position) + q[6 * i:6 * i + 3],
+                                        rotation_vector=q[6 * i + 3:6 * i + 6], anchor=base.anchor)
+    n = 6 * len(body_ids)
+    positions = np.asarray(nodes.positions) + q[n:].reshape(-1, 3)
+    zero = np.zeros_like(positions)
+    return out, MooringNodeState(positions, zero, zero)
+
+
+def mooring_tension_gradient(model, states, nodes, *, step=1e-6):
+    """d(segment tension)/dq by central differences of the public assembly."""
+    mooring = model.mooring
+    body_ids = tuple(model.body_ids)
+    states = stationary_states({bid: states[bid] for bid in body_ids})
+    nodes = stationary_nodes(nodes)
+    columns = []
+    for j in range(mooring.size):
+        e = np.zeros(mooring.size)
+        e[j] = step
+        plus = mooring.evaluate(*_perturbed(states, nodes, body_ids, e), time=0.0).tensions
+        minus = mooring.evaluate(*_perturbed(states, nodes, body_ids, -e), time=0.0).tensions
+        columns.append((np.asarray(plus) - np.asarray(minus)) / (2 * step))
+    return np.column_stack(columns)
+
+
+def mooring_wave_excitation(model, states, nodes, omega):
+    """Exact line wave-excitation phasor (fluid inertia, zero drag) by three public force evaluations."""
+    mooring = model.mooring
+    body_ids = tuple(model.body_ids)
+    states = stationary_states({bid: states[bid] for bid in body_ids})
+    nodes = stationary_nodes(nodes)
+    quarter = math.pi / (2.0 * float(omega))
+    f0, f1, f2 = (np.asarray(mooring.force(states, nodes, time=k * quarter), dtype=float) for k in (0, 1, 2))
     mean = 0.5 * (f0 + f2)
     return (f0 - mean) + 1j * (f1 - mean)

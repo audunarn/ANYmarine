@@ -77,10 +77,21 @@ def extract_run(record, *, omega, amplitude, anchors, transient_seconds, window_
         fit = fit_window(times, values, omega, s2, e2, **kw)
         forces[cid] = dict(phasor=fit.fundamental / amplitude, mean=fit.mean, residual_rms=fit.residual_rms,
                            harmonic_distortion=fit.harmonic_distortion())
+    # Observed motion over both steady windows (mean, drift and every harmonic included):
+    # peak translation/rotation magnitude per body for the small-motion preconditions.
+    inside = (times >= s1 - 1e-9) & (times <= e2 + 1e-9)
+    peaks = []
+    for i in range(len(record.body_ids)):
+        block = q[inside, 6 * i:6 * i + 6]
+        peaks.append([float(np.max(np.linalg.norm(block[:, :3], axis=1))),
+                      float(np.max(np.linalg.norm(block[:, 3:], axis=1)))])
+    higher = np.sqrt(np.sum(np.abs(second.phasors[1:]) ** 2, axis=0)) if harmonics > 1 else np.zeros(q.shape[1])
     return dict(omega=float(omega), amplitude=float(amplitude), windows=[[s1, e1], [s2, e2]],
                 dof_keys=[f'{bid}::{name}' for bid in record.body_ids for name in DOF_NAMES],
-                response=second.fundamental, rao=second.fundamental / amplitude,
+                response=second.fundamental, response_first=first.fundamental,
+                rao=second.fundamental / amplitude,
                 steadiness=phasor_change(first.fundamental, second.fundamental, steady_floor),
                 mean=second.mean, drift=second.drift, residual_rms=second.residual_rms,
+                higher_absolute=higher + second.residual_rms,
                 harmonic_distortion=second.harmonic_distortion(), condition=second.condition,
-                forces=forces)
+                body_peaks=peaks, forces=forces)

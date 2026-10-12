@@ -39,7 +39,10 @@ def test_single_omega_fixture_terms():
     pf = rl.potential_flow_contribution(model)
     D, keys = rl.potential_flow_jacobian(pf, states)
     np.testing.assert_allclose(D, np.eye(12), atol=1e-15)
-    L = rl.linearize(model, states, dt=spec.dt)
+    with pytest.raises(rl.RaoLinearizationError, match='excitation is active'):
+        rl.linearize(model, states, dt=spec.dt)            # calm water only (pullback carries X)
+    calm_model, calm_states, calm_spec = prepare_native_run(rl.wave_free_project(p))
+    L = rl.linearize(calm_model, calm_states, dt=calm_spec.dt)
     np.testing.assert_allclose(L.contributions[rl.POTENTIAL_FLOW_ID]['mass'], pf.data.added_mass_infinite, atol=1e-14)
     np.testing.assert_allclose(L.contributions[rl.POTENTIAL_FLOW_ID]['stiffness'], pf.data.restoring, atol=1e-12)
     np.testing.assert_allclose(L.static_force, 0.0, atol=1e-12)
