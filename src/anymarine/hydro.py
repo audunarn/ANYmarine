@@ -130,6 +130,15 @@ _CRITERIA_KEYS = (
     "damping_abs_tol",
     "damping_rel_tol",
 )
+_FULL_BLOCK_CRITERIA_KEYS = (
+    "form",
+    "omega_min",
+    "omega_max",
+    "block_rel_tol",
+    "modal_rel_tol",
+    "energetic_fraction",
+    "cluster_fraction",
+)
 _WAVE_KEYS = ("omega", "heading", "amplitude", "phase")
 
 
@@ -410,10 +419,20 @@ def _parse_options(options) -> dict:
             "explicitly (e.g. {\"max_frames\": <frames>}) to admit a longer "
             "development job - an execution bound, never a qualification"
         )
-    criteria = _require_mapping(data["criteria"], "criteria", _CRITERIA_KEYS)
-    criteria_data = {
-        key: _finite_float(criteria[key], f"criteria.{key}") for key in _CRITERIA_KEYS
-    }
+    raw_criteria = data["criteria"]
+    if isinstance(raw_criteria, Mapping) and raw_criteria.get("form") is not None:
+        criteria = _require_mapping(raw_criteria, "criteria", _FULL_BLOCK_CRITERIA_KEYS)
+        if criteria["form"] != "full_block":
+            raise HydroOptionsError(f"unknown criteria form {criteria['form']!r}")
+        criteria_data = {"form": "full_block"}
+        criteria_data.update({
+            key: _finite_float(criteria[key], f"criteria.{key}")
+            for key in _FULL_BLOCK_CRITERIA_KEYS if key != "form"})
+    else:
+        criteria = _require_mapping(raw_criteria, "criteria", _CRITERIA_KEYS)
+        criteria_data = {
+            key: _finite_float(criteria[key], f"criteria.{key}") for key in _CRITERIA_KEYS
+        }
     t0 = _finite_float(data.get("t0", 0.0), "t0")
     q0 = _finite_vector(data.get("q0", (0.0,) * LINEAR_DOF_COUNT), "q0", LINEAR_DOF_COUNT)
     v0 = _finite_vector(data.get("v0", (0.0,) * LINEAR_DOF_COUNT), "v0", LINEAR_DOF_COUNT)
@@ -747,6 +766,10 @@ def import_hydro_inputs(
                 f"kernel diagnostics report {name}={count}; all symmetry/passivity "
                 "diagnostic counts must be zero for admission"
             )
+    if dict(opt["criteria"]).get("form") is not None:
+        raise HydroOptionsError(
+            "the raw-dataset route supports only the per-coefficient reconstruction "
+            "criteria; full-block criteria apply to the derived route")
     criteria = anyhydro.ReconstructionCriteria(**opt["criteria"])
     try:
         report = anyhydro.compare_reconstruction(kernel, dataset, criteria)
@@ -1152,7 +1175,18 @@ def _assemble_derived_inputs(
             "kernel body identity/order does not match the project body order"
         )
     a_inf_4 = np.asarray(artifact.derived_added_mass_infinite, dtype=np.float64)
-    if not np.array_equal(np.asarray(kernel.added_mass_infinite, dtype=np.float64), a_inf_4):
+    if getattr(kernel.settings, "a_inf_policy", "computed") == "band_consistent":
+        # Ogilvie-consistent time-domain A_inf: proved against the artifact's
+        # computed A_inf and its own calibration band, never trusted.
+        try:
+            a_inf_4 = np.asarray(anyhydro.verify_band_consistent_added_mass_infinite(
+                kernel, artifact.derived_added_mass_infinite, artifact.omegas,
+                artifact.derived_added_mass), dtype=np.float64)
+        except Exception as error:
+            raise HydroAdmissionError(
+                f"the kernel's band-consistent added_mass_infinite is not proved: {error}"
+            ) from error
+    elif not np.array_equal(np.asarray(kernel.added_mass_infinite, dtype=np.float64), a_inf_4):
         raise HydroAdmissionError(
             "the kernel's added_mass_infinite does not exactly match the derived "
             "artifact's admitted derived added_mass_infinite"
@@ -1171,7 +1205,13 @@ def _assemble_derived_inputs(
                 f"kernel diagnostics report {name}={count}; all symmetry/passivity "
                 "diagnostic counts must be zero for admission"
             )
-    criteria = anyhydro.ReconstructionCriteria(**opt["criteria"])
+    if dict(opt["criteria"]).get("form") is None:
+        criteria = anyhydro.ReconstructionCriteria(**opt["criteria"])
+    else:
+        try:
+            criteria = anyhydro.reconstruction_criteria_from_dict(opt["criteria"])
+        except Exception as error:
+            raise HydroOptionsError(f"invalid reconstruction criteria: {error}") from error
     try:
         # BOTH A+B recomputed against the DERIVED reference through the
         # public comparator, with the actual raw source supplied so the
@@ -1443,7 +1483,7 @@ def recompile_derived_inputs(
     opt = {
         "n_steps": int(provenance_data["n_steps"]),
         "criteria": {
-            key: float(value)
+            key: (str(value) if key == "form" else float(value))
             for key, value in dict(provenance_data["criteria"]).items()
         },
         "t0": float(provenance_data["t0"]),

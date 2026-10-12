@@ -1706,8 +1706,20 @@ def load_hydro_spectrum(case: AssessmentCase, inputs: LinearDevelopmentInputs,
             artifact.excitation_force[omega_index, direction_index, :],
             dtype=np.complex128,
         )
+        expected_ainf = np.asarray(artifact.derived_added_mass_infinite, dtype=float)
+        stored_kernel = _load_stored_kernel(provenance, project_root)
+        if getattr(stored_kernel.settings, "a_inf_policy", "computed") == "band_consistent":
+            try:
+                expected_ainf = np.asarray(
+                    _import_anyhydro().verify_band_consistent_added_mass_infinite(
+                        stored_kernel, artifact.derived_added_mass_infinite,
+                        artifact.omegas, artifact.derived_added_mass), dtype=float)
+            except Exception as error:
+                raise AssessmentRefusalError(
+                    f"the stored kernel's band-consistent added_mass_infinite is not "
+                    f"proved: {error}") from error
         if not np.array_equal(
-            np.asarray(artifact.derived_added_mass_infinite, dtype=float),
+            expected_ainf,
             np.asarray(inputs.added_mass_infinite, dtype=float),
         ):
             raise AssessmentRefusalError(
@@ -1787,18 +1799,8 @@ def _case_source_phasor(case: AssessmentCase, f_hat_source: np.ndarray):
     return expected
 
 
-def _prove_stored_kernel(inputs: LinearDevelopmentInputs,
-                         provenance: HydroBridgeProvenance,
-                         project_root, route: str):
-    """Re-prove the stored radiation kernel sidecar against the inputs.
-
-    The actual kernel sidecar bytes are read from the project root,
-    checked against the public provenance raw sha256, loaded through the
-    public ANYhydro loader on a private byte-identical copy and
-    content-hash re-checked; the retained 4-DOF kernel must reproduce the
-    stored effective inputs' radiation kernel samples exactly.
-    """
-
+def _load_stored_kernel(provenance, project_root):
+    """Load the stored kernel sidecar from its actual, hash-checked bytes."""
     anyhydro = _import_anyhydro()
     if provenance.kernel_sidecar is None or (
         not str(provenance.kernel_sidecar)
@@ -1827,6 +1829,22 @@ def _prove_stored_kernel(inputs: LinearDevelopmentInputs,
                 "the loaded radiation kernel content hash does not reproduce "
                 "the provenance identity; the actual source bytes are refused"
             )
+    return kernel
+
+
+def _prove_stored_kernel(inputs: LinearDevelopmentInputs,
+                         provenance: HydroBridgeProvenance,
+                         project_root, route: str):
+    """Re-prove the stored radiation kernel sidecar against the inputs.
+
+    The actual kernel sidecar bytes are read from the project root,
+    checked against the public provenance raw sha256, loaded through the
+    public ANYhydro loader on a private byte-identical copy and
+    content-hash re-checked; the retained 4-DOF kernel must reproduce the
+    stored effective inputs' radiation kernel samples exactly.
+    """
+
+    kernel = _load_stored_kernel(provenance, project_root)
     kernel_dof_keys = tuple(str(key) for key in kernel.dof_keys)
     kernel_array = np.asarray(kernel.kernel, dtype=float)
     if route == HYDRO_ROUTE_DERIVED:

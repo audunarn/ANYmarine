@@ -110,7 +110,7 @@ def _validate(data):
     # Optional dependencies are reached only on explicit preparation/execution.
     try:
         from anyhydro.source_study_case import SourceStudyCase
-        from anyhydro.radiation import RadiationSettings, ReconstructionCriteria
+        from anyhydro.radiation import RadiationSettings, reconstruction_criteria_from_dict
         from .domain import LinearExecutionLimits, LINEAR_MAX_FRAMES
         from .linear_assessment import validate_assessment_controls
         source = SourceStudyCase.from_dict(data['source_case'])
@@ -119,7 +119,7 @@ def _validate(data):
         _keys(data['kernel_settings'], ('coarse', 'fine'), 'kernel_settings')
         kernels = {r: RadiationSettings.from_dict(data['kernel_settings'][r])
                    for r in ('coarse', 'fine')}
-        criteria = ReconstructionCriteria(**data['reconstruction_criteria'])
+        criteria = reconstruction_criteria_from_dict(data['reconstruction_criteria'])
         controls = validate_assessment_controls(data['assessment_criteria'], data['fit_controls'])
         _keys(data['frames'], ('coarse', 'fine'), 'frames')
         _keys(data['linear_execution_limits'], ('coarse', 'fine'), 'linear_execution_limits')
@@ -147,6 +147,9 @@ def _validate(data):
         _require(coarse == fine, 'paired kernels differ in physical/tail settings or execution-limit identity')
         _require(source.omegas[0] <= criteria.omega_min <= criteria.omega_max <= source.omegas[-1],
                  'reconstruction window lies outside the source band')
+        if kernels['fine'].a_inf_policy == 'band_consistent':
+            _require(kernels['fine'].a_inf_calibration_max < criteria.omega_min,
+                     'the A_inf calibration band must lie below the reconstruction window')
         t0 = _number(data['t0'], 't0')
         link = _number(data['surge_link_stiffness'], 'surge_link_stiffness', positive=True)
         _require(isinstance(data['free_decay_initial_states'], list)
