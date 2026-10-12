@@ -22,9 +22,8 @@ C:/ANYworkspaceWork/anymarine-evidence/w5-prony-attribution-20261012/ATTRIBUTION
 
 ## Next action
 
-W5 criteria adopted (R1-R8). Production Capytaine route with anyhydro.green_function
-(ANYhydro 8299047, adapter 0.4.0) passes R1-R4, R6, R8 on the 03c configuration; R5
-needs a HAMS weak-mode uncertainty; R7 needs the time-domain radiation model and free
-decay. See TASK.md top. W5 NO_GO.
-Tests on Windows: runtime python with PYTHONPATH=C:/Github/ANYhydro/src and a writable
---basetemp. Linux native runtime: /var/tmp/anyhydro-e1-installed-repair-20261011.
+W5 v3 (evidence w5-physical-20261012d): source admitted; reconstruction fails only K2 added
+mass at 5.875 rad/s (2.53 % vs 2 %). Owner decision pending: extended-band prospective case
+or other. See TASK.md top. W5 NO_GO.
+Tests on Windows: runtime python with PYTHONPATH=C:/Github/ANYhydro/src;C:/Github/ANYmarine/src
+and a writable --basetemp. Linux native runtime: /var/tmp/anyhydro-e1-installed-repair-20261011.

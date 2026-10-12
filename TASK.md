@@ -1,3 +1,25 @@
+## Current — W5 v3: source admitted, reconstruction fails K2 at one point, 2026-10-12
+
+Owner adopted K1-K3 (0dfc18f) and the spectral-radius K2 (61f0f3e). Code: ANYhydro 2349c9e,
+5401ffa, cbdddaa (band-consistent A_inf, body-diagonal tail, full-block criteria; Sol reviews
+clean after fixes); ANYmarine f1d436a, 32d6622, c973a0f.
+
+Registered cases (evidence C:/ANYworkspaceWork/anymarine-evidence/):
+- w5-physical-20261012c (v2, levels 4/6, 0.0625 rad/s above 2, 256 s kernels, body-diagonal
+  omega^-3 tail to 60 rad/s, band-consistent A_inf on 0.25-1.75, far-field weak modes):
+  operators admitted; mesh refinement fails at one frequency 7.4375 rad/s (damping 38.44 vs
+  35.62; level-4 panels > lambda/8).
+- w5-physical-20261012d (v3, identical but levels 6/9): SOURCE ADMISSION PASSES (PSD,
+  reciprocity, refinement). Kernel reconstruction: K1 pass (Z 1.37 %, A 1.91 %, B 0.22 %),
+  K2 damping 0.24 % pass, K2 added mass 2.53 % at the single point 5.875 rad/s (limit 2 %):
+  gate line 1 FAILS; free decay and RAO not run. Band-consistent A_inf - computed A_inf
+  = -4.95 on the surge diagonals. Nothing was tuned after evaluation. W5 NO_GO.
+
+Limiting error: high-frequency tail model above 8 rad/s (exponent sensitivity) on the surge
+added mass near 6 rad/s. Next option for the owner: a prospective case with the computed band
+extended (e.g. to 10-12 rad/s) on meshes resolving lambda/8 there, which reduces the tail-model
+share; several hours of solves.
+
 ## Current — W5 time-domain stage: source admitted, kernel reconstruction open, 2026-10-12
 
 ANYhydro b01355d (adapter 0.5.0): far-field Kochin damping output + explicit derived-operator
