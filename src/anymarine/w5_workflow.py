@@ -150,6 +150,15 @@ def _validate(data):
         if kernels['fine'].a_inf_policy == 'band_consistent':
             _require(kernels['fine'].a_inf_calibration_max < criteria.omega_min,
                      'the A_inf calibration band must lie below the reconstruction window')
+            # Time-step refinement compares ONE physical model: both kernels
+            # calibrate the band-consistent A_inf once, on the fine grid.
+            _require(kernels['fine'].a_inf_calibration_dt == kernels['fine'].dt,
+                     'a band-consistent A_inf must be calibrated on the fine kernel grid '
+                     '(a_inf_calibration_dt equal to the fine dt) for paired refinement')
+            _require((kernels['fine'].n_time - 1) == ratio * (kernels['coarse'].n_time - 1)
+                     and kernels['coarse'].calibration_settings().n_time == kernels['fine'].n_time,
+                     'the coarse A_inf calibration kernel must be exactly the fine kernel grid '
+                     '(nested sample counts)')
         t0 = _number(data['t0'], 't0')
         link = _number(data['surge_link_stiffness'], 'surge_link_stiffness', positive=True)
         _require(isinstance(data['free_decay_initial_states'], list)

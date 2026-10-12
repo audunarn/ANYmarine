@@ -1713,7 +1713,8 @@ def load_hydro_spectrum(case: AssessmentCase, inputs: LinearDevelopmentInputs,
                 expected_ainf = np.asarray(
                     _import_anyhydro().verify_band_consistent_added_mass_infinite(
                         stored_kernel, artifact.derived_added_mass_infinite,
-                        artifact.omegas, artifact.derived_added_mass), dtype=float)
+                        artifact.omegas, artifact.derived_added_mass,
+                        calibration_source=artifact), dtype=float)
             except Exception as error:
                 raise AssessmentRefusalError(
                     f"the stored kernel's band-consistent added_mass_infinite is not "

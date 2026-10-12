@@ -309,7 +309,7 @@ def test_actual_first_slice_project_geometry(spec):
         assert app.mass==512.5
 
 
-@pytest.mark.parametrize('quadrature_method', ['frequency_trapezoid', 'piecewise_linear_exact'])
+@pytest.mark.parametrize('quadrature_method', ['frequency_trapezoid', 'piecewise_linear_exact', 'band_shared'])
 def test_real_public_source_kernel_import_registration_join_without_solver(spec,tmp_path,monkeypatch,quadrature_method):
     """Analytic source fixture; mock ONLY source-study admission, never claim BEM.
 
@@ -321,8 +321,16 @@ def test_real_public_source_kernel_import_registration_join_without_solver(spec,
     from anyhydro.source_study_case import SourceStudyCase,build_study_bodies,build_study_request,study_operator_settings
     from anymarine.linear_assessment import read_case_artifact
     from anymarine.linear import linear_input_hash
+    band=quadrature_method=='band_shared'
     for controls in spec['kernel_settings'].values():
-        if quadrature_method != 'frequency_trapezoid': controls['quadrature_method']=quadrature_method
+        if quadrature_method != 'frequency_trapezoid': controls['quadrature_method']='piecewise_linear_exact'
+        if band:
+            # Band-consistent A_inf calibrated once on the fine grid (dt .16).
+            controls.update(a_inf_policy='band_consistent',a_inf_calibration_min=.2,
+                            a_inf_calibration_max=1.,a_inf_calibration_dt=.16)
+    if band:
+        spec['reconstruction_criteria']=dict(form='full_block',omega_min=2.,omega_max=6.,block_rel_tol=.02,
+            modal_rel_tol=.02,energetic_fraction=1e-3,cluster_fraction=.01)
     spec['source_case']['omegas']=[round(.1*k,1) for k in range(1,81)]
     omega=np.array(spec['source_case']['omegas'])
     R=np.diag(np.linspace(.1,1.2,12))+.01*np.ones((12,12))
@@ -369,14 +377,18 @@ def test_real_public_source_kernel_import_registration_join_without_solver(spec,
     with pytest.raises(w5.W5Cancelled):
         w5.execute_w5_case(out,backend=object(),execution_limits=object(),should_cancel=cancel_after_cases)
     for run in ('decay-0','wave-0'):
+        a_inf={}
         for role in ('coarse','fine'):
             service=ApplicationService()
             project=service.load(out/run/role)
+            a_inf[role]=project.linear_inputs.added_mass_infinite
             registered=read_case_artifact(out/run/role/'registered-case.json')
             assert registered.input_hash==linear_input_hash(project.linear_inputs)
             assert project.hydro_provenance.derived_bundle is not None
             service.verify_hydro_provenance(project)
             assert registered.mode==('free_decay' if run=='decay-0' else 'regular_wave')
+        if band:  # one physical model at both time steps
+            assert a_inf['coarse']==a_inf['fine']
     assert json.loads((out/'status.json').read_text())['state']=='cancelled'
 
 
@@ -395,3 +407,36 @@ def test_directional_report_uses_fixed_fine_basis_and_no_threshold(spec):
     basis=np.array(item['finest_basis'])
     assert np.allclose(basis@projected@basis.T,delta)
     assert 'threshold' in report['scope'] and 'pass' not in report
+
+
+def test_band_consistent_pair_must_calibrate_on_the_fine_grid(spec):
+    for role in ('coarse','fine'):
+        spec['kernel_settings'][role].update(quadrature_method='piecewise_linear_exact',
+            a_inf_policy='band_consistent',a_inf_calibration_min=.2,a_inf_calibration_max=1.)
+    spec['reconstruction_criteria']=dict(form='full_block',omega_min=2.,omega_max=6.,block_rel_tol=.02,
+        modal_rel_tol=.02,energetic_fraction=1e-3,cluster_fraction=.01)
+    with pytest.raises(w5.W5Error,match='fine kernel grid'):
+        w5.W5Case.from_dict(spec)
+    for role in ('coarse','fine'):spec['kernel_settings'][role]['a_inf_calibration_dt']=.16
+    w5.W5Case.from_dict(spec)
+
+
+def test_band_consistent_pair_calibration_grid_must_equal_the_fine_grid(spec):
+    """abs-tol horizon edge: equal-looking horizons with unnested sample counts are refused."""
+    for role in ('coarse','fine'):
+        spec['kernel_settings'][role].update(quadrature_method='piecewise_linear_exact',
+            a_inf_policy='band_consistent',a_inf_calibration_min=.2,a_inf_calibration_max=1.,
+            a_inf_calibration_dt=.16)
+    spec['reconstruction_criteria']=dict(form='full_block',omega_min=2.,omega_max=6.,block_rel_tol=.02,
+        modal_rel_tol=.02,energetic_fraction=1e-3,cluster_fraction=.01)
+    w5.W5Case.from_dict(spec)
+    from anyhydro.radiation import RadiationSettings
+    coarse=RadiationSettings.from_dict(spec['kernel_settings']['coarse'])
+    fine=RadiationSettings.from_dict(spec['kernel_settings']['fine'])
+    assert coarse.calibration_settings().n_time==fine.n_time
+    # Codex edge: horizons 5e-10 and 4.995e-10 agree within the 1e-12 absolute
+    # tolerance, but the coarse calibration rebuild would have 1001 samples.
+    spec['kernel_settings']['coarse'].update(dt=1e-12,n_time=501,a_inf_calibration_dt=5e-13)
+    spec['kernel_settings']['fine'].update(dt=5e-13,n_time=1000,a_inf_calibration_dt=5e-13)
+    with pytest.raises(w5.W5Error,match='nested sample counts'):
+        w5.W5Case.from_dict(spec)

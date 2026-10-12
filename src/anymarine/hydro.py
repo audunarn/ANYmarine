@@ -1185,7 +1185,7 @@ def _assemble_derived_inputs(
         try:
             a_inf_4 = np.asarray(anyhydro.verify_band_consistent_added_mass_infinite(
                 kernel, artifact.derived_added_mass_infinite, artifact.omegas,
-                artifact.derived_added_mass), dtype=np.float64)
+                artifact.derived_added_mass, calibration_source=artifact), dtype=np.float64)
         except Exception as error:
             raise HydroAdmissionError(
                 f"the kernel's band-consistent added_mass_infinite is not proved: {error}"
