@@ -57,7 +57,7 @@ def test_case_table_campaign_and_comparison(tmp_path):
     records, extractions = rr.run_campaign(project, case)
     assert len(records) == 2 and all(r.kind == 'mechanical_development' for r in records)
     report = rr.compare(case, table, extractions)
-    assert report['verdict'] == 'not_adjudicated' and not report['criteria_adopted']
+    assert report['criteria_adopted'] and report['verdict'] == 'pass' and not report['demoted']
     values = {(c['name'], c['detail']): c for c in report['checks']}
     rao_amp = [c for c in report['checks'] if c['name'] == 'rao_amplitude_relative']
     assert all(c['value'] < 1e-3 for c in rao_amp)          # Newmark-only difference at w dt = 0.05

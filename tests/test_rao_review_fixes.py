@@ -77,7 +77,7 @@ def test_f6_observed_motion_demotes_and_power_closure_is_checked():
     c = case()
     report = rr.compare(c, table(c, BASE), [extraction(0.1, BASE, body_peaks=[[0.2, 0.001], [0.0, 0.0]]),
                                             extraction(0.05, BASE)])
-    assert report['demoted'] and 'observed_excursion_m' in names(report, False)
+    assert report['demoted'] and 'observed_excursion_m' in names(report, False) and report['verdict'] == 'nogo'
     assert 'power_closure_relative' in names(report, True) | names(report, False)
 
 

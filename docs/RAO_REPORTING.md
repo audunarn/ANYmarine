@@ -3,8 +3,8 @@
 Status: working design (2026-10-12), development only. Owner decisions: RAOs are produced
 both ways and compared (linearized frequency-domain table, checked by time-domain
 extraction at selected frequencies); headless (Qt-free module, JSON/CSV, service + CLI)
-plus a GUI view. Numeric criteria marked *proposed* need owner adoption before any verdict
-is produced; nothing is tuned after evaluation. ANYsolver is used through its public API
+plus a GUI view. The additional numeric criteria (marked *proposed* below) were adopted by the owner on
+2026-10-12 (IMPLEMENTATION_PLAN, RAO reporting criteria); nothing is tuned after evaluation. ANYsolver is used through its public API
 only (no edits). Line references are to the code as read on 2026-10-12.
 
 ## Conventions

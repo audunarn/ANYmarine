@@ -3,8 +3,9 @@
 A case fixes, before any solve, the frequency/heading/amplitude grid, the declared
 linearizations, the fit controls and the criteria. Its category is derived from
 the model features, never chosen. Criteria may be stricter than the ceilings
-below, never looser. Limits marked proposed await owner adoption: until then
-``criteria_adopted()`` is False and no RAO verdict may be produced.
+below, never looser. The additional ceilings (``PROPOSED_MAXIMA``) were adopted by
+the owner on 2026-10-12 (IMPLEMENTATION_PLAN, RAO reporting criteria); without that
+adoption ``criteria_adopted()`` would be False and no RAO verdict produced.
 """
 import hashlib
 import json
@@ -26,7 +27,7 @@ GOVERNING_MAXIMA = {
     'fit_rms_relative': 0.02,
     'max_condition': 1.0e12,
 }
-#: Proposed ceilings (docs/RAO_REPORTING.md section 3); need owner adoption.
+#: Additional ceilings (docs/RAO_REPORTING.md section 3), adopted 2026-10-12.
 PROPOSED_MAXIMA = {
     'linearity_relative': 0.01,
     'max_omega_dt': 0.05,
@@ -38,7 +39,7 @@ PROPOSED_MAXIMA = {
 #: Case-declared positive scales without a ceiling.
 DECLARED_SCALES = ('nearzero_amplitude_absolute', 'small_angle_bound_rad', 'small_excursion_m')
 CRITERIA_KEYS = frozenset(GOVERNING_MAXIMA) | frozenset(PROPOSED_MAXIMA) | frozenset(DECLARED_SCALES)
-_ADOPTED = False
+_ADOPTED = True  # owner adoption 2026-10-12 (IMPLEMENTATION_PLAN, RAO reporting criteria)
 
 _CASE_KEYS = ('schema_version', 'case_id', 'project_input_hash', 'linearization_point',
               'radiation_source', 'omegas', 'headings_degrees', 'amplitudes', 'phase',
@@ -53,7 +54,7 @@ class RaoCaseError(ValueError):
 
 
 def criteria_adopted():
-    """True once the proposed ceilings are adopted by the owner (they are not yet)."""
+    """True once the additional ceilings are adopted by the owner (2026-10-12)."""
     return _ADOPTED
 
 

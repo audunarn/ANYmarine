@@ -2620,7 +2620,7 @@ A has no weak mode there (retained eigenvalues 350-445), so R5 currently concern
 
 - Reference series: pinned HAMS-MREL first-slice decks (anyhydro
   prepare_hams_first_slice_reference, numerical waterplane on) at subdivisions s = 6, 9, 14
-  (linear ratios r21 = 1.5, r32 = 14/9). HAMS runs at the Froude-scaled native frequency of
+  (successive linear ratios 9/6 = 1.5 and 14/9; GCI indices below). HAMS runs at the Froude-scaled native frequency of
   the manifest (same wavenumber), so no frequency-mismatch term applies.
 - Mode measure: fine basis. v_k are the weak eigenvectors of S(R_14); at every level
   lambda_k(s) = v_k^T S(R_s) v_k (no eigenvalue sorting). The reference value is lambda_k(14).
@@ -2645,6 +2645,17 @@ A has no weak mode there (retained eigenvalues 350-445), so R5 currently concern
   (production route, quad meshes, lid z = -0.1; sha256 142777ad3c5b4028...), unchanged.
 
 Failed or unresolved outcomes are recorded as such; nothing here is changed after evaluation.
+
+#### RAO reporting criteria (adopted by the owner, 2026-10-12)
+
+Design: docs/RAO_REPORTING.md (FD table and time-domain extraction, compared). Matched
+linearized cases keep the governing 3 % amplitude / 3 deg phase and the existing 2 % steadiness
+and fit limits. Adopted additional ceilings (a case may be stricter, never looser): amplitude
+linearity between the declared amplitudes 1 %; omega dt <= 0.05; harmonic distortion 5 %; mean
+contribution power closure 1 %; advisory RAO bands 10 % / 10 deg for linearized-nonlinear cases
+(reported, not gating). Cases declare their near-zero amplitude and small-motion bounds;
+observed motion outside them demotes the case to nogo. Category is derived, never chosen.
+Development evidence only; no qualification follows from an RAO pass.
 
 #### W5 kernel reconstruction criteria K1-K3 (adopted by the owner, 2026-10-12)
 

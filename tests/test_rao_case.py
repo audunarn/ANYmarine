@@ -24,12 +24,12 @@ def spec(**over):
 
 def test_valid_case_hash_and_round_trip():
     case = rc.prepare_rao_case(spec(), project_input_hash=HASH, features=LINEAR, created_utc='t0')
-    assert case.category == 'matched_linearized' and case.scope['criteria_adopted'] is False
+    assert case.category == 'matched_linearized' and case.scope['criteria_adopted'] is True
     later = rc.prepare_rao_case(spec(), project_input_hash=HASH, features=LINEAR, created_utc='t1')
     assert later.case_hash == case.case_hash
     back = rc.RaoCase.from_dict(case.to_dict(), expected_hash=case.case_hash)
     assert back.to_dict() == case.to_dict()
-    assert not rc.criteria_adopted()
+    assert rc.criteria_adopted()          # owner adoption 2026-10-12
 
 
 @pytest.mark.parametrize('features, source, drag, category', [
