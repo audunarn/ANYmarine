@@ -1,3 +1,24 @@
+## Current — 03c energy predicate conditioning, 2026-10-12
+
+Evidence: C:/ANYworkspaceWork/anymarine-evidence/w5-route-comparison-20261012/REPORT.md
+(scripts, copied 03c inputs with hashes, Capytaine comparisons, codex-review-05.md by
+GPT 6 Astra high). ANYhydro CI green again at 81c04c6.
+
+Findings: the frozen 03c rate is the near-null eigenvector of the retained HAMS damping
+(overlap 0.999964, lambda_min/lambda_max 5.6e-6); the 3 % P(rate) tolerance equals a
+~4.6e-7 normwise B perturbation, so the predicate is unsuitable as a sole accuracy gate.
+Its failure stays on record and does not exonerate the source (6/16 A and 8/16 B retained
+coefficients also fail). Candidate energetic eigenvalues agree with HAMS within ~1 %.
+Production Capytaine on the same triangles: near-null eigenvalue -0.015, P(rate) -0.0075 W.
+Capytaine quad-mesh refinement (864-3456 panels): pressure-integrated near-null eigenvalue
+stays ~-0.011, far-field Kochin damping (analytic c = 4 pi rho k/(omega D) = 1969.5) is PSD
+and trends to +0.0015 (P(rate) ~ +0.0039 W). Cause of the negative near-field eigenvalue
+unresolved (not irregular frequencies, lid or singularity option). Prony fix not involved.
+
+W5 NO_GO. Owner decision requested: adopt replacement W5 energy/coefficient criteria
+(scaled full-block, modal, force-response, near/far, symmetry, matched convergence with
+quantified HAMS uncertainty) and the passivity route, before further campaigns.
+
 ## Current — W5 free-surface failure attributed and repaired, 2026-10-12
 
 Pushed earlier: ANYhydro 36cd502, ANYmarine 76a6c0b (user approved). New ANYhydro
