@@ -421,10 +421,14 @@ def _parse_options(options) -> dict:
         )
     raw_criteria = data["criteria"]
     if isinstance(raw_criteria, Mapping) and raw_criteria.get("form") is not None:
+        raw_criteria = dict(raw_criteria)
+        reference = raw_criteria.pop("modal_reference", "spectral_radius")
+        if reference != "spectral_radius":
+            raise HydroOptionsError(f"unsupported criteria modal_reference {reference!r}")
         criteria = _require_mapping(raw_criteria, "criteria", _FULL_BLOCK_CRITERIA_KEYS)
         if criteria["form"] != "full_block":
             raise HydroOptionsError(f"unknown criteria form {criteria['form']!r}")
-        criteria_data = {"form": "full_block"}
+        criteria_data = {"form": "full_block", "modal_reference": "spectral_radius"}
         criteria_data.update({
             key: _finite_float(criteria[key], f"criteria.{key}")
             for key in _FULL_BLOCK_CRITERIA_KEYS if key != "form"})
@@ -1483,7 +1487,7 @@ def recompile_derived_inputs(
     opt = {
         "n_steps": int(provenance_data["n_steps"]),
         "criteria": {
-            key: (str(value) if key == "form" else float(value))
+            key: (str(value) if key in ("form", "modal_reference") else float(value))
             for key, value in dict(provenance_data["criteria"]).items()
         },
         "t0": float(provenance_data["t0"]),
