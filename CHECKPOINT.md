@@ -10,8 +10,9 @@ numerical admission false; full W5–W10, thin-sheet and release requirements op
 
 ## Source and Git state
 
-- ANYhydro main 8299047 (validated Prony, exact imaginary kernel, criteria checker, John oracle).
-- ANYmarine: records on top of pushed 76a6c0b. GUI unchanged from verified 4cd9a6c.
+- ANYhydro main dc319ff (calibration-step A_inf), a81cb34 (declaration verifier), pushed.
+- ANYmarine main 0da13f9 pushed (shared A_inf W5 rule); 2d84b14 (R5 protocol) pushed;
+  RAO slices 1-6 local commits c98d6c2..HEAD, not pushed (review pending).
 - Superseded worker component oracle archived (not in repo):
   C:/ANYworkspaceWork/anymarine-evidence/w5-free-surface-repair-20261011/superseded-component-oracle.
 
@@ -22,8 +23,10 @@ C:/ANYworkspaceWork/anymarine-evidence/w5-prony-attribution-20261012/ATTRIBUTION
 
 ## Next action
 
-W5 v3 (evidence w5-physical-20261012d): source admitted; reconstruction fails only K2 added
-mass at 5.875 rad/s (2.53 % vs 2 %). Owner decision pending: extended-band prospective case
-or other. See TASK.md top. W5 NO_GO.
+1. W5 v5 (evidence w5-physical-20261013b) running: on completion read the gates, record, then
+   reinstall ANYhydro dc319ff into the evidence runtime (INSTALL.md pattern). W5 NO_GO.
+2. R5 passed under the adopted protocol (w5-r5-hams-uncertainty-20261012); independent review.
+3. RAO reporting: review slices 1-6, then mooring (7), drag (8), GUI (9), docs (10); owner
+   adoption of the proposed RAO limits. See TASK.md top and docs/RAO_REPORTING.md.
 Tests on Windows: runtime python with PYTHONPATH=C:/Github/ANYhydro/src;C:/Github/ANYmarine/src
 and a writable --basetemp. Linux native runtime: /var/tmp/anyhydro-e1-installed-repair-20261011.

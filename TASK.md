@@ -1,3 +1,40 @@
+## Current — W5 v4/v5, R5 evaluated, RAO reporting in progress, 2026-10-12
+
+W5 v4 (owner: extended band; evidence w5-physical-20261013, case v4 band10 l1015): source
+admission PASSES (levels 10/15, 136 frequencies to 10 rad/s). Reconstruction K1/K2 PASS at both
+dt (Z 0.70 %, A 0.96 %, B 0.22 %, K2 A 1.46 % (v3 failure resolved), K2 B 0.24 %). Free decay
+decay-0 REFUSED before comparison: per-kernel band-consistent A_inf differed by 0.26 % between
+dt 0.05/0.025 (paired refinement compares one physical model). Owner chose option 1 (one A_inf
+calibrated on the fine grid); tolerance on A_inf rejected. ANYhydro dc319ff
+(RadiationSettings.a_inf_calibration_dt; verifier proves it against the derived artifact) and
+ANYmarine 0da13f9 (W5 requires the fine-grid calibration and nested sample counts); three Sol
+rounds, no defects remain. W5 v5 (w5-physical-20261013b) identical except the calibration step:
+source PASS, K1/K2 PASS, shared A_inf accepted by the paired check; free decay decay-0: fine and
+coarse members each PASS their assessments, paired time-step refinement NOGO: coarse (0.05 s) vs
+fine (0.025 s) histories differ by 2.3-3.5 % (q) / up to 4.2 % (a) in heave vs 2 % of each DOF's
+peak (surge ~1 %). Cause: Newmark period error at omega dt ~ 0.17 for the ~3.4 rad/s heave
+mode, accumulating over 5-7 cycles. Nothing tuned. Regular-wave RAO cases not reached. Owner
+decision: a v6 with a finer dt pair (e.g. 0.025/0.0125 s; kernel horizon 250 s to stay within
+the 20001-sample ceiling). Evidence runtime ANYhydro reinstalled from dc319ff
+(anyhydro-install-20261012b/INSTALL.md; 98 tests pass against it).
+
+R5 weak-mode uncertainty: owner adopted the protocol (plan, ANYmarine 2d84b14; HAMS s = 6/9/14,
+fine-basis Rayleigh values, Celik GCI + print bound, sign and independent-route guards).
+Evidence w5-r5-hams-uncertainty-20261012 (scripts hash-registered before the solves): R5 PASS
+on the 03c point: HAMS weak B 0.00218/0.00163/0.001368 (order 1.99), U_k 2.45e-4; far-field
+0.0195/0.0102/0.0056 (U_far 0.0045), G2 holds narrowly (0.0042 <= 0.00475); candidate
+difference 1.41e-4 <= U_k; A has no weak modes. Independent review running. W5 NO_GO
+(R7 free decay pending v5).
+
+RAO reporting with Morison and mooring (owner: FD table and TD extraction, compared; headless +
+GUI). Design docs/RAO_REPORTING.md (Fable). Implemented and tested (local, unreviewed): slices 1-6
+(harmonic fit, hash-bound case with derived category, FD linearization through public ANYsolver
+calls, potential-flow kernel/dataset/excitation terms, Morison inertia (analytic cylinder 1e-10),
+TD extraction (native oscillator matches the Newmark-consistent FD solve to 1e-7), campaign,
+comparison, CSV, CLI rao-prepare/rao-table/rao-run). Proposed limits (linearity 1 %, omega dt 0.05,
+THD 5 %, power closure 1 %, advisory 10 %/10 deg) await owner adoption; until then reports are
+not_adjudicated. Open: mooring (slice 7), drag linearization (8), GUI (9), docs (10).
+
 ## Current — W5 v3: source admitted, reconstruction fails K2 at one point, 2026-10-12
 
 Owner adopted K1-K3 (0dfc18f) and the spectral-radius K2 (61f0f3e). Code: ANYhydro 2349c9e,

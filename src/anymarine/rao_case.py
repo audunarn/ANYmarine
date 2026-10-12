@@ -216,3 +216,26 @@ class RaoCase:
                  'stored RAO case is not in canonical validated form')
         _require(expected_hash is None or stored.case_hash == expected_hash, 'RAO case hash mismatch')
         return stored
+
+
+def write_case_artifact(case, path):
+    """Write a case with its hash; refuse to overwrite evidence."""
+    from pathlib import Path
+    target = Path(path)
+    if target.exists():
+        raise RaoCaseError(f'{target} exists; case artifacts are never overwritten')
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(dict(case=case.to_dict(), case_hash=case.case_hash), indent=2,
+                                 sort_keys=True), encoding='utf-8')
+    return target
+
+
+def read_case_artifact(path):
+    """Read and fully re-validate a stored case artifact against its hash."""
+    from pathlib import Path
+    try:
+        data = json.loads(Path(path).read_text(encoding='utf-8'))
+    except (OSError, ValueError) as error:
+        raise RaoCaseError(f'cannot read the RAO case artifact {path}: {error}') from error
+    _exact(data, ('case', 'case_hash'), 'RAO case artifact')
+    return RaoCase.from_dict(data['case'], expected_hash=data['case_hash'])

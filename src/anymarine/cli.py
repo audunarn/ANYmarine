@@ -192,6 +192,18 @@ def _build_parser() -> argparse.ArgumentParser:
     adjudicate_ref.add_argument(
         "--snapshot", required=True, help="paired snapshot root"
     )
+    rao_prepare = sub.add_parser('rao-prepare', help='register a closed-world RAO case for the project (no solve)')
+    rao_prepare.add_argument('--project', required=True, help='project directory')
+    rao_prepare.add_argument('--spec', required=True, help='JSON file with the RAO case specification')
+    rao_prepare.add_argument('--out', required=True, help='output case artifact path')
+    rao_table = sub.add_parser('rao-table', help='frequency-domain RAO table with per-contribution forces')
+    rao_table.add_argument('--project', required=True, help='project directory')
+    rao_table.add_argument('--case', required=True, help='registered RAO case artifact')
+    rao_table.add_argument('--out-dir', required=True, help='new output directory (JSON + CSV)')
+    rao_run = sub.add_parser('rao-run', help='FD table, time-domain campaign and comparison; development only')
+    rao_run.add_argument('--project', required=True, help='project directory')
+    rao_run.add_argument('--case', required=True, help='registered RAO case artifact')
+    rao_run.add_argument('--out-dir', required=True, help='new output directory (JSON, CSV, run records)')
     waves=sub.add_parser('inspect-wave-bundle',help='validate and sample stored HAMS waves without a numerical producer')
     waves.add_argument('--path',help='portable wave bundle directory; omitted uses bundled saved example')
     waves.add_argument('--component',choices=('incident','total','scattered','radiation'),default='total')
@@ -763,6 +775,74 @@ def _cmd_run_hams_fields(args):
     return 0
 
 
+def _utc_now():
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _rao_out_dir(path):
+    out = Path(path)
+    if out.exists():
+        raise ServiceError(f'{out} exists; RAO evidence is never overwritten')
+    out.mkdir(parents=True)
+    return out
+
+
+def _cmd_rao_prepare(args) -> int:
+    from . import rao_case, rao_report
+    project = ApplicationService().load(args.project)
+    try:
+        spec = json.loads(Path(args.spec).read_text(encoding='utf-8'))
+        case = rao_report.prepare_case(project, spec, created_utc=_utc_now())
+        path = rao_case.write_case_artifact(case, args.out)
+    except (OSError, ValueError) as error:
+        raise ServiceError(f'RAO case refused: {error}') from error
+    print(f'registered RAO case {case.case_id} category={case.category}')
+    print(f'case_hash={case.case_hash}')
+    print(f'case artifact: {path}')
+    print('scope: development only, unqualified; criteria adopted: ' + str(case.scope['criteria_adopted']))
+    return 0
+
+
+def _cmd_rao_table(args) -> int:
+    from . import rao_case, rao_report
+    project = ApplicationService().load(args.project)
+    try:
+        case = rao_case.read_case_artifact(args.case)
+        table = rao_report.fd_table(project, case)
+        out = _rao_out_dir(args.out_dir)
+        (out / 'rao_table.json').write_text(json.dumps(table, indent=1), encoding='utf-8')
+        rao_report.write_csv(out, table)
+    except (OSError, ValueError) as error:
+        raise ServiceError(f'RAO table refused: {error}') from error
+    print(f'RAO table {table["table_hash"]}: {len(table["entries"])} entries -> {out}')
+    return 0
+
+
+def _cmd_rao_run(args) -> int:
+    from . import rao_case, rao_report
+    project = ApplicationService().load(args.project)
+    try:
+        case = rao_case.read_case_artifact(args.case)
+        table = rao_report.fd_table(project, case)
+        out = _rao_out_dir(args.out_dir)
+        records, extractions = rao_report.run_campaign(
+            project, case, progress=lambda n: print(f'run {n} extracted', flush=True))
+        report = rao_report.compare(case, table, extractions)
+        runs = out / 'runs'
+        runs.mkdir()
+        for record in records:
+            (runs / f'{record.result_id}.json').write_text(json.dumps(record.to_dict()), encoding='utf-8')
+        (out / 'rao_table.json').write_text(json.dumps(table, indent=1), encoding='utf-8')
+        (out / 'rao_report.json').write_text(json.dumps(report, indent=1), encoding='utf-8')
+        rao_report.write_csv(out, table, report)
+    except (OSError, ValueError) as error:
+        raise ServiceError(f'RAO run refused: {error}') from error
+    print(f'RAO report {report["report_hash"]}: category={report["category"]} verdict={report["verdict"]}')
+    print(f'failed checks: {sorted(set(report["failed"])) or "none"}')
+    return 2 if report['verdict'] == 'nogo' else 0
+
+
 def _cmd_inspect_wave_bundle(args):
     import math
     service=ApplicationService();project,record=service.load_hams_wave_bundle(args.path)
@@ -799,6 +879,9 @@ def main(argv: list[str] | None = None) -> int:
         "adjudicate-assessment": _cmd_adjudicate_assessment,
         "assess-refinement": _cmd_assess_refinement,
         "adjudicate-refinement": _cmd_adjudicate_refinement,
+        "rao-prepare": _cmd_rao_prepare,
+        "rao-table": _cmd_rao_table,
+        "rao-run": _cmd_rao_run,
     }
     try:
         return handlers[args.command](args)
