@@ -2604,6 +2604,13 @@ Impedance Z = B + i omega A.
 Tolerances come from the plan's existing 2-3 % range and were fixed before evaluation.
 A criterion with missing evidence is "unresolved", never "passed".
 
+Clarifications (2026-10-12, from independent review; tolerances unchanged):
+energetic reference eigenvalues closer than 1 % (relative) form a cluster, whose R2/R8
+error is the spectral norm of V^T (S(C) - S(R)) V over the cluster's smallest eigenvalue
+(basis-independent); R5 applies to weak modes of A as well as B; R8 measures directional
+change on the fine mesh's energetic modes (not sorted eigenvalues) and needs panel counts
+showing the linear ratio; retained coefficient sets must be complete and unique.
+
 ---
 
 W4/W5 extension integration: attached plates use the existing owning-body
