@@ -36,20 +36,25 @@ class LinearModel:
     def size(self):
         return self.stiffness.shape[0]
 
-    def impedance(self, omega, extra=None):
-        """``K - i w C - w^2 M`` plus frequency-dependent blocks ``extra[cid]``."""
-        z = self.stiffness - 1j * omega * self.damping - omega ** 2 * self.mass
+    def impedance(self, omega, extra=None, *, rate_omega=None):
+        """``K - i r C - r^2 M`` plus frequency-dependent blocks ``extra[cid]``.
+
+        ``r`` is ``omega`` (physical) or a declared rate frequency such as the
+        Newmark effective frequency (:func:`newmark_effective_omega`).
+        """
+        r = omega if rate_omega is None else rate_omega
+        z = self.stiffness - 1j * r * self.damping - r ** 2 * self.mass
         for block in (extra or {}).values():
             z = z + block
         return z
 
-    def solve(self, omega, excitation, extra=None):
+    def solve(self, omega, excitation, extra=None, *, rate_omega=None):
         """Response phasor q for the complex excitation vector X."""
         x = np.asarray(excitation, dtype=complex)
         if x.shape != (self.size,):
             raise RaoLinearizationError(f'excitation must have shape ({self.size},)')
         try:
-            return np.linalg.solve(self.impedance(float(omega), extra), x)
+            return np.linalg.solve(self.impedance(float(omega), extra, rate_omega=rate_omega), x)
         except np.linalg.LinAlgError as error:
             raise RaoLinearizationError(f'singular impedance at omega={omega}: {error}') from error
 
@@ -205,7 +210,19 @@ def _reorder(matrix_keys, keys, values, *, square):
     return values[np.ix_(index, index)] if square else values[index]
 
 
-def radiation_impedance(contribution, states, omega, source, dataset=None):
+def newmark_effective_omega(omega, dt):
+    """Average-acceleration Newmark steady state: rates act as ``-i r`` with
+    ``r = (2/dt) tan(w dt / 2)`` while sampled phase shifts keep ``w``.
+
+    With ``q_n = Q exp(-i w t_n)`` the update ``v_{n+1} = v_n + dt (a_n + a_{n+1})/2``,
+    ``q_{n+1} = q_n + dt v_n + dt^2 (a_n + a_{n+1})/4`` gives ``V = -i r Q``, ``A = (-i r)^2 Q``.
+    """
+    if not 0.0 < omega * dt < math.pi:
+        raise RaoLinearizationError('omega dt must lie in (0, pi)')
+    return 2.0 / dt * math.tan(0.5 * omega * dt)
+
+
+def radiation_impedance(contribution, states, omega, source, dataset=None, *, rate_omega=None):
     """Chart impedance block of radiation beyond the A_inf already in M.
 
     ``kernel_discrete``: ``-i w D^T Z_rad D`` (predicts the time-domain steady
@@ -216,8 +233,11 @@ def radiation_impedance(contribution, states, omega, source, dataset=None):
     data = contribution.data
     D, keys = potential_flow_jacobian(contribution, states)
     if source == 'kernel_discrete':
-        z_h = -1j * omega * kernel_transfer(data.kernel, data.dt, omega)
+        r = omega if rate_omega is None else rate_omega
+        z_h = -1j * r * kernel_transfer(data.kernel, data.dt, omega)
     elif source == 'dataset':
+        if rate_omega is not None:
+            raise RaoLinearizationError('dataset radiation is continuous physics; no rate frequency applies')
         if dataset is None:
             raise RaoLinearizationError('the dataset radiation source needs the bound dataset')
         omegas = np.asarray(dataset['omega'].values, dtype=float)
