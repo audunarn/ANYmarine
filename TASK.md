@@ -27,15 +27,18 @@ fixed). Tests: 47 new/related pass; full-suite failure set identical to baseline
 71 errors, pre-existing HAMS/env/order); portable CI classification fixed (CI had been red
 since the retained panel-pair slice only for unclassified modules).
 
-Impact: BEM added mass/damping of a 10x5x2 m box at h=150 change by 1e-4..2e-3 relative.
-This fixes a real accuracy defect but cannot by itself explain a large coupled energy gap.
+Impact: BEM added mass/damping of a 10x5x2 m box at h=150 change by 1e-4..2e-3 relative;
+near/far energy consistency (Kochin flux over damping) moves by <= 2e-3, typically 1e-5..1e-4.
+The fit-error field is non-radiating, so it does NOT explain the 03c energetic-mode near/far
+gaps of 1.35-2.15 %: that defect has another cause (ANYhydro 9e12fb7 records this).
 Known limits: kh < ~8 algebraic remainder tail (field error <= ~2e-4, near-surface Robin
 ratio 1.0-1.3 at kh=1-3); kh <= 0.3 refused; the artifact-bound W5 reference still binds the
 frozen producer coefficients by design.
 
-W5 status: free-surface discriminator failure explained and repairable; W5 remains NO_GO
-until the coupled energy point is re-run with the validated kernel. Next: re-run the coupled
-energy diagnostic with the validated decomposition and compare with the frozen-fit result.
+W5 status: free-surface discriminator failure explained and repaired; W5 remains NO_GO.
+A re-run of 03c with the validated kernel is not expected to close its energy gap. Next:
+decide the W5 hydrodynamic source route (custom retained panel assembly vs production
+Capytaine BEM) from a direct comparison on the 03c geometry against HAMS and near/far flux.
 
 ## Current — development resumed by Claude, 2026-10-11
 

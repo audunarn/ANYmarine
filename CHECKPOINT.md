@@ -23,8 +23,9 @@ C:/ANYworkspaceWork/anymarine-evidence/w5-prony-attribution-20261012/ATTRIBUTION
 
 ## Next action
 
-Re-run the coupled energy diagnostic (native coupled case 03c) with the validated
-decomposition and compare with the frozen-fit result; W5 stays NO_GO until then.
+The Prony fix does not explain the 03c energy gap (near/far moves <= 2e-3). Decide the W5
+hydrodynamic source route: compare the custom retained panel assembly with production
+Capytaine BEM (validated kernel) on the 03c geometry against HAMS and near/far flux.
 Tests on Windows: runtime python with PYTHONPATH=C:/Github/ANYhydro/src (an installed
 non-editable anyhydro otherwise shadows the source) and a writable --basetemp.
 Linux native runtime: /var/tmp/anyhydro-e1-installed-repair-20261011 (Ubuntu-24.04).
