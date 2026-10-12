@@ -2625,8 +2625,12 @@ reconstruction X_rec from the kernel and its stored A_inf, Z = B + i omega A:
 - K1 full block: ||Z_rec - Z||_F <= 0.02 ||Z||_F, ||A_rec - A||_F <= 0.02 ||A||_F,
   ||B_rec - B||_F <= 0.02 ||B||_F.
 - K2 energetic modes: for A and for B, with the eigenpairs of S(X) at that frequency and
-  the R2 energetic threshold and 1 % clustering, |v^T S(X_rec) v - lambda| <= 0.02 lambda
-  (cluster: spectral-norm form).
+  the R2 energetic threshold and 1 % clustering, |v^T S(X_rec) v - lambda| <= 0.02 rho,
+  rho the largest eigenvalue of S(X) at that frequency (cluster: spectral norm of
+  V^T (S(X_rec) - S(X)) V <= 0.02 rho). Amended by the owner 2026-10-12 from the
+  per-mode-eigenvalue form, which failed only on nearly vanishing modes (A eigenvalue ~14
+  of 304 at 5.19 rad/s: 24 % of itself, 1.1 % of rho); recorded before evaluation of
+  the second case.
 - K3 reporting: weak modes, per-coefficient errors and the difference between the stored
   time-domain A_inf and the computed (omega = inf) A_inf are reported, not gated.
 The time-domain A_inf may be the band-consistent (Ogilvie) value
