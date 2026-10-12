@@ -1,3 +1,24 @@
+## Current — W5 time-domain stage: source admitted, kernel reconstruction open, 2026-10-12
+
+ANYhydro b01355d (adapter 0.5.0): far-field Kochin damping output + explicit derived-operator
+policy reciprocal_average_far_field_weak_modes (weak damping subspace, eigenvalue < 1e-3 of the
+largest, takes the PSD far-field damping); e79e73e: declared power-law high-tail kernel policy.
+Both Sol-reviewed. ANYmarine f1e1d3f (assessment branch accepts the new policy).
+
+Registered physical W5 case rerun under the new policy (evidence
+C:/ANYworkspaceWork/anymarine-evidence/w5-physical-20261012b, case-spec unchanged except ids
+and policy): SOURCE ADMISSION PASSES at levels 4/6 (damping PSD, refinement). It stops at the
+kernel reconstruction gate (A err 48 / B err 17 vs per-coefficient 0.05 + 1 % tolerances).
+Diagnosis (offline, same data): 0.25 rad/s grid too coarse for inter-body coupling oscillation
+above 2 rad/s (0.0625 fixes cross-body A from 16x to 1.2x threshold); 64 s kernel horizon too
+short for B (256 s passes); B truncated at 8 rad/s where surge damping (~omega^-3) is still
+~700 leaves an added-mass offset; a residual ~2 % Kramers-Kronig inconsistency of the BEM's
+own coupled A/B on heave-heave coupling remains (no tail involved). Best model (fine grid,
+256 s, block-diagonal n=3 tail, Ogilvie A_inf calibrated at 0.25-2 rad/s): full-block
+impedance error <= 1.38 % (mean 0.32 %), A block <= 1.9 % in the 2-6 rad/s window; per-
+coefficient criterion still 2.2x on small couplings. Owner decision requested on the
+reconstruction tolerance form before the second registered case. W5 NO_GO.
+
 ## Current — W5 criteria adopted; exact imaginary kernel, 2026-10-12
 
 Owner adopted W5 retained-block criteria R1-R8 (plan, Gate W5 subsection; ANYmarine
