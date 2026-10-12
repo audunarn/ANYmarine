@@ -842,12 +842,13 @@ def _cmd_rao_run(args) -> int:
         try:
             records, extractions = rao_report.run_campaign(
                 project, case, progress=lambda n: print(f'run {n} extracted', flush=True), store=store)
+            report = rao_report.compare(case, table, extractions)
+            (out / 'rao_report.json').write_text(json.dumps(report, indent=1), encoding='utf-8')
+            rao_report.write_csv(out, table, report)
         except (OSError, ValueError) as error:
+            # Any failure after the output directory exists leaves an explicit marker.
             (out / 'failure.json').write_text(json.dumps(dict(error=str(error))), encoding='utf-8')
             raise
-        report = rao_report.compare(case, table, extractions)
-        (out / 'rao_report.json').write_text(json.dumps(report, indent=1), encoding='utf-8')
-        rao_report.write_csv(out, table, report)
     except (OSError, ValueError) as error:
         raise ServiceError(f'RAO run refused: {error}') from error
     print(f'RAO report {report["report_hash"]}: category={report["category"]} verdict={report["verdict"]}')

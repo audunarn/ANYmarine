@@ -24,6 +24,8 @@ from . import rao_linearize as rl
 REPORT_VERSION = 1
 STATIC_FORCE_LIMIT_N = 1e-8 + 1e-8 * 100.0     # equilibrium_jobs DEFAULT_SPEC atol + rel * scale
 STATIC_MOMENT_LIMIT_NM = 1e-8 + 1e-8 * 100.0
+DRAG_BALANCE_TOLERANCE = 1e-8      # relative change of the response between harmonic-balance iterates
+DRAG_BALANCE_ITERATIONS = 200
 
 
 class RaoReportError(ValueError):
@@ -48,11 +50,13 @@ def _supported(project):
     if native is None:
         raise RaoReportError('the project has no native mechanical inputs')
     if native.mooring is not None:
-        raise RaoReportError('mooring lines are not linearized yet (RAO design slice 7)')
-    if native.morison is not None:
-        for member in native.morison.data['members']:
-            if member['section']['drag_coefficient'] != 0:
-                raise RaoReportError('Morison drag needs a declared linearization (RAO design slice 8)')
+        if native.mooring.has_contact:
+            raise RaoReportError('seabed contact switches branches: not linearized (reported only, later slice)')
+        if native.mooring.has_hydrodynamics:
+            for line in native.mooring.data['lines']:
+                for section in line['hydrodynamics']:
+                    if section['drag_normal'] != 0 or section['drag_tangential'] != 0:
+                        raise RaoReportError('line drag needs a declared linearization (RAO design slice 8)')
     return native
 
 
@@ -95,6 +99,9 @@ def run_project(project, *, omega, heading_degrees, amplitude, phase, steps):
         flow['excitation_imag'] = [amplitude * x for x in flow['excitation_imag']]
     if data.get('morison') is not None:
         data['morison']['environment']['components'] = [dict(component)]
+    mooring = data.get('mooring')
+    if mooring is not None and 'environment' in mooring['data']:
+        mooring['data']['environment']['components'] = [dict(component)]
     data['run_spec'].update(steps=int(steps))
     dt = data['run_spec']['dt']
     return project.with_edits(settings=AnalysisSettings(duration=steps * dt, dt=dt),
@@ -112,9 +119,13 @@ class _Linear:
     def __init__(self, project):
         native = _supported(project)
         self.project = project
-        model, states, spec = _prepare(rl.wave_free_project(project))
+        calm = rl.wave_free_project(project)
+        model, states, spec = _prepare(calm)
         self.model, self.states, self.dt = model, states, spec.dt
-        self.linear = rl.linearize(model, states, dt=spec.dt)
+        from .mechanics import prepare_native_nodes
+        self.nodes = prepare_native_nodes(calm)
+        self.linear = rl.linearize(model, states, dt=spec.dt, nodes=self.nodes)
+        self.node_positions = None if self.nodes is None else np.asarray(self.nodes.positions)
         force = self.linear.static_force
         self.static_force = float(max(np.max(np.abs(force[i * 6:i * 6 + 3])) for i in range(len(model.body_ids))))
         self.static_moment = float(max(np.max(np.abs(force[i * 6 + 3:i * 6 + 6])) for i in range(len(model.body_ids))))
@@ -123,33 +134,110 @@ class _Linear:
                         for bid in model.body_ids}
         self.dataset = bound_dataset(project)
         self.native = native
+        self.drag = native.morison is not None and any(
+            m['section']['drag_coefficient'] != 0 for m in native.morison.data['members'])
+        if self.drag and any(any(any(v) for v in env['current']['velocities']) for env in _environments(native)):
+            raise RaoReportError('member drag with current has no admitted linearization (reported only)')
 
-    def excitation(self, omega, heading, phase):
-        """Per-contribution unit-amplitude excitation from the derived run project."""
-        derived = run_project(self.project, omega=omega, heading_degrees=heading, amplitude=1.0, phase=phase, steps=2)
+    def excitation(self, omega, heading, phase, amplitude=1.0, *, with_model=False):
+        """Per-contribution excitation of the derived run project at ``amplitude``.
+
+        Member drag (quadratic) is excluded here and added by harmonic balance.
+        """
+        derived = run_project(self.project, omega=omega, heading_degrees=heading, amplitude=amplitude,
+                              phase=phase, steps=2)
         model, states, _ = _prepare(derived)
         out = {}
         flow = rl.potential_flow_contribution(model)
         if flow is not None:
-            out[rl.POTENTIAL_FLOW_ID] = rl.potential_flow_excitation(flow, states, omega)
+            x = rl.potential_flow_excitation(flow, states, omega)
+            out[rl.POTENTIAL_FLOW_ID] = rl._pad(x, self.linear.size) if self.nodes is not None else x
         for member_set in _morison(model):
-            out[member_set.contribution_id] = rl.stateless_wave_excitation(member_set, model, states, omega)
-        return out
+            x = rl.stateless_wave_excitation(member_set, model, states, omega, exclude_drag=self.drag)
+            out[member_set.contribution_id] = rl._pad(x, self.linear.size) if self.nodes is not None else x
+        if model.mooring is not None and derived.native_inputs.mooring.has_hydrodynamics:
+            from .mechanics import prepare_native_nodes
+            out['mooring'] = rl.mooring_wave_excitation(model, states, prepare_native_nodes(derived), omega)
+        return (out, model, states) if with_model else out
 
     def radiation(self, omega, source, rate_omega=None):
         flow = rl.potential_flow_contribution(self.model)
         if flow is None:
             return {}
-        return {rl.POTENTIAL_FLOW_ID: rl.radiation_impedance(flow, self.states, omega, source,
-                                                             self.dataset, rate_omega=rate_omega)}
+        z = rl.radiation_impedance(flow, self.states, omega, source, self.dataset, rate_omega=rate_omega)
+        return {rl.POTENTIAL_FLOW_ID: rl._pad(z, self.linear.size) if self.nodes is not None else z}
 
-    def response(self, omega, heading, phase, source, *, newmark=False):
-        x = self.excitation(omega, heading, phase)
+    def response(self, omega, heading, phase, source, *, newmark=False, amplitude=1.0):
+        """RAO (response per unit amplitude) and per-unit-amplitude contribution forces.
+
+        Without drag the model is linear and ``amplitude`` is immaterial. With member
+        drag the first harmonic of the drag is balanced iteratively at ``amplitude``
+        (describing-function linearization); the iteration count is returned in
+        ``self.last_iterations``; non-convergence is a refusal.
+        """
+        x, model, states = self.excitation(omega, heading, phase, amplitude, with_model=True)
         r = rl.newmark_effective_omega(omega, self.dt) if newmark else None
         extra = self.radiation(omega, source, rate_omega=r)
-        q = self.linear.solve(omega, sum(x.values()), extra, rate_omega=r)
+        total = sum(x.values(), np.zeros(self.linear.size, complex))
+        q = self.linear.solve(omega, total, extra, rate_omega=r)
+        self.last_iterations = 0
+        if self.drag:
+            members = _morison(model)
+            n, nb = self.linear.size, 6 * len(model.body_ids)
+            z = self.linear.impedance(omega, extra, rate_omega=r)
+
+            def drag(response):
+                f = sum((rl.harmonic_drag(m, model, states, response, omega) for m in members),
+                        np.zeros(nb, complex))
+                return rl._pad(f, n) if self.nodes is not None else f
+
+            def residual(response):
+                return z @ response - total - drag(response)
+
+            def real(v):
+                return np.concatenate((v.real, v.imag))
+
+            # Newton on (Re q, Im q): exact linear part plus a finite-difference
+            # derivative of the drag fundamental (body DOFs only), with backtracking.
+            zr = np.block([[z.real, -z.imag], [z.imag, z.real]])
+            current = residual(q)
+            for iteration in range(1, DRAG_BALANCE_ITERATIONS + 1):
+                scale = max(float(np.max(np.abs(q[:nb]))), 1e-9)
+                jac = zr.copy()
+                base = real(drag(q))
+                for j in range(2 * nb):
+                    step = 1e-6 * scale
+                    dq = np.zeros(n, complex)
+                    dq[j % nb] = step if j < nb else 1j * step
+                    jac[:, (j % nb) + (0 if j < nb else n)] -= (real(drag(q + dq)) - base) / step
+                delta = np.linalg.solve(jac, -real(current))
+                delta = delta[:n] + 1j * delta[n:]
+                factor, accepted = 1.0, False
+                while factor > 1e-6:
+                    trial = q + factor * delta
+                    try:
+                        trial_residual = residual(trial)
+                    except ValueError:              # chart/bounds refusal: shorten the step
+                        factor *= 0.5
+                        continue
+                    if np.linalg.norm(trial_residual) <= np.linalg.norm(current) or factor < 1e-3:
+                        accepted = True
+                        break
+                    factor *= 0.5
+                if not accepted:
+                    raise RaoReportError(f'drag harmonic balance line search failed at omega {omega}')
+                q, current = trial, trial_residual
+                if np.linalg.norm(factor * delta) <= DRAG_BALANCE_TOLERANCE * max(np.linalg.norm(q), 1e-300):
+                    break
+            else:
+                raise RaoReportError(f'drag harmonic balance did not converge at omega {omega}, amplitude {amplitude}')
+            self.last_iterations = iteration
+            member_id = members[0].contribution_id
+            x[member_id] = x[member_id] + drag(q)
         forces = self.linear.contribution_forces(omega, q, x, extra) if not newmark else None
-        return q, forces
+        if forces is not None:
+            forces = {cid: f / amplitude for cid, f in forces.items()}
+        return q / amplitude, forces
 
 
 def features(project, spec):
@@ -160,19 +248,36 @@ def features(project, spec):
     radiation = spec['radiation_source']
     small = True
     criteria = spec['criteria']
+    taut = None
+    if not lin.audited:
+        # No FD response at a point that is not an equilibrium; the case derivation refuses it.
+        return dict(potential_flow=native.potential_flow is not None, any_drag=bool(lin.drag), current=bool(current),
+                    links=bool(native.links), mooring=native.mooring is not None,
+                    mooring_taut=None if native.mooring is None else False, contact_branch_risk=False,
+                    small_motion=False, linearization_audited=False), lin
+    if native.mooring is not None:
+        tension = lin.linear.mooring_tension
+        taut = bool(np.all(tension > 0))
+        gradient = rl.mooring_tension_gradient(lin.model, lin.states, lin.nodes) if taut else None
     for omega in spec['omegas']:
         for heading in spec['headings_degrees']:
             # Without potential flow no radiation block exists, whatever the source label.
             source = 'dataset' if radiation in ('dataset', 'both') else 'kernel_discrete'
-            q, _ = lin.response(omega, heading, spec['phase'], source)
+            q, _ = lin.response(omega, heading, spec['phase'], source, amplitude=max(spec['amplitudes']))
             q = q * max(spec['amplitudes'])
+            if taut:
+                # Linearization valid only while every segment stays taut: the predicted
+                # tension amplitude at the largest amplitude must stay below the static tension.
+                if np.any(np.abs(gradient @ q) >= lin.linear.mooring_tension):
+                    taut = False
             for i in range(len(lin.model.body_ids)):
                 # Peak vector magnitude of Re{Q exp(-iwt)} is bounded by ||Q|| (all phases).
                 if np.linalg.norm(q[6 * i:6 * i + 3]) > criteria['small_excursion_m'] \
                         or np.linalg.norm(q[6 * i + 3:6 * i + 6]) > criteria['small_angle_bound_rad']:
                     small = False
-    return dict(potential_flow=native.potential_flow is not None, any_drag=False, current=bool(current),
-                links=bool(native.links), mooring=False, mooring_taut=None, contact_branch_risk=False,
+    return dict(potential_flow=native.potential_flow is not None, any_drag=bool(lin.drag), current=bool(current),
+                links=bool(native.links), mooring=native.mooring is not None, mooring_taut=taut,
+                contact_branch_risk=False,
                 small_motion=small, linearization_audited=bool(lin.audited)), lin
 
 
@@ -204,13 +309,22 @@ def fd_table(project, case):
     sources = {'none': [None], 'dataset': ['dataset'], 'kernel_discrete': ['kernel_discrete'],
                'both': ['dataset', 'kernel_discrete']}[case.radiation_source]
     entries = []
+    # Linear models: one entry per omega/heading/source. With drag the RAO depends on the
+    # amplitude: one entry per declared amplitude (harmonic balance at that amplitude).
+    amplitudes = case.amplitudes if lin.drag else [None]
     for omega in case.omegas:
         for heading in case.headings_degrees:
             for source in sources:
-                q, forces = lin.response(omega, heading, case.phase, source or 'kernel_discrete')
-                power = {cid: float(0.5 * np.real(np.vdot(-1j * omega * q, f))) for cid, f in forces.items()}
-                entries.append(dict(omega=omega, heading_degrees=heading, source=source or 'mechanical',
-                                    rao=_c(q), forces={cid: _c(f) for cid, f in forces.items()}, power_fd=power))
+                for amplitude in amplitudes:
+                    q, forces = lin.response(omega, heading, case.phase, source or 'kernel_discrete',
+                                             amplitude=amplitude or 1.0)
+                    power = {cid: float(0.5 * np.real(np.vdot(-1j * omega * q, f))) for cid, f in forces.items()}
+                    entry = dict(omega=omega, heading_degrees=heading, source=source or 'mechanical',
+                                 rao=_c(q), forces={cid: _c(f) for cid, f in forces.items()}, power_fd=power)
+                    if amplitude is not None:
+                        entry.update(amplitude=amplitude, drag_iterations=lin.last_iterations,
+                                     drag_linearization='first-harmonic balance of the reported member drag')
+                    entries.append(entry)
     table = dict(artifact='anymarine_rao_table', schema_version=REPORT_VERSION, case_hash=case.case_hash,
                  project_input_hash=case.project_input_hash, dof_keys=list(lin.linear.dof_keys),
                  phasor_convention='x(t) = Re{X exp(-i omega t)}; RAO per unit incident amplitude',
@@ -252,6 +366,7 @@ def solve_record(project, *, wall_seconds, store=None):
     from .native_jobs import project_from_snapshot, record_from_evidence
     from .mechanics import prepare_native_nodes
     import anysolver.marine_mechanical as solver
+    _supported(project)
     steps = project.native_inputs.run_spec['steps']
     snapshot = ApplicationService().native_input_snapshot(project, max_frames=steps + 1, wall_seconds=wall_seconds)
     produced = project_from_snapshot(snapshot)
@@ -263,7 +378,14 @@ def solve_record(project, *, wall_seconds, store=None):
                                                 initial_nodes=prepare_native_nodes(produced))
     except solver.MarineMechanicalSolveError as error:
         if store is not None:
-            store('failure', dict(input_hash=snapshot['input_hash'], error=str(error)))
+            partial = getattr(error, 'partial', None)
+            payload = dict(input_hash=snapshot['input_hash'], error=str(error), reason=getattr(error, 'reason', None),
+                           timed_out=deadline())
+            try:
+                payload['evidence'] = None if partial is None else solver.result_to_dict(partial)
+            except Exception as dump_error:          # keep the failure record even if the partial cannot be dumped
+                payload['evidence_error'] = str(dump_error)
+            store('failure', payload)
         raise RaoReportError(f'native run failed: {error}') from error
     evidence = solver.result_to_dict(result)
     if result.status != 'completed':
@@ -284,6 +406,8 @@ def run_campaign(project, case, *, solve=solve_record, progress=None, store=None
     ('record'), partial or failed runs ('partial'/'failure'), so a later
     failure never discards earlier evidence.
     """
+    if case.project_input_hash != input_hash(project):
+        raise RaoReportError('the case belongs to different project inputs')
     lin = _Linear(project)
     records, extractions = [], []
     fit = case.fit_controls
@@ -299,7 +423,7 @@ def run_campaign(project, case, *, solve=solve_record, progress=None, store=None
                 ex = rx.extract_run(record, omega=omega, amplitude=amplitude, anchors=lin.anchors,
                                     transient_seconds=transient, window_cycles=case.windows['window_cycles'],
                                     harmonics=fit['harmonics'], intercept=fit['intercept'], drift=fit['drift'],
-                                    max_condition=case.criteria['max_condition'])
+                                    max_condition=case.criteria['max_condition'], nodes=lin.node_positions)
                 ex.update(heading_degrees=heading, run_input_hash=input_hash(derived), result_id=record.result_id,
                           omega_dt=omega * lin.dt)
                 records.append(record)
@@ -314,9 +438,14 @@ def _check(name, value, limit, detail=''):
 
 
 def _power(forces, response, omega, n_body):
-    """Mean power per contribution 1/2 Re(F . conj(v)), v = -i w q (body DOFs)."""
+    """Mean power per contribution 1/2 Re(F . conj(v)), v = -i w q (body DOFs).
+
+    The stored ``dry`` wrench is the internal inertial covector (residual =
+    external - dry), so it enters with the opposite sign: the powers then sum to zero.
+    """
     v = -1j * omega * np.asarray(response)[:n_body]
-    return {cid: float(0.5 * np.real(np.vdot(v, np.asarray(f['phasor'])[:n_body]))) for cid, f in forces.items()}
+    return {cid: (-1.0 if cid == 'dry' else 1.0) * float(0.5 * np.real(np.vdot(v, np.asarray(f['phasor'])[:n_body])))
+            for cid, f in forces.items()}
 
 
 def compare(case, table, extractions):
@@ -334,8 +463,8 @@ def compare(case, table, extractions):
     got = sorted((x['omega'], x['heading_degrees'], x['amplitude']) for x in extractions)
     if got != expected:
         raise RaoReportError('the campaign does not cover the case grid exactly once per run')
-    if any(list(x['dof_keys']) != list(table['dof_keys'])[:len(x['dof_keys'])] for x in extractions):
-        raise RaoReportError('extraction DOF keys differ from the FD table')
+    if any(list(x['dof_keys']) != list(table['dof_keys']) for x in extractions):
+        raise RaoReportError('extraction DOF keys differ from the FD table (every table DOF is compared)')
     crit = case.criteria
     category = case.category
     nz = crit['nearzero_amplitude_absolute']
@@ -346,7 +475,9 @@ def compare(case, table, extractions):
     fd = {}
     for entry in table['entries']:
         if entry['source'] in reference_source:
-            fd.setdefault((entry['omega'], entry['heading_degrees']), np.array([complex(*v) for v in entry['rao']]))
+            key = (entry['omega'], entry['heading_degrees'], entry.get('amplitude'))
+            fd.setdefault(key, np.array([complex(*v) for v in entry['rao']]))
+    per_amplitude = any(k[2] is not None for k in fd)
     advisory = category in ('linearized_nonlinear', 'nonlinear_reported')
     amp_limit = crit['advisory_amplitude_relative'] if advisory else crit['rao_amplitude_relative']
     phase_limit = crit['advisory_phase_deg'] if advisory else crit['rao_phase_deg']
@@ -354,7 +485,7 @@ def compare(case, table, extractions):
     for ex in extractions:
         key = (ex['omega'], ex['heading_degrees'])
         n = len(ex['dof_keys'])
-        ref = fd[key][:n]
+        ref = fd[key + ((ex['amplitude'],) if per_amplitude else (None,))][:n]
         td = np.asarray(ex['rao'])
         a = ex['amplitude']
         label = f"omega={ex['omega']} heading={ex['heading_degrees']} a={a}"
@@ -408,7 +539,9 @@ def compare(case, table, extractions):
             checks.append(_check('linearity_absolute', float(np.max((np.abs(other - base) * run['amplitude'])[~both],
                                                                      initial=0)), nz, detail))
     failed = [c for c in checks if not c['passed']]
-    advisory_names = ('rao_amplitude_relative', 'rao_phase_deg')
+    # Linearized-nonlinear cases gate on convergence and balance only (design section 3);
+    # RAO differences, amplitude dependence and harmonic content are reported.
+    gating_nonlinear = ('steady_relative', 'power_closure_relative', 'max_omega_dt')
     if not rc.criteria_adopted():
         verdict = 'not_adjudicated'
     elif category == 'nonlinear_reported':
@@ -416,7 +549,7 @@ def compare(case, table, extractions):
     elif demotions:
         verdict = 'nogo'
     elif advisory:
-        verdict = 'pass' if not [c for c in failed if c['name'] not in advisory_names] else 'nogo'
+        verdict = 'pass' if not [c for c in failed if c['name'] in gating_nonlinear] else 'nogo'
     else:
         verdict = 'pass' if not failed else 'nogo'
     report = dict(artifact='anymarine_rao_report', schema_version=REPORT_VERSION, case_hash=case.case_hash,

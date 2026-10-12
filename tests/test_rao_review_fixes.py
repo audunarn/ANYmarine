@@ -113,3 +113,41 @@ def test_f8_f9_deadline_refuses_and_keeps_partial_evidence():
     with pytest.raises(rr.RaoReportError, match='did not complete|failed'):
         rr.solve_record(oscillator_project(), wall_seconds=1e-6, store=lambda kind, payload: stored.append(kind))
     assert stored and stored[0] in ('partial', 'failure')
+
+
+# ---------------------------------------------------------------- round 2
+@requires_solver
+def test_n1_declared_excitation_is_refused_even_if_zero_at_t0():
+    from anymarine.native_inputs import NativeMechanicalInputs
+    p = rl.wave_free_project(at_equilibrium(oscillator_project()))
+    data = p.native_inputs.to_dict()
+    data['potential_flow']['excitation_imag'][0] = 1.0     # sin(w t): zero force at t = 0
+    sine = p.with_edits(native_inputs=NativeMechanicalInputs.from_dict(data))
+    model, states, spec = prepare_native_run(sine)
+    with pytest.raises(rl.RaoLinearizationError, match='excitation is active'):
+        rl.linearize(model, states, dt=spec.dt)
+
+
+def test_n2_dry_inertia_power_enters_with_internal_sign():
+    q = np.zeros(N, complex)
+    q[0] = 1.0
+    force = np.zeros(N, complex)
+    force[0] = 1j
+    power = rr._power({'x': dict(phasor=force), 'dry': dict(phasor=force)}, q, 1.0, N)
+    assert abs(sum(power.values())) < 1e-15 and power['x'] != 0
+
+
+def test_n3_every_table_dof_is_compared():
+    c = case()
+    short = [dict(extraction(a, BASE), dof_keys=KEYS[:1], rao=BASE[:1], response=BASE[:1] * a)
+             for a in (0.1, 0.05)]
+    with pytest.raises(rr.RaoReportError, match='DOF keys'):
+        rr.compare(c, table(c, BASE), short)
+
+
+@requires_solver
+def test_n4_campaign_is_bound_to_the_case_project():
+    from test_rao_report import oscillator_with_cylinder, spec
+    c = rr.prepare_case(oscillator_with_cylinder(), spec())
+    with pytest.raises(rr.RaoReportError, match='different project'):
+        rr.run_campaign(oscillator_project(), c, solve=lambda *a, **k: pytest.fail('solver reached'))

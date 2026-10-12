@@ -70,6 +70,27 @@ Per frequency: `Z(w) = K - w^2 (M + A_rad(w)) - i w (C + B_rad(w))`, `Z q = X`.
 - Per-contribution force phasors `F_c = X_c - (K_c - w^2 M_c - i w C_c) q`, with the balance
   `sum_c F_c = -w^2 M_dry q` checked to roundoff, and FD power `1/2 Re(F_c conj(-i w q))`.
 
+### Implemented status (2026-10-12)
+
+- Mooring (slice 7): node DOFs are kept (3 per free node after the bodies) with the
+  assembler's exact sparse K/C/M; the static audit includes node residuals. A case is taut
+  when every segment tension is positive at the linearization point and the FD-predicted
+  tension amplitude at the largest declared amplitude (finite-difference tension gradient
+  of the public assembly) stays below the static tension; otherwise `nonlinear_reported`.
+  Line fluid inertia excitation uses three public force evaluations. Seabed contact and
+  line drag are refused for now. Verified: exact taut-line equilibrium, mooring tangent vs
+  central differences, axial EA/L0 tension gradient, and a native campaign with node DOFs
+  passing the comparison.
+- Member drag (slice 8): describing-function (first-harmonic) balance. For a trial response
+  the stateless member contribution is evaluated over one period at the moving states and the
+  fundamental of its reported drag component is balanced by Newton iteration on (Re q, Im q)
+  with a finite-difference drag Jacobian and backtracking (tolerance 1e-8). The inertia
+  excitation excludes the drag component. With drag the FD table has one entry per declared
+  amplitude. Member drag with current is refused (no admitted linearization). Verified: the
+  fixed vertical cylinder matches (8/3pi) b int U^2 dz to 1e-6; a native drag campaign passes
+  the linearized-nonlinear gates (steadiness, power closure, omega dt) with the RAO
+  difference reported. Linearized-nonlinear cases gate on convergence/balance only.
+
 ## 2. Time-domain extraction
 
 - One native run per (omega, heading, amplitude), built as a derived project through the

@@ -135,7 +135,8 @@ def stationary_nodes(nodes):
 
 
 def _pad(matrix, size):
-    out = np.zeros((size, size) if np.ndim(matrix) == 2 else (size,))
+    """Zero-pad a body-layout vector/matrix to ``size`` (dtype preserved, complex included)."""
+    out = np.zeros((size, size) if np.ndim(matrix) == 2 else (size,), dtype=np.result_type(matrix, float))
     n = np.shape(matrix)[0]
     if np.ndim(matrix) == 2:
         out[:n, :n] = matrix
@@ -173,9 +174,16 @@ def linearize(model, states, *, dt, nodes=None):
     # its geometric stiffness (-dD^T/dq X), so a live excitation would make the
     # tangents wave-dependent. Linearize the wave-free copy (wave_free_project).
     force = np.array(total.external_force)
-    excitation = total.diagnostics.get(POTENTIAL_FLOW_ID, {}).get('components', {}).get('excitation')
-    if excitation is not None and np.any(np.asarray(excitation, dtype=float)):
-        raise RaoLinearizationError('the potential-flow excitation is active: linearize the wave-free project')
+    flow = potential_flow_contribution(model)
+    if flow is not None:
+        data = flow.data
+        if data.excitation_series is None:
+            declared = np.any(np.asarray(data.excitation_real)) or np.any(np.asarray(data.excitation_imag))
+        else:
+            declared = (np.any(np.asarray(data.excitation_series.weighted_real))
+                        or np.any(np.asarray(data.excitation_series.weighted_imag)))
+        if declared:
+            raise RaoLinearizationError('the potential-flow excitation is active: linearize the wave-free project')
     dry = {}
     for i, body in enumerate(model.bodies):
         tangents = body.dry_tangents(states[body.body_id])
@@ -353,13 +361,21 @@ def wave_free_project(project):
     return project.with_edits(native_inputs=NativeMechanicalInputs.from_dict(data))
 
 
-def stateless_wave_excitation(contribution, model, states, omega):
+def _morison_drag(result):
+    """Summed chart drag covector of a Morison member-set evaluation."""
+    members = result.diagnostics.get('members', {})
+    return sum((np.asarray(m['components']['drag'], dtype=float) for m in members.values()),
+               np.zeros(np.shape(result.external_force)))
+
+
+def stateless_wave_excitation(contribution, model, states, omega, *, exclude_drag=False):
     """Exact excitation phasor of a stateless contribution linear in the waves.
 
     At the fixed stationary geometry ``F(t) = F_s + a cos(w t) + b sin(w t)``
-    when the force is linear in Airy kinematics (Morison inertia; zero drag):
-    three public evaluations at t = 0, T/4, T/2 give ``X = a + i b`` with the
-    solver's own quadrature. Drag makes this inexact and is refused upstream.
+    when the force is linear in Airy kinematics (Morison inertia): three public
+    evaluations at t = 0, T/4, T/2 give ``X = a + i b`` with the solver's own
+    quadrature. Drag is quadratic: with ``exclude_drag`` its reported component is
+    removed first (it is then treated by :func:`harmonic_drag`).
     """
     contributions, _ = _solver()
     body_ids = tuple(model.body_ids)
@@ -373,7 +389,8 @@ def stateless_wave_excitation(contribution, model, states, omega):
         else:
             info = contributions.StepInformation(step, quarter, 'step', states)
         result = contribution.evaluate_trial_with_context(contributions.CommittedHistory(), states, layout, info)
-        return np.asarray(result.external_force, dtype=float)
+        force = np.asarray(result.external_force, dtype=float)
+        return force - _morison_drag(result) if exclude_drag else force
 
     f0, f1, f2 = at(0), at(1), at(2)
     mean = 0.5 * (f0 + f2)
@@ -422,3 +439,36 @@ def mooring_wave_excitation(model, states, nodes, omega):
     f0, f1, f2 = (np.asarray(mooring.force(states, nodes, time=k * quarter), dtype=float) for k in (0, 1, 2))
     mean = 0.5 * (f0 + f2)
     return (f0 - mean) + 1j * (f1 - mean)
+
+
+# ---------------------------------------------------------------------- drag
+def harmonic_drag(contribution, model, states, response, omega, *, samples=64):
+    """First-harmonic phasor of the Morison drag covector for body motion ``response``.
+
+    The stateless public contribution is evaluated at ``samples`` instants of one
+    period with the bodies moving as ``q(t) = Re{q exp(-i w t)}`` (chart position,
+    rate and acceleration) in the contribution's own wave field; the fundamental of
+    its reported drag component is returned (describing-function linearization:
+    for a single scalar relative velocity it equals ``(8/3pi) b |w| w``).
+    """
+    contributions, rigid = _solver()
+    body_ids = tuple(model.body_ids)
+    layout = contributions.BodyLayout(body_ids)
+    base = stationary_states({bid: states[bid] for bid in body_ids})
+    q = np.asarray(response, dtype=complex)[:6 * len(body_ids)]
+    dt = 2.0 * math.pi / float(omega) / samples
+    total = np.zeros(6 * len(body_ids), dtype=complex)
+    for k in range(samples):
+        t = k * dt
+        e = np.exp(-1j * omega * t)
+        pos, vel, acc = (q * e).real, (-1j * omega * q * e).real, (-omega ** 2 * q * e).real
+        moving = {bid: rigid.RigidBodyState(position=np.asarray(base[bid].position) + pos[6 * i:6 * i + 3],
+                                            rotation_vector=pos[6 * i + 3:6 * i + 6],
+                                            velocity=vel[6 * i:6 * i + 6], acceleration=acc[6 * i:6 * i + 6],
+                                            anchor=base[bid].anchor)
+                  for i, bid in enumerate(body_ids)}
+        info = (contributions.StepInformation(0, dt, 'initialization') if k == 0
+                else contributions.StepInformation(k, dt, 'step', moving))
+        result = contribution.evaluate_trial_with_context(contributions.CommittedHistory(), moving, layout, info)
+        total += _morison_drag(result) * np.conj(e)
+    return 2.0 * total / samples

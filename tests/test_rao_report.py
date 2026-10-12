@@ -88,8 +88,8 @@ def test_refusals():
     data = project.native_inputs.to_dict()
     data['morison']['members'][0]['section']['drag_coefficient'] = 1.0
     dragged = project.with_edits(native_inputs=NativeMechanicalInputs.from_dict(data))
-    with pytest.raises(rr.RaoReportError, match='drag'):
-        rr.prepare_case(dragged, spec())
+    with pytest.raises((rr.RaoReportError, rc.RaoCaseError), match='drag'):
+        rr.prepare_case(dragged, spec())            # drag present: declare its linearization
     from anymarine.native_examples import mooring_two_body_project
     with pytest.raises(rr.RaoReportError, match='mooring'):
         rr.prepare_case(mooring_two_body_project(), spec(radiation_source='none'))

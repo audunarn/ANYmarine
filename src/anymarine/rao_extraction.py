@@ -34,12 +34,23 @@ def rotation_vector(R):
     return vee * (angle / math.sin(angle))
 
 
-def dof_series(record, anchors):
-    """``(times, q)`` with q of shape (n_t, 6 n_bodies) in the record's body order."""
+def dof_series(record, anchors, nodes=None):
+    """``(times, q)``: (n_t, 6 n_bodies [+ 3 n_nodes]) in the record's body order.
+
+    ``nodes`` are the mooring node positions at the linearization point; node
+    DOFs are their stored displacements, appended after the bodies.
+    """
     if record.kind != 'mechanical_development' or record.rotation_matrices is None:
         raise RaoExtractionError('RAO extraction needs a native mechanical result')
     times = np.asarray(record.times, dtype=float)
-    q = np.zeros((times.size, 6 * len(record.body_ids)))
+    n_body = 6 * len(record.body_ids)
+    n_node = 0 if nodes is None else 3 * len(nodes)
+    if nodes is not None and record.line_nodes is None:
+        raise RaoExtractionError('the run stores no mooring nodes')
+    q = np.zeros((times.size, n_body + n_node))
+    if nodes is not None:
+        stored = np.asarray(record.line_nodes, dtype=float)
+        q[:, n_body:] = (stored - np.asarray(nodes, dtype=float)[None]).reshape(times.size, -1)
     for i, bid in enumerate(record.body_ids):
         r0, R0 = (np.asarray(x, dtype=float) for x in anchors[bid])
         q[:, 6 * i:6 * i + 3] = np.asarray(record.positions[bid], dtype=float) - r0
@@ -63,9 +74,10 @@ def contribution_channels(record):
 
 
 def extract_run(record, *, omega, amplitude, anchors, transient_seconds, window_cycles,
-                harmonics=1, intercept=True, drift=False, max_condition=1e12, steady_floor=1e-12):
+                harmonics=1, intercept=True, drift=False, max_condition=1e12, steady_floor=1e-12,
+                nodes=None):
     """Response and force phasors of one regular-wave run (per unit amplitude)."""
-    times, q = dof_series(record, anchors)
+    times, q = dof_series(record, anchors, nodes)
     (s1, e1), (s2, e2) = steady_windows(float(times[-1]), omega, window_cycles)
     if s1 < transient_seconds - 1e-9:
         raise RaoExtractionError('the run is too short for the declared transient and two windows')
@@ -87,7 +99,8 @@ def extract_run(record, *, omega, amplitude, anchors, transient_seconds, window_
                       float(np.max(np.linalg.norm(block[:, 3:], axis=1)))])
     higher = np.sqrt(np.sum(np.abs(second.phasors[1:]) ** 2, axis=0)) if harmonics > 1 else np.zeros(q.shape[1])
     return dict(omega=float(omega), amplitude=float(amplitude), windows=[[s1, e1], [s2, e2]],
-                dof_keys=[f'{bid}::{name}' for bid in record.body_ids for name in DOF_NAMES],
+                dof_keys=[f'{bid}::{name}' for bid in record.body_ids for name in DOF_NAMES]
+                + ([] if nodes is None else [f'node{i}::{axis}' for i in range(len(nodes)) for axis in 'xyz']),
                 response=second.fundamental, response_first=first.fundamental,
                 rao=second.fundamental / amplitude,
                 steadiness=phasor_change(first.fundamental, second.fundamental, steady_floor),
