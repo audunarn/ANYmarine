@@ -474,7 +474,7 @@ def harmonic_drag(contribution, model, states, response, omega, *, samples=64):
     return 2.0 * total / samples
 
 
-def mooring_orbit_min_tension(model, states, nodes, response, omega, *, samples=64):
+def mooring_orbit_min_tension(model, states, nodes, response, omega, *, samples=256):
     """Smallest segment tension along the predicted orbit ``q(t) = Re{q exp(-i w t)}``.
 
     The public assembly is evaluated at moving body/node states (positions and

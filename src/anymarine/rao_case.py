@@ -133,7 +133,9 @@ def prepare_rao_case(spec, *, project_input_hash, features, created_utc=''):
     allowed = set(_CASE_KEYS) - {'schema_version', 'project_input_hash', 'features', 'category',
                                  'scope', 'created_utc'}
     _require(set(spec) == allowed, f'spec needs exactly the fields {sorted(allowed)}')
-    _require(isinstance(spec['case_id'], str) and spec['case_id'].strip(), 'case_id must be a nonempty string')
+    _require(isinstance(spec['case_id'], str) and 0 < len(spec['case_id']) <= 120
+             and all(c.isalnum() or c in '._-' for c in spec['case_id']) and spec['case_id'][0] not in '.-',
+             'case_id must be 1-120 characters of letters, digits, ".", "_" or "-" (it names files)')
     _require(isinstance(project_input_hash, str) and len(project_input_hash) == 64
              and all(c in '0123456789abcdef' for c in project_input_hash), 'project_input_hash must be sha256 hex')
     _exact(spec['linearization_point'], ('source',), 'linearization_point')

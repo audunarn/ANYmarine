@@ -213,3 +213,32 @@ def test_r9_csv_keeps_the_incident_amplitude(tmp_path):
     rr.write_csv(tmp_path, t)
     rows = list(csv.reader((tmp_path / 'rao_table.csv').open(encoding='utf-8')))
     assert rows[0][2] == 'incident_amplitude' and {r[2] for r in rows[1:]} == {'0.1', '0.05'}
+
+
+# ---------------------------------------------------------------- round 4
+def test_m2_case_id_cannot_name_a_path():
+    for bad in ('C:/Github/ANYhydro/unexpected', '../escape', '.hidden', 'a/b', ''):
+        with pytest.raises(rc.RaoCaseError, match='case_id'):
+            case(case_id=bad)
+
+
+def test_m6_mooring_case_without_tension_evidence_is_demoted():
+    feats = dict(LINEAR, mooring=True, mooring_taut=True)
+    spec_keys = ('case_id', 'linearization_point', 'radiation_source', 'omegas', 'headings_degrees', 'amplitudes',
+                 'phase', 'drag_linearization', 'windows', 'fit_controls', 'criteria', 'execution_limits')
+    c = rc.prepare_rao_case({k: v for k, v in case().to_dict().items() if k in spec_keys},
+                            project_input_hash='c' * 64, features=feats)
+    report = rr.compare(c, table(c, BASE), [extraction(0.1, BASE), extraction(0.05, BASE)])
+    assert report['verdict'] == 'nogo' and any('no segment-tension evidence' in d for d in report['demoted'])
+
+
+def test_m8_non_finite_power_arithmetic_fails():
+    c = case()
+    q = np.zeros(N, complex)
+    q[0] = 1e-160
+    f = np.zeros(N, complex)
+    f[0] = 1e160j
+    huge = dict(x=dict(phasor=f), dry=dict(phasor=np.zeros(N, complex)))
+    report = rr.compare(c, table(c, BASE), [extraction(0.1, BASE, response=q, forces=huge),
+                                            extraction(0.05, BASE, forces=huge)])
+    assert 'power_closure_relative' in names(report, False)

@@ -680,6 +680,8 @@ class MainWindow(QMainWindow):
     def _set_project(self, project: ProjectModel) -> None:
         self._waves.reset()
         self._project = project
+        if getattr(self, '_rao', None) is not None:
+            self._rao.project_changed()
         self._dirty = False
         self._current_result = None
         self._handles = {}
@@ -1034,6 +1036,8 @@ class MainWindow(QMainWindow):
         self._waves.reset()
         self._project = project
         self._dirty = True
+        if getattr(self, '_rao', None) is not None:
+            self._rao.project_changed()
         self._tree_model.set_project(project)
         self._details.set_project(project)
         self._refresh_assessment_detachment()
@@ -2104,6 +2108,15 @@ class MainWindow(QMainWindow):
     # ----------------------------------------------------------------- close
 
     def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802
+        if self._rao.busy:
+            answer = QMessageBox.question(
+                self, "RAO calculation running",
+                "Cancel the running RAO calculation and close? Its evidence stays in the output directory.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No, QMessageBox.StandardButton.No)
+            if answer != QMessageBox.StandardButton.Yes:
+                event.ignore()
+                return
+            self._rao.cancel()
         active = self._job_manager.active_jobs()
         if not active:
             if not self._confirm_discard():

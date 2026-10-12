@@ -811,6 +811,7 @@ def _cmd_rao_table(args) -> int:
         case = rao_case.read_case_artifact(args.case)
         table = rao_report.fd_table(project, case)
         out = _rao_out_dir(args.out_dir)
+        (out / 'case.json').write_text(Path(args.case).read_text(encoding='utf-8'), encoding='utf-8')
         (out / 'rao_table.json').write_text(json.dumps(table, indent=1), encoding='utf-8')
         rao_report.write_csv(out, table)
     except (OSError, ValueError) as error:
@@ -838,6 +839,7 @@ def _cmd_rao_run(args) -> int:
                 (runs / f'{kind}-{counter[kind]:03d}.json').write_text(json.dumps(payload), encoding='utf-8')
 
         try:
+            (out / 'case.json').write_text(Path(args.case).read_text(encoding='utf-8'), encoding='utf-8')
             (out / 'rao_table.json').write_text(json.dumps(table, indent=1), encoding='utf-8')
             runs.mkdir()
             records, extractions = rao_report.run_campaign(

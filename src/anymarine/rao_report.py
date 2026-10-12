@@ -26,6 +26,9 @@ STATIC_FORCE_LIMIT_N = 1e-8 + 1e-8 * 100.0     # equilibrium_jobs DEFAULT_SPEC a
 STATIC_MOMENT_LIMIT_NM = 1e-8 + 1e-8 * 100.0
 DRAG_BALANCE_TOLERANCE = 1e-8      # relative change of the response between harmonic-balance iterates
 DRAG_BALANCE_ITERATIONS = 200
+#: Declared validity margin of the taut-line linearization: along the sampled predicted
+#: orbit every segment keeps at least this fraction of the smallest static tension.
+TAUT_ORBIT_MARGIN = 0.05
 NO_EVIDENCE = 1e300                # finite (JSON) sentinel for a check without evidence; always fails
 
 
@@ -206,6 +209,9 @@ class _Linear:
             zr = np.block([[z.real, -z.imag], [z.imag, z.real]])
             current = residual(q)
             for iteration in range(1, DRAG_BALANCE_ITERATIONS + 1):
+                balance = max(np.linalg.norm(total), np.linalg.norm(z @ q), 1e-300)
+                if np.linalg.norm(current) <= 1e-4 * DRAG_BALANCE_TOLERANCE * balance:
+                    break               # start already balanced far below tolerance (e.g. exact q = 0)
                 scale = max(float(np.max(np.abs(q[:nb]))), 1e-9)
                 jac = zr.copy()
                 base = real(drag(q))
@@ -273,7 +279,8 @@ def features(project, spec):
                 # Linearization valid only while every segment stays taut along the predicted
                 # orbit at the largest amplitude (public assembly at moving states: finite
                 # rotation and axial damping included).
-                if rl.mooring_orbit_min_tension(lin.model, lin.states, lin.nodes, q, omega) <= 0:
+                floor = TAUT_ORBIT_MARGIN * float(np.min(lin.linear.mooring_tension))
+                if rl.mooring_orbit_min_tension(lin.model, lin.states, lin.nodes, q, omega) <= floor:
                     taut = False
             for i in range(len(lin.model.body_ids)):
                 # Peak vector magnitude of Re{Q exp(-iwt)} is bounded by ||Q|| (all phases).
@@ -343,8 +350,17 @@ def fd_table(project, case):
     return table
 
 
+_OWN_HASH = {'anymarine_rao_table': 'table_hash', 'anymarine_rao_report': 'report_hash'}
+
+
 def _hash(data):
-    body = {k: v for k, v in data.items() if k not in ('table_hash', 'report_hash', 'created_utc')}
+    """Hash of an artifact over every field except its own hash and created_utc.
+
+    A report's ``table_hash`` and ``case_hash`` are covered, so a report cannot be
+    re-attached to another table or case without changing its own hash.
+    """
+    own = _OWN_HASH.get(data.get('artifact'), 'table_hash')
+    body = {k: v for k, v in data.items() if k not in (own, 'created_utc')}
     return hashlib.sha256(canonical_json(body).encode('utf-8')).hexdigest()
 
 
@@ -532,19 +548,30 @@ def compare(case, table, extractions):
         if not forces or 'dry' not in forces:
             closure, note = NO_EVIDENCE, ' (no contribution/dry force evidence: not a measured closure)'
         else:
-            power = _power(forces, response, ex['omega'], n_body)
-            velocity = np.linalg.norm(ex['omega'] * np.asarray(response)[:n_body])
-            reference = 0.5 * velocity * sum(np.linalg.norm(np.asarray(f['phasor'])[:n_body]) for f in forces.values())
-            scale = max(sum(abs(v) for v in power.values()), 1e-6 * reference)
-            # Zero forces at zero power close exactly; roundoff is measured against the force-velocity scale.
-            closure = abs(sum(power.values())) / scale if scale > 0 else 0.0
+            with np.errstate(over='ignore', invalid='ignore'):
+                power = _power(forces, response, ex['omega'], n_body)
+                velocity = np.linalg.norm(ex['omega'] * np.asarray(response)[:n_body])
+                reference = 0.5 * velocity * sum(np.linalg.norm(np.asarray(f['phasor'])[:n_body])
+                                                 for f in forces.values())
+                scale = max(sum(abs(v) for v in power.values()), 1e-6 * reference)
+                net = abs(sum(power.values()))
+            if not (math.isfinite(net) and math.isfinite(scale) and all(math.isfinite(v) for v in power.values())):
+                closure, note = NO_EVIDENCE, ' (power arithmetic not finite: not a measured closure)'
+            else:
+                # Zero forces at zero power close exactly; roundoff is measured against the force-velocity scale.
+                closure = net / scale if scale > 0 else 0.0
         checks.append(_check('power_closure_relative', closure, crit['power_closure_relative'], label + note))
-        if ex.get('min_tension') is not None:
-            slack = dict(name='observed_min_tension_n', value=float(ex['min_tension']), limit=0.0,
-                         passed=bool(ex['min_tension'] > 0), detail=label + ' (stored segment tensions, steady windows)')
+        if case.features.get('mooring') or ex.get('min_tension') is not None:
+            missing = ex.get('min_tension') is None
+            value = NO_EVIDENCE if missing else float(ex['min_tension'])
+            slack = dict(name='observed_min_tension_n', value=-value if missing else value, limit=0.0,
+                         passed=bool(not missing and value > 0),
+                         detail=label + (' (no stored segment tensions: not evidence of taut lines)' if missing
+                                         else ' (stored segment tensions, steady windows)'))
             checks.append(slack)
             if not slack['passed']:
-                demotions.append(f"segment slack observed (min tension {ex['min_tension']:.4g} N) ({label})")
+                demotions.append(('no segment-tension evidence' if missing else
+                                  f"segment slack observed (min tension {ex['min_tension']:.4g} N)") + f' ({label})')
         by_point.setdefault(key, []).append(ex)
     for key, runs in by_point.items():
         runs = sorted(runs, key=lambda r: -r['amplitude'])
