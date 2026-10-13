@@ -2757,7 +2757,10 @@ block at that frequency, with the unchanged 3 % limit. Effect on v7's numbers (i
 v7 stays recorded under its registered R6):
 - the 2.1875 rad/s mode would be judged against 3.11 and pass (about 0.4 %);
 - the 6.0 rad/s modes lie above the floor, keep their own denominators and still fail at 3.02 %.
-The owner was told otherwise when adopting the floor; this correction is recorded for decision.
+The owner was told otherwise when adopting the floor. After the correction the owner decided
+(2026-10-13): keep R6 at 3 % with the 0.01 floor, with no larger floor and no resonance exemption.
+R6 at 6.0 rad/s stays an open W5 item, to be closed by mesh convergence: the next W5 source study
+adds a finer level (within the 6144-panel ceiling) and adjudicates R6 and R8 within the run.
 
 #### OrcaWave benchmark B (adopted by the owner, 2026-10-13)
 
