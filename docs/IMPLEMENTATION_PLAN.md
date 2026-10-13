@@ -2711,6 +2711,28 @@ contribution power closure 1 %; advisory RAO bands 10 % / 10 deg for linearized-
 observed motion outside them demotes the case to nogo. Category is derived, never chosen.
 Development evidence only; no qualification follows from an RAO pass.
 
+#### OrcaWave benchmark B (adopted by the owner, 2026-10-13)
+
+Reference: D:/OrcaflexAqC2/barge_d1_35.owr (OrcaWave 11.6c; single body, 1391 t, CoG z 7 m,
+infinite depth, potential formulation, interior lid panels, quarter-symmetric Sesam mesh;
+36 periods 2.2-15 s, 7 headings 0-180 deg). ANYmarine never imports OrcFxAPI: a standalone
+extractor (system Python with OrcFxAPI) writes neutral SI data plus the symmetrised panel mesh.
+Prospective limits: amplitude within 5 % of that DOF's peak over the band; phase within 5 deg
+where the amplitude is >= 10 % of that peak. Roll near its resonance is reported, not gated
+(viscous roll damping is model dependent). Failures are recorded, never tuned away.
+
+Slices and acceptance:
+- B1 extractor: periods, headings, A(w), B(w), diffraction and Haskind load RAOs, displacement
+  RAOs, hydrostatics, environment and settings in SI with recorded units, conventions and the
+  .owr sha256; values equal to the API arrays after unit conversion; mesh exported.
+- B2 conventions: OrcaWave's complex/phase, heading and rotation conventions mapped to ours
+  (x = Re{X exp(-i w t)}) and proved on long-wave limits (heave -> 1, pitch -> k slope) before
+  any comparison.
+- B3 ANYhydro on the exported mesh at the same periods/headings: A, B, excitation vs OrcaWave.
+- B4 excitation-only load RAOs stored in the RAO table (schema bump) and shown in the GUI.
+- B5 ANYmarine FD displacement RAOs (same mass, inertia, CoG) vs OrcaWave.
+- B6 ANYmarine TD RAOs vs OrcaWave. Each slice reviewed; development evidence only.
+
 #### RAO taut-mooring admission (adopted by the owner, 2026-10-13)
 
 The taut check's linearized tension minimum (finite-difference gradients of the clipped

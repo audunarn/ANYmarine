@@ -1,0 +1,110 @@
+"""Extract an OrcaWave results file (.owr) into neutral SI benchmark data.
+
+Standalone tool for the OrcaWave benchmark (docs/IMPLEMENTATION_PLAN.md, "OrcaWave
+benchmark B"). Run it with a Python that has Orcina's OrcFxAPI and an OrcaWave licence::
+
+    python tools/orcawave_extract.py <results.owr> <output directory>
+
+ANYmarine itself never imports OrcFxAPI; it reads the JSON written here. Values are
+copied as OrcFxAPI reports them, converted only from the file's SI-with-tonnes units
+(te, kN, m) to SI (kg, N, m). Complex RAOs keep OrcFxAPI's own complex convention; the
+mapping to ANYmarine's ``x = Re{X exp(-i w t)}`` is defined and proved separately
+(benchmark slice B2), never assumed here. Rotational displacement RAOs are in rad/m.
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import math
+import sys
+from pathlib import Path
+
+SCHEMA = 'orcawave_reference_v1'
+TONNE, KILONEWTON = 1000.0, 1000.0
+INFINITE_DEPTH = 1e300
+
+
+def _pairs(array):
+    return [[float(z.real), float(z.imag)] for z in array]
+
+
+def _matrix(m, scale=1.0):
+    return [[float(v) * scale for v in row] for row in m]
+
+
+def extract(owr: Path, out: Path) -> dict:
+    import numpy as np
+    import OrcFxAPI as ofx
+
+    raw = owr.read_bytes()
+    d = ofx.Diffraction(str(owr))
+    units = (d.UnitsSystem, d.LengthUnits, d.MassUnits, d.ForceUnits)
+    if units != ('SI', 'm', 'te', 'kN'):
+        raise SystemExit(f'unsupported OrcaWave units {units}; expected SI with m, te, kN')
+    if d.NumberOfBodies != 1:
+        raise SystemExit('benchmark B extracts single-body results only')
+    periods = np.asarray(d.periods, dtype=float)
+    headings = np.asarray(d.headings, dtype=float)
+    depth = float(d.WaterDepth)
+    out.mkdir(parents=True, exist_ok=True)
+    mesh_name = 'body_mesh_quarter_xz_yz.gdf'          # WAMIT GDF, ISX = ISY = 1
+    d.SaveSymmetrisedBodyMesh(ofx.PanelMeshSymmetry.XZYZ, 1e-6, str(out / mesh_name))
+    h = d.hydrostaticResults[0]
+    added = np.asarray(d.addedMass, dtype=float) * TONNE          # te, te.m, te.m^2 -> kg, kg.m, kg.m^2
+    damping = np.asarray(d.damping, dtype=float) * KILONEWTON     # kN.s/m (and moments) -> N.s/m
+    load_diffraction = np.asarray(d.loadRAOsDiffraction) * KILONEWTON
+    load_haskind = np.asarray(d.loadRAOsHaskind) * KILONEWTON
+    displacement = np.asarray(d.displacementRAOs)
+    body = dict(
+        name=str(d.GetData('BodyName', 0)),
+        mesh_source=str(d.GetData('BodyMeshFileName', 0)),
+        mesh_source_format=str(d.GetData('BodyMeshFormat', 0)),
+        mesh_source_symmetry=str(d.GetData('BodyMeshSymmetry', 0)),
+        mesh_exported=mesh_name,
+        interior_surface_panels=str(d.GetData('BodyAddInteriorSurfacePanels', 0)),
+        volume_m3=float(h['volume']),
+        centre_of_buoyancy_m=[float(v) for v in h['centreOfBuoyancy']],
+        mass_kg=float(h['mass']) * TONNE,
+        centre_of_mass_m=[float(v) for v in h['centreOfMass']],
+        restoring_matrix_si=_matrix(h['restoringMatrix'], KILONEWTON),
+        inertia_matrix_si=_matrix(h['inertiaMatrix'], TONNE),
+        waterplane_area_m2=float(h['Awp']),
+        position_m=[float(v) for v in h['position']],
+    )
+    data = dict(
+        schema=SCHEMA,
+        source=dict(path=str(owr), sha256=hashlib.sha256(raw).hexdigest(), orcawave_dll=str(ofx.DLLVersion()),
+                    file_units=dict(system='SI', length='m', mass='te', force='kN')),
+        environment=dict(water_depth_m=None if depth >= INFINITE_DEPTH else depth,
+                         water_density_kg_m3=float(d.WaterDensity) * TONNE, g_m_s2=float(d.g)),
+        settings=dict(solve_type=str(d.SolveType), load_rao_method=str(d.LoadRAOCalculationMethod)),
+        body=body,
+        periods_s=[float(t) for t in periods],
+        omegas_rad_s=[2.0 * math.pi / float(t) for t in periods],
+        headings_deg=[float(b) for b in headings],
+        added_mass_si=[_matrix(m) for m in added],
+        damping_si=[_matrix(m) for m in damping],
+        displacement_raos=[[_pairs(row) for row in per_heading] for per_heading in displacement],
+        load_raos_diffraction_si=[[_pairs(row) for row in per_heading] for per_heading in load_diffraction],
+        load_raos_haskind_si=[[_pairs(row) for row in per_heading] for per_heading in load_haskind],
+        layout=dict(raos='[heading][period][dof] complex [re, im] as reported by OrcFxAPI',
+                    dofs=['surge', 'sway', 'heave', 'roll', 'pitch', 'yaw'],
+                    matrices='[period][6][6]', rotation_units='rad (displacement RAOs rad/m)'),
+        conventions=dict(complex='as reported by OrcFxAPI (OrcaWave convention); mapping to ANYmarine '
+                                 'x = Re{X exp(-i w t)} is defined and proved in benchmark slice B2'),
+    )
+    (out / 'orcawave_reference.json').write_text(json.dumps(data, indent=1), encoding='utf-8')
+    return data
+
+
+def main(argv=None):
+    argv = sys.argv[1:] if argv is None else argv
+    if len(argv) != 2:
+        raise SystemExit(__doc__)
+    data = extract(Path(argv[0]), Path(argv[1]))
+    print(f"wrote {argv[1]}: {len(data['periods_s'])} periods, {len(data['headings_deg'])} headings, "
+          f"sha256 {data['source']['sha256'][:12]}")
+
+
+if __name__ == '__main__':
+    main()
