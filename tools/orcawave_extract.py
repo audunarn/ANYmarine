@@ -69,7 +69,8 @@ def extract(owr: Path, out: Path) -> dict:
         restoring_matrix_si=_matrix(h['restoringMatrix'], KILONEWTON),
         inertia_matrix_si=_matrix(h['inertiaMatrix'], TONNE),
         waterplane_area_m2=float(h['Awp']),
-        position_m=[float(v) for v in h['position']],
+        # OrcaWave reports NaN when no body position applies; JSON gets null (strict parsers).
+        position_m=None if not all(math.isfinite(float(v)) for v in h['position']) else [float(v) for v in h['position']],
     )
     data = dict(
         schema=SCHEMA,
@@ -93,7 +94,8 @@ def extract(owr: Path, out: Path) -> dict:
         conventions=dict(complex='as reported by OrcFxAPI (OrcaWave convention); mapping to ANYmarine '
                                  'x = Re{X exp(-i w t)} is defined and proved in benchmark slice B2'),
     )
-    (out / 'orcawave_reference.json').write_text(json.dumps(data, indent=1), encoding='utf-8')
+    # allow_nan=False: any other non-finite value is a refusal, never a nonstandard JSON token.
+    (out / 'orcawave_reference.json').write_text(json.dumps(data, indent=1, allow_nan=False), encoding='utf-8')
     return data
 
 
