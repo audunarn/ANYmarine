@@ -429,6 +429,7 @@ def execute_w5_case(out_dir, *, backend, execution_limits, should_cancel=None):
             import numpy as np
             from .linear_assessment import fd_reference_response
             start_root = root / run['id'] / 'fd-start'
+            check_cancel()
             service = ApplicationService()
             project = _project(source_case, level)
             service.save_current(project, start_root)
@@ -438,9 +439,12 @@ def execute_w5_case(out_dir, *, backend, execution_limits, should_cancel=None):
                            q0=zero, v0=zero, surge_link_stiffness=data['surge_link_stiffness'], wave=wave,
                            execution_limits=data['linear_execution_limits']['fine'])
             project = service.import_derived_hydro_inputs(project, dataset_path, operators_path, kernels['fine'], options)
+            check_cancel()
             service.save(project)
+            check_cancel()
             reference_case = service.prepare_linear_assessment(project,
                 _case_spec(case, project, run, 'fine', None, artifact))
+            check_cancel()
             qhat = fd_reference_response(reference_case, project.linear_inputs, project.hydro_provenance, service.root)
             phase = np.exp(-1j * wave['omega'] * float(data['t0']))
             state = dict(q0=[float(v) for v in (qhat * phase).real],
@@ -455,6 +459,7 @@ def execute_w5_case(out_dir, *, backend, execution_limits, should_cancel=None):
             phase = f"registration:{run['id']}"
             _state(root, case, 'running', phase=phase)
             if run['state'] is None:
+                check_cancel()
                 run['state'] = fd_steady_state(run)
             members = {}
             # Every member case persists before ANY dynamics solve starts.

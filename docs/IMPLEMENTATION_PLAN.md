@@ -2653,8 +2653,12 @@ Prospective, after W5 v6 (free decay passed; regular wave wave-0 nogo, records r
   both members from the declared FD reference steady state at t0, q0 = Re(q exp(-i w t0)),
   v0 = Re(-i w q exp(-i w t0)), q being the source-proved hydro_spectrum reference response of
   the fine member (computed from a from-rest import kept as evidence under fd-start/). This
-  removes the start-from-rest transient of the free common-surge mode (no restoring, little
-  low-frequency damping), which in v6 drifted 1.5 m. Windows, fits and criteria are unchanged.
+  sets the dataset FD displacement and velocity at t0 and so reduces, but is not guaranteed to
+  remove, the start transient of the free common-surge mode (no restoring, little low-frequency
+  damping), which in v6 drifted 1.5 m: the solver's radiation memory still has zero prehistory
+  before t0 (a periodic solution has a nonzero one), and the TD kernel differs slightly from the
+  dataset A(w), B(w), so a residual transient remains and is judged by the unchanged windows,
+  fits and criteria.
 - The raw-vs-processed impedance sensitivity may be judged in full-block form,
   ||Z_raw - Z_proc||_F <= 1 % ||Z_raw||_F (case criterion `impedance_full_block_relative`,
   ceiling 0.01), as K1. The per-coefficient maximum stays reported; the response

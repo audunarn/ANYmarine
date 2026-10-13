@@ -1000,6 +1000,10 @@ def fd_reference_response(case: AssessmentCase, inputs: LinearDevelopmentInputs,
     """
     if case.reference["kind"] != REFERENCE_HYDRO_SPECTRUM:
         raise AssessmentRefusalError("an FD steady state needs a hydro_spectrum reference")
+    if case.input_hash != linear_input_hash(inputs):
+        raise AssessmentRefusalError(
+            "the case input_hash does not match the given linear inputs; the FD "
+            "steady state of one case is never computed from another model's inputs")
     spectrum = load_hydro_spectrum(case, inputs, provenance, project_root)
     qhat, _, _ = _fd_reference(inputs, case, spectrum)
     return qhat
@@ -1396,9 +1400,14 @@ def hydro_reciprocal_sensitivity(artifact, inputs: LinearDevelopmentInputs,
             "floor": impedance_floor,
             "absolute": impedance_absolute,
             "passed": impedance_pass,
-            "form": impedance_form,
-            "value": impedance_metric,
-            "max_coefficient_deviation": float(np.max(impedance_deviation)),
+            **({
+                # Full-block form: "unit" (J) still describes max_deviation/max_scale;
+                # the governing value is dimensionless and carries its own unit.
+                "form": impedance_form,
+                "value": impedance_metric,
+                "value_unit": "relative (Frobenius, ||Z_raw - Z_proc||_F / ||Z_raw||_F)",
+                "max_coefficient_deviation": float(np.max(impedance_deviation)),
+            } if impedance_form == "full_block" else {}),
         },
         "response": {
             "unit": "dimensionless (S^-1 qhat)",

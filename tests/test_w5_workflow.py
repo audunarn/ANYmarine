@@ -309,7 +309,7 @@ def test_actual_first_slice_project_geometry(spec):
         assert app.mass==512.5
 
 
-@pytest.mark.parametrize('quadrature_method', ['frequency_trapezoid', 'piecewise_linear_exact', 'band_shared', 'fd_start'])
+@pytest.mark.parametrize('quadrature_method', ['frequency_trapezoid', 'piecewise_linear_exact', 'band_shared', 'fd_start', 'fd_cancel'])
 def test_real_public_source_kernel_import_registration_join_without_solver(spec,tmp_path,monkeypatch,quadrature_method):
     """Analytic source fixture; mock ONLY source-study admission, never claim BEM.
 
@@ -322,9 +322,11 @@ def test_real_public_source_kernel_import_registration_join_without_solver(spec,
     from anymarine.linear_assessment import read_case_artifact
     from anymarine.linear import linear_input_hash
     band=quadrature_method=='band_shared'
-    fd_start=quadrature_method=='fd_start'
+    fd_cancel=quadrature_method=='fd_cancel'   # cancellation pending before the FD bootstrap
+    fd_start=quadrature_method in ('fd_start','fd_cancel')
     if fd_start:
         quadrature_method='frequency_trapezoid'
+        spec['t0']=.7   # nonzero start time: the start-state phase is exercised
         for wave in spec['regular_waves']:
             del wave['q0'], wave['v0']
             wave['initial_state']='fd_steady_state'
@@ -380,8 +382,16 @@ def test_real_public_source_kernel_import_registration_join_without_solver(spec,
     out=tmp_path/'join';w5.prepare_w5_case(spec,out)
     def cancel_after_cases():
         return (out/'wave-0/fine/registered-case.json').exists() and (out/'wave-0/coarse/registered-case.json').exists()
+    if fd_cancel:
+        import anymarine.linear_assessment as la
+        monkeypatch.setattr(la,'fd_reference_response',lambda *a,**k:pytest.fail('FD bootstrap ran after cancellation'))
+        cancel_after_cases=lambda:(out/'decay-0/coarse/registered-case.json').exists()
     with pytest.raises(w5.W5Cancelled):
         w5.execute_w5_case(out,backend=object(),execution_limits=object(),should_cancel=cancel_after_cases)
+    if fd_cancel:
+        assert not (out/'wave-0').exists()
+        assert json.loads((out/'status.json').read_text())['state']=='cancelled'
+        return
     for run in ('decay-0','wave-0'):
         a_inf={}
         for role in ('coarse','fine'):
@@ -401,6 +411,18 @@ def test_real_public_source_kernel_import_registration_join_without_solver(spec,
                 inputs=ApplicationService().load(out/run/role).linear_inputs
                 assert list(inputs.q0)==start['q0'] and list(inputs.v0)==start['v0']
             assert any(start['q0']) and any(start['v0'])
+            # Independent FD steady state from the analytic fixture (retained DOFs 0,2,6,8, SI):
+            # Z = K - w^2 (M + A(w)) - i w (B(w) + C), F from the registered case.
+            fine=ApplicationService().load(out/run/'fine').linear_inputs
+            registered=read_case_artifact(out/run/'fine'/'registered-case.json')
+            w=registered.omega
+            sel=np.ix_(selection,selection)
+            A=(10*np.eye(12)+R-R/(lam**2+w**2))[sel];B=(R*lam/(lam**2+w**2))[sel]
+            Z=(np.asarray(fine.stiffness)-w*w*(np.asarray(fine.mass_dry)+A)-1j*w*(B+np.asarray(fine.damping)))
+            F=np.array([complex(*p) for p in registered.force_phasors])
+            q=np.linalg.solve(Z,F)*np.exp(-1j*w*.7)
+            assert np.allclose(start['q0'],q.real,rtol=1e-9,atol=1e-15)
+            assert np.allclose(start['v0'],(-1j*w*q).real,rtol=1e-9,atol=1e-15)
     assert json.loads((out/'status.json').read_text())['state']=='cancelled'
 
 

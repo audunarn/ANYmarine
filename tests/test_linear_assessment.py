@@ -1681,6 +1681,67 @@ def test_hydro_impedance_sensitivity_full_block_form(hydro_flow):
     assert "hydro_impedance_sensitivity" in reports[1.0e-14].failed
     check = next(c for c in reports[1.0e-14].checks if c["name"] == "hydro_impedance_sensitivity")
     assert check["unit"] == "relative (Frobenius)" and "max coefficient deviation" in check["detail"]
+    # The serialized report keeps the relative value's own unit next to the J diagnostics.
+    stored = json.loads(json.dumps(reports[1.0e-14].arrays["hydro_sensitivity"]["impedance"]))
+    assert stored["unit"].startswith("J") and stored["value_unit"].startswith("relative (Frobenius")
+    # A case without the key keeps the historical per-coefficient field set.
+    historical = hydro_flow["report"].arrays["hydro_sensitivity"]["impedance"]
+    assert not {"form", "value", "value_unit", "max_coefficient_deviation"} & set(historical)
+
+
+def test_full_block_impedance_is_frobenius_of_work_conjugate_blocks():
+    """Independent norm on non-unit scales; per-coefficient fail vs full-block pass; abs allowance."""
+    inputs = _regular_wave_inputs(_project())
+    mass_dry = np.asarray(inputs.mass_dry, dtype=float)
+    stiffness = np.asarray(inputs.stiffness, dtype=float)
+    damping = np.asarray(inputs.damping, dtype=float)
+    omega = HYDRO_OMEGA
+    scales = np.array([1.0, 2.5, 0.4, 10.0])
+    a_proc = np.diag([1.0e5, 1.2e5, 0.8e5, 1.1e5])
+    b_proc = np.diag([2.0e4, 2.2e4, 1.8e4, 2.1e4])
+    a_raw = a_proc.copy()
+    a_raw[0, 2] = a_raw[2, 0] = 40.0   # a small coupling entry absent from the processed block
+    mock = SimpleNamespace(
+        raw_added_mass=a_raw[None], raw_damping=b_proc[None],
+        derived_added_mass=a_proc[None], derived_damping=b_proc[None],
+        settings=SimpleNamespace(correction_policy="reciprocal_average",
+                                 normalization=SimpleNamespace(scales=[float(v) for v in scales])))
+    f_hat = np.array([1.0e5, 2.0e5, 1.5e5, 3.0e5], dtype=np.complex128)
+
+    def z(a_matrix, b_matrix):
+        block = stiffness - omega * omega * (mass_dry + a_matrix) - 1j * omega * (b_matrix + damping)
+        return np.diag(scales) @ block @ np.diag(scales)
+
+    expected = np.linalg.norm(z(a_raw, b_proc) - z(a_proc, b_proc)) / np.linalg.norm(z(a_raw, b_proc))
+    assert 0.0 < expected < 1.0e-3
+
+    def run(**changes):
+        criteria = dict(CRITERIA)
+        criteria.update(changes)
+        return hydro_reciprocal_sensitivity(mock, inputs, omega, 0, f_hat, criteria)["impedance"]
+
+    per_coefficient = run()
+    assert per_coefficient["passed"] is False and "form" not in per_coefficient
+    full = run(impedance_full_block_relative=0.01)
+    assert full["passed"] is True and full["form"] == "full_block"
+    assert full["value"] == pytest.approx(expected, rel=1e-12)
+    assert full["max_coefficient_deviation"] == pytest.approx(per_coefficient["max_deviation"], rel=1e-12)
+    assert run(impedance_full_block_relative=0.5 * expected)["passed"] is False
+    # The declared absolute allowance (J) is added to the full-block bound.
+    deviation = expected * np.linalg.norm(z(a_raw, b_proc))
+    assert run(impedance_full_block_relative=0.5 * expected, impedance_absolute_j=deviation)["passed"] is True
+
+
+@requires_solver
+def test_fd_reference_response_refuses_inputs_of_another_model(hydro_flow):
+    from anymarine.linear_assessment import fd_reference_response
+    case, inputs = hydro_flow["case"], hydro_flow["inputs"]
+    provenance, root = hydro_flow["provenance"], hydro_flow["service"].root
+    qhat = fd_reference_response(case, inputs, provenance, root)
+    assert qhat.shape == (4,) and np.all(np.isfinite(qhat))
+    other = dataclasses.replace(inputs, stiffness=np.asarray(inputs.stiffness, dtype=float) * 2.0)
+    with pytest.raises(AssessmentRefusalError, match="input_hash"):
+        fd_reference_response(case, other, provenance, root)
 
 
 def test_full_block_impedance_criterion_is_optional_and_bounded():
