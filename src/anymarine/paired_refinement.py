@@ -378,6 +378,32 @@ def _assess_member(member: PairedMember) -> AssessmentReport:
         raise PairedRefinementRefusalError(str(error)) from error
 
 
+def _same_full_kernels(kernel_coarse, kernel_fine, ratio: int, dt_coarse: float, dt_fine: float) -> dict:
+    """A prehistory pair's full kernel artifacts: nested grids, equal horizon, identical shared lags.
+
+    The history force of each member covers its artifact beyond the run length, so the pair must
+    carry the same physical kernel over the whole horizon, not only over the run-length prefix.
+    """
+    kernel_coarse = np.asarray(kernel_coarse, dtype=float)
+    kernel_fine = np.asarray(kernel_fine, dtype=float)
+    lags_coarse, lags_fine = kernel_coarse.shape[0] - 1, kernel_fine.shape[0] - 1
+    horizon_coarse, horizon_fine = lags_coarse * float(dt_coarse), lags_fine * float(dt_fine)
+    if lags_fine != ratio * lags_coarse or abs(horizon_coarse - horizon_fine) > 1e-9 * max(horizon_coarse, 1.0):
+        _refusal(
+            "the members' full kernel artifacts do not share one horizon on nested grids "
+            f"({horizon_coarse:g} s vs {horizon_fine:g} s); a prehistory pair needs the same kernel "
+            "over every lag")
+    shared = kernel_fine[::ratio]
+    deviation = np.abs(shared - kernel_coarse)
+    scale = np.maximum(np.abs(shared), np.abs(kernel_coarse))
+    if not np.all(deviation <= KERNEL_IDENTITY_RELATIVE * scale + KERNEL_IDENTITY_ABSOLUTE):
+        _refusal(
+            "the members' full kernel artifacts differ at shared lags beyond the run length; "
+            "a prehistory pair needs the same kernel over every lag")
+    return {"full_kernel_horizon_s": horizon_coarse,
+            "max_full_kernel_shared_lag_deviation_kg_s2": float(np.max(deviation))}
+
+
 def _same_pair_identity(member_coarse: PairedMember,
                         member_fine: PairedMember, ratio: int) -> dict:
     """Prove the pairing identity: same model, same physical kernel.
@@ -598,6 +624,8 @@ def assess_paired_refinement(member_coarse: PairedMember,
     if member_coarse.case.reference.get("prehistory") is not None:
         kernels = tuple(proven_full_kernel(m.project.linear_inputs, m.project.hydro_provenance, m.root)
                         for m in (member_coarse, member_fine))
+        ratio_declared = int(member_coarse.case.refinement["dt_ratio"])
+        _same_full_kernels(kernels[0], kernels[1], ratio_declared, inputs_coarse.dt, inputs_fine.dt)
     try:
         refinement = assess_refinement(
             member_coarse.case,
