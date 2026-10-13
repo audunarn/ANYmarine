@@ -2809,6 +2809,34 @@ def _same_physical_model(inputs_coarse, inputs_fine, ratio: int, history=None) -
         )
 
 
+def same_full_kernels(kernel_coarse, kernel_fine, ratio: int, dt_coarse: float, dt_fine: float) -> dict:
+    """A prehistory pair's full kernel artifacts: nested grids, equal horizon, identical shared lags.
+
+    The history force of each member covers its artifact beyond the run length, so the pair must
+    carry the same physical kernel over the whole horizon, not only over the run-length prefix.
+    """
+    # The pairing's own kernel identity tolerances (imported here: paired_refinement imports this module).
+    from .paired_refinement import KERNEL_IDENTITY_ABSOLUTE, KERNEL_IDENTITY_RELATIVE
+    kernel_coarse = np.asarray(kernel_coarse, dtype=float)
+    kernel_fine = np.asarray(kernel_fine, dtype=float)
+    lags_coarse, lags_fine = kernel_coarse.shape[0] - 1, kernel_fine.shape[0] - 1
+    horizon_coarse, horizon_fine = lags_coarse * float(dt_coarse), lags_fine * float(dt_fine)
+    if lags_fine != ratio * lags_coarse or abs(horizon_coarse - horizon_fine) > 1e-9 * max(horizon_coarse, 1.0):
+        raise AssessmentRefusalError(
+            "the members' full kernel artifacts do not share one horizon on nested grids "
+            f"({horizon_coarse:g} s vs {horizon_fine:g} s); a prehistory pair needs the same kernel "
+            "over every lag")
+    shared = kernel_fine[::ratio]
+    deviation = np.abs(shared - kernel_coarse)
+    scale = np.maximum(np.abs(shared), np.abs(kernel_coarse))
+    if not np.all(deviation <= KERNEL_IDENTITY_RELATIVE * scale + KERNEL_IDENTITY_ABSOLUTE):
+        raise AssessmentRefusalError(
+            "the members' full kernel artifacts differ at shared lags beyond the run length; "
+            "a prehistory pair needs the same kernel over every lag")
+    return {"full_kernel_horizon_s": horizon_coarse,
+            "max_full_kernel_shared_lag_deviation_kg_s2": float(np.max(deviation))}
+
+
 def _history_force(case: AssessmentCase, inputs, kernel_full) -> np.ndarray:
     """History force of the declared prehistory over every lag of the full kernel artifact."""
     kernel_full = np.asarray(kernel_full, dtype=float)
@@ -2873,6 +2901,8 @@ def assess_refinement(case_coarse: AssessmentCase, case_fine: AssessmentCase,
         if kernels is None:
             raise AssessmentRefusalError(
                 "a prehistory pair needs both members' proved full kernel artifacts")
+        # Validated pair (roles, ratio, partners): the full artifacts must share one horizon.
+        same_full_kernels(kernels[0], kernels[1], ratio, inputs_coarse.dt, inputs_fine.dt)
         history = (_history_force(case_coarse, inputs_coarse, kernels[0]),
                    _history_force(case_fine, inputs_fine, kernels[1]))
     _same_physical_model(inputs_coarse, inputs_fine, ratio, history)

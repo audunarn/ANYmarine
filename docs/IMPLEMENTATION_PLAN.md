@@ -2743,15 +2743,21 @@ retained added-mass eigenvalue. Inside such a band:
 - the peak modal damping of the crossing mode must agree within 1 %.
 Detection and band are computed from the fine level before any comparison.
 
-#### R6 weak-mode floor (adopted by the owner, 2026-10-13; prospective)
+#### R6 low-eigenvalue floor (adopted by the owner, 2026-10-13; prospective)
 
-The v7 R6 failures are weak modes (anymarine-evidence/w5-physical-20261013d/DIAGNOSIS-R6-R8.md):
-- at 2.1875 rad/s an eigenvalue of 0.39 against a largest of 311, converging 6.1 % -> 3.5 %;
-- at 6.0 rad/s about 1.4 % of the largest, 3.13 % -> 3.02 %.
-The energetic modes agree within 0.3-1.7 %. Adopted for future cases: each near-field damping
-eigenmode's near/far difference is judged against max(|lambda_mode|, 0.01 * lambda_max), where
-lambda_max is the largest near-field damping eigenvalue of the retained block at that frequency,
-with the unchanged 3 % limit. v7 stays recorded under its registered R6.
+The v7 R6 failures are in the lowest-eigenvalue modes, which are still energetic under the plan's
+definition (lambda/lambda_max >= 1e-3); see anymarine-evidence/w5-physical-20261013d/
+DIAGNOSIS-R6-R8.md.
+- 2.1875 rad/s: eigenvalue 0.39 of 311 (1.25e-3), converging 6.1 % -> 3.5 %.
+- 6.0 rad/s: eigenvalues about 24 of 1673 (1.4e-2), 3.13 % -> 3.02 %.
+The larger modes at those frequencies agree within 0.3-1.7 %. Adopted for future cases: each
+near-field damping eigenmode's near/far difference is judged against max(|lambda_mode|,
+0.01 * lambda_max), where lambda_max is the largest near-field damping eigenvalue of the retained
+block at that frequency, with the unchanged 3 % limit. Effect on v7's numbers (illustration only;
+v7 stays recorded under its registered R6):
+- the 2.1875 rad/s mode would be judged against 3.11 and pass (about 0.4 %);
+- the 6.0 rad/s modes lie above the floor, keep their own denominators and still fail at 3.02 %.
+The owner was told otherwise when adopting the floor; this correction is recorded for decision.
 
 #### OrcaWave benchmark B (adopted by the owner, 2026-10-13)
 

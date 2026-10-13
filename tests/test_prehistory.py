@@ -135,14 +135,25 @@ def test_refinement_compares_the_wave_part_of_prehistory_members():
 
 def test_prehistory_pairs_need_one_full_kernel_horizon():
     """Review P2: full artifacts with different horizons (or different tails) must not pair."""
-    from anymarine.paired_refinement import PairedRefinementRefusalError, _same_full_kernels
+    from anymarine.linear_assessment import AssessmentRefusalError, same_full_kernels as _same_full_kernels
     fine = kernel(2001, dt=DT)                       # 20 s on dt
     coarse = fine[::2]                               # the same kernel on 2 dt, same horizon
     record = _same_full_kernels(coarse, fine, 2, 2 * DT, DT)
     assert record['full_kernel_horizon_s'] == pytest.approx(20.0)
-    with pytest.raises(PairedRefinementRefusalError, match='horizon'):
+    with pytest.raises(AssessmentRefusalError, match='horizon'):
         _same_full_kernels(coarse[:-100], fine, 2, 2 * DT, DT)       # shorter coarse artifact
     tail = coarse.copy()
     tail[-50:] *= 1.001                              # same prefix, different tail beyond the run
-    with pytest.raises(PairedRefinementRefusalError, match='shared lags'):
+    with pytest.raises(AssessmentRefusalError, match='shared lags'):
         _same_full_kernels(tail, fine, 2, 2 * DT, DT)
+
+
+
+def test_prehistory_pair_without_refinement_declaration_is_a_typed_refusal():
+    """Review P2: the full-kernel check runs only after assess_refinement validated the pair."""
+    from types import SimpleNamespace
+    from anymarine.linear_assessment import AssessmentRefusalError, assess_refinement
+    declared = dict(kind='periodic', qhat=[[0.01, 0.0]] * 4)
+    case = SimpleNamespace(mode='regular_wave', refinement=None, reference=dict(prehistory=declared))
+    with pytest.raises(AssessmentRefusalError, match='refinement partner'):
+        assess_refinement(case, case, None, None, None, None, kernels=(kernel(10), kernel(19)))
