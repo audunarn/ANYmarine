@@ -2727,6 +2727,22 @@ R5 are not adjudicated in that evidence, and the three status gates remain open.
   and the pairing reproduce H from the bound kernel sidecar. v7 used the run-length kernel
   (difference about 0.011 N) and stands as recorded.
 
+#### R8 near resonances (adopted by the owner, 2026-10-13; prospective)
+
+Diagnosis of the v7 R8 failure at 5.875 rad/s: a narrow resonance of the common-surge mode (both
+bodies surging together) near 5.92 rad/s, where the lowest retained added-mass eigenvalue passes
+through zero (about 104 -> -13 between 5.75 and 5.94 rad/s). Between level 10 and level 15:
+- the zero crossing moves 5.9259 -> 5.9192 rad/s (0.11 %);
+- the modal damping peak (5.812 rad/s) moves 2481.9 -> 2483.4 (0.06 %);
+- point-by-point the mode changes 21.7 % relative to its near-zero value, and the full block 1.43 %.
+A mode-relative pointwise test is ill-posed where an eigenvalue crosses zero.
+Adopted for future cases (v7 stays recorded under the R8 it was registered with): R8 keeps its
+pointwise 1 % outside a band of +-2 frequency steps around every detected zero crossing of a
+retained added-mass eigenvalue. Inside such a band:
+- the crossing frequency must agree within 0.5 % between the matched meshes;
+- the peak modal damping of the crossing mode must agree within 1 %.
+Detection and band are computed from the fine level before any comparison.
+
 #### OrcaWave benchmark B (adopted by the owner, 2026-10-13)
 
 Reference: D:/OrcaflexAqC2/barge_d1_35.owr (OrcaWave 11.6c; single body, 1391 t, CoG z 7 m,
