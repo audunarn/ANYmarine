@@ -2711,6 +2711,22 @@ contribution power closure 1 %; advisory RAO bands 10 % / 10 deg for linearized-
 observed motion outside them demotes the case to nogo. Category is derived, never chosen.
 Development evidence only; no qualification follows from an RAO pass.
 
+#### W5 v7 review outcome and owner decisions (2026-10-13)
+
+W5 v7 (anymarine-evidence/w5-physical-20261013d) passed every registered development check. The
+independent review (REVIEW.md there) keeps W5 NO_GO. R6 fails (near/far energetic damping 3.46 % at
+2.1875 rad/s and at 6 rad/s). R8 fails (an energetic mode changes 21.7 % at 5.875 rad/s). R1-R3 and
+R5 are not adjudicated in that evidence, and the three status gates remain open. Owner decisions:
+- Scope: the RAO-reporting ceilings (omega dt <= 0.05, amplitude independence, distortion, power
+  closure) govern ANYmarine RAO reporting only. W5 regular-wave time-step adequacy is governed by the
+  W5 paired-refinement gate (2 %).
+- R6/R8: investigate the 5.875 rad/s behaviour (mode tracking, lid, crossing) before any further
+  mesh refinement. Limits are unchanged.
+- Periodic prehistory: the history force uses every lag of the member's admitted kernel artifact.
+  The solver's own memory covers lags up to the run length, and H carries the rest. The assessor
+  and the pairing reproduce H from the bound kernel sidecar. v7 used the run-length kernel
+  (difference about 0.011 N) and stands as recorded.
+
 #### OrcaWave benchmark B (adopted by the owner, 2026-10-13)
 
 Reference: D:/OrcaflexAqC2/barge_d1_35.owr (OrcaWave 11.6c; single body, 1391 t, CoG z 7 m,

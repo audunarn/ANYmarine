@@ -1602,7 +1602,11 @@ def test_prehistory_import_stores_wave_minus_history_force(prehistory_flow):
     qhat = np.array([complex(*p) for p in prehistory_flow["declaration"]["qhat"]])
     times = np.asarray(inputs.times, dtype=float)
     wave = (prehistory_flow["f_hat"][None, :] * np.exp(-1j * HYDRO_OMEGA * times)[:, None]).real
-    kernel = np.asarray(inputs.radiation_kernel, dtype=float)
+    import anyhydro
+    # Every stored lag of the admitted kernel artifact (the run-length kernel is its prefix).
+    kernel = np.asarray(anyhydro.load_radiation_kernel(prehistory_flow["paths"][2]).kernel, dtype=float)
+    assert kernel.shape[0] >= inputs.n_steps
+    assert np.array_equal(kernel[: inputs.n_steps], np.asarray(inputs.radiation_kernel))
     history = brute_force(kernel, inputs.dt, inputs.t0, inputs.n_steps, HYDRO_OMEGA, qhat, -1j * HYDRO_OMEGA * qhat)
     stored = np.asarray(inputs.forces, dtype=float)
     tolerance = 1e-9 * np.max(np.abs(wave))

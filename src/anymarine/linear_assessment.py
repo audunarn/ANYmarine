@@ -1835,9 +1835,13 @@ def load_hydro_spectrum(case: AssessmentCase, inputs: LinearDevelopmentInputs,
     if route == HYDRO_ROUTE_DERIVED:
         source["derived_content_hash"] = bundle["derived_content_hash"]
         source["operators_raw_sha256"] = bundle["operators_raw_sha256"]
+    kernel_full = None
+    if "prehistory" in reference:
+        kernel_full = _prove_stored_kernel(inputs, provenance, project_root, route)
     return {
         "a_omega": a_omega,
         "b_omega": b_omega,
+        "kernel_full": kernel_full,
         "f_hat": f_hat_case,
         "source": source,
         "sensitivity": sensitivity,
@@ -1952,7 +1956,20 @@ def _prove_stored_kernel(inputs: LinearDevelopmentInputs,
             "effective inputs' radiation kernel samples; the actual TD "
             "source and the input matrices disagree"
         )
-    return kernel
+    return kernel_4
+
+
+def proven_full_kernel(inputs: LinearDevelopmentInputs, provenance, project_root) -> np.ndarray:
+    """The member's full retained kernel artifact (every stored lag), re-proved from its sidecar.
+
+    Used by the periodic prehistory, whose history force covers the lags beyond the run length.
+    """
+    if provenance is None or project_root is None:
+        raise AssessmentRefusalError(
+            "a declared prehistory needs the project's hydro provenance and root to re-prove the "
+            "full kernel artifact")
+    route = HYDRO_ROUTE_DERIVED if provenance.derived_bundle is not None else HYDRO_ROUTE_RAW
+    return _prove_stored_kernel(inputs, provenance, project_root, route)
 
 
 def _verify_raw_source_recompilation(inputs: LinearDevelopmentInputs,
@@ -2187,7 +2204,9 @@ def _assess_regular_wave(case, inputs, channels, spectrum, checks, arrays):
     if "prehistory" in case.reference:
         # The history force of the declared periodic prehistory, recomputed from the
         # stored kernel (the same lags the solver integrates).
-        history = _history_force(case, inputs)
+        if spectrum is None or spectrum.get("kernel_full") is None:
+            raise AssessmentRefusalError("a declared prehistory needs the proved full kernel artifact")
+        history = _history_force(case, inputs, spectrum["kernel_full"])
         expected_forces = expected_forces - history
         detail += " minus the recomputed periodic-prehistory history force"
         arrays["prehistory"] = {
@@ -2790,17 +2809,22 @@ def _same_physical_model(inputs_coarse, inputs_fine, ratio: int, history=None) -
         )
 
 
-def _history_force(case: AssessmentCase, inputs) -> np.ndarray:
-    return periodic_prehistory_force(
-        np.asarray(inputs.radiation_kernel, dtype=float), inputs.dt, inputs.t0, inputs.n_steps,
-        case.omega, declaration_phasor(case.reference["prehistory"]))
+def _history_force(case: AssessmentCase, inputs, kernel_full) -> np.ndarray:
+    """History force of the declared prehistory over every lag of the full kernel artifact."""
+    kernel_full = np.asarray(kernel_full, dtype=float)
+    stored = np.asarray(inputs.radiation_kernel, dtype=float)
+    if kernel_full.shape[0] < stored.shape[0] or not np.array_equal(kernel_full[: stored.shape[0]], stored):
+        raise AssessmentRefusalError("the full kernel artifact does not extend the stored run-length kernel")
+    return periodic_prehistory_force(kernel_full, inputs.dt, inputs.t0, inputs.n_steps, case.omega,
+                                     declaration_phasor(case.reference["prehistory"]))
 
 
 def assess_refinement(case_coarse: AssessmentCase, case_fine: AssessmentCase,
                       result_coarse: ResultRecord,
                       result_fine: ResultRecord,
                       inputs_coarse: LinearDevelopmentInputs,
-                      inputs_fine: LinearDevelopmentInputs) -> AssessmentReport:
+                      inputs_fine: LinearDevelopmentInputs,
+                      kernels=None) -> AssessmentReport:
     """Compare two caller-explicit cases of the SAME physical model.
 
     The grids must be exactly nested with the declared integer dt ratio
@@ -2845,7 +2869,12 @@ def assess_refinement(case_coarse: AssessmentCase, case_fine: AssessmentCase,
             "refinement compares the same declared prehistory; it differs between the cases")
     history = None
     if case_coarse.reference.get("prehistory") is not None:
-        history = (_history_force(case_coarse, inputs_coarse), _history_force(case_fine, inputs_fine))
+        # ``kernels``: each member's proved full kernel artifact (coarse, fine).
+        if kernels is None:
+            raise AssessmentRefusalError(
+                "a prehistory pair needs both members' proved full kernel artifacts")
+        history = (_history_force(case_coarse, inputs_coarse, kernels[0]),
+                   _history_force(case_fine, inputs_fine, kernels[1]))
     _same_physical_model(inputs_coarse, inputs_fine, ratio, history)
     if case_coarse.reference["kind"] != case_fine.reference["kind"]:
         raise AssessmentRefusalError("refinement requires the same reference kind")

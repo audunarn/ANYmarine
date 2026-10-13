@@ -440,7 +440,9 @@ def test_real_public_source_kernel_import_registration_join_without_solver(spec,
                     assert project.hydro_provenance.to_dict()['wave']['prehistory']==declaration
                     times=np.asarray(inputs.times)
                     wave_force=(F[None,:]*np.exp(-1j*w*times)[:,None]).real
-                    H=brute_force(np.asarray(inputs.radiation_kernel),inputs.dt,inputs.t0,inputs.n_steps,w,qd,-1j*w*qd)
+                    import anyhydro
+                    full=np.asarray(anyhydro.load_radiation_kernel(out/f'kernel-{role}.nc').kernel)   # every stored lag
+                    H=brute_force(full,inputs.dt,inputs.t0,inputs.n_steps,w,qd,-1j*w*qd)
                     assert np.max(np.abs(H))>0
                     assert np.max(np.abs(np.asarray(inputs.forces)-(wave_force-H)))<=1e-9*np.max(np.abs(wave_force))
     assert json.loads((out/'status.json').read_text())['state']=='cancelled'

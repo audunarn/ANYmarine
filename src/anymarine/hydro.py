@@ -1347,8 +1347,10 @@ def _assemble_derived_inputs(
                     "q0/v0 must equal the declared periodic prehistory state at t0, "
                     "Re(q exp(-i w t0)) and Re(-i w q exp(-i w t0))"
                 )
+            # Every lag of the admitted kernel (owner decision 2026-10-13): the solver's own
+            # memory covers lags up to the run length, H carries the rest of the prehistory.
             forces = forces - periodic_prehistory_force(
-                kernel_4, dt, opt["t0"], n_steps, wave["omega"], qhat)
+                np.asarray(kernel.kernel, dtype=np.float64), dt, opt["t0"], n_steps, wave["omega"], qhat)
             wave_selection["prehistory"] = declaration
     else:
         forces = np.zeros((n_steps, LINEAR_DOF_COUNT), dtype=np.float64)

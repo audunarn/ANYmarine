@@ -57,6 +57,7 @@ from .linear_assessment import (
     _FRESH_REPORT_KEYS,
     _payload_disagreement,
     assess_refinement,
+    proven_full_kernel,
     assess_result,
     read_case_artifact,
     read_report_artifact,
@@ -593,6 +594,10 @@ def assess_paired_refinement(member_coarse: PairedMember,
     inputs_fine = _member_inputs(member_fine)
     report_coarse = _assess_member(member_coarse)
     report_fine = _assess_member(member_fine)
+    kernels = None
+    if member_coarse.case.reference.get("prehistory") is not None:
+        kernels = tuple(proven_full_kernel(m.project.linear_inputs, m.project.hydro_provenance, m.root)
+                        for m in (member_coarse, member_fine))
     try:
         refinement = assess_refinement(
             member_coarse.case,
@@ -601,6 +606,7 @@ def assess_paired_refinement(member_coarse: PairedMember,
             member_fine.result,
             inputs_coarse,
             inputs_fine,
+            kernels,
         )
     except AssessmentRefusalError as error:
         raise PairedRefinementRefusalError(str(error)) from error
