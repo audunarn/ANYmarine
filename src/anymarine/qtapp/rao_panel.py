@@ -69,6 +69,10 @@ def _finite_number(x):
         return False
 
 
+def _positive(x):
+    return _finite_number(x) and x > 0
+
+
 def _is_vector(value, length):
     return isinstance(value, list) and len(value) == length and all(
         isinstance(p, list) and len(p) == 2 and all(_finite_number(x) for x in p) for p in value)
@@ -88,9 +92,16 @@ def _load_results(directory, read_case_artifact, RaoCaseError, _hash):
     if table['case_hash'] != case.case_hash or table['project_input_hash'] != case.project_input_hash:
         raise RaoResultError('rao_table.json is not bound to this case')
     n = len(table['dof_keys']) if isinstance(table['dof_keys'], list) else -1
+    if n < 0 or not all(isinstance(k, str) and '::' in k for k in table['dof_keys']):
+        raise RaoResultError('rao_table.json dof_keys are malformed')
+    n_body = sum(1 for k in table['dof_keys'] if k.split('::', 1)[1] in ('surge', 'sway', 'heave', 'roll', 'pitch', 'yaw'))
+    grid = {(w, h) for w in case.omegas for h in case.headings_degrees}
     if not isinstance(table['entries'], list) or not table['entries'] or not all(
             isinstance(e, dict) and _is_vector(e.get('rao'), n) and isinstance(e.get('forces'), dict)
-            and all(_is_vector(f, n) for f in e['forces'].values()) for e in table['entries']):
+            and all(isinstance(c, str) and _is_vector(f, n) for c, f in e['forces'].items())
+            and _positive(e.get('omega')) and _finite_number(e.get('heading_degrees'))
+            and (e.get('omega'), e.get('heading_degrees')) in grid and isinstance(e.get('source'), str)
+            and (e.get('amplitude') is None or _positive(e.get('amplitude'))) for e in table['entries']):
         raise RaoResultError('rao_table.json entries are malformed')
     report = None
     if (root / 'rao_report.json').exists():
@@ -105,7 +116,11 @@ def _load_results(directory, read_case_artifact, RaoCaseError, _hash):
         expected = len(case.omegas) * len(case.headings_degrees) * len(case.amplitudes)
         grid = sorted((w, h, a) for w in case.omegas for h in case.headings_degrees for a in case.amplitudes)
         if not isinstance(runs, list) or len(runs) != expected or not all(
-                isinstance(r, dict) and _is_vector(r.get('rao'), n) for r in runs):
+                isinstance(r, dict) and _is_vector(r.get('rao'), n) and _positive(r.get('omega'))
+                and _finite_number(r.get('heading_degrees')) and _positive(r.get('amplitude'))
+                and isinstance(r.get('forces', {}), dict)
+                and all(isinstance(c, str) and isinstance(f, dict) and _is_vector(f.get('phasor'), n_body)
+                        for c, f in r.get('forces', {}).items()) for r in runs):
             raise RaoResultError(f'rao_report.json runs do not cover the case grid ({expected} runs expected)')
         if sorted((r.get('omega'), r.get('heading_degrees'), r.get('amplitude')) for r in runs) != grid:
             raise RaoResultError('rao_report.json runs do not match the case grid point for point')
@@ -527,7 +542,7 @@ class RaoPanel(QWidget):
             self.project_changed()
             self.refresh()
             self._fill_checks()
-        except (KeyError, TypeError, ValueError, IndexError, OverflowError) as error:
+        except (KeyError, TypeError, ValueError, IndexError, ArithmeticError) as error:
             self._clear()
             self.status.setText(f'results could not be displayed: {error}')
             return
@@ -586,7 +601,7 @@ class RaoPanel(QWidget):
         self.amplitude.clear()
         self.amplitude.addItem('All', None)
         for a in info['amplitudes']:
-            self.amplitude.addItem(f'{a:g} m', a)
+            self.amplitude.addItem(rao_view.amplitude_label(a), a)
         self.source_buttons['frequency'].setEnabled(info['has_frequency'])
         self.source_buttons['time'].setEnabled(info['has_time'])
         self.source_buttons['compare'].setEnabled(info['has_frequency'] and info['has_time'])
@@ -616,10 +631,15 @@ class RaoPanel(QWidget):
                 selection['quantity'] == 'force' and selection['contribution'] is None):
             self.grid.show_series(rao_view.GRID, {}, '', lambda dof: '')
             return
-        data = rao_view.series(self.table, self.report, **selection)
+        try:
+            data = rao_view.series(self.table, self.report, **selection)
+        except (KeyError, TypeError, ValueError, IndexError, ArithmeticError) as error:
+            self.status.setText(f'graphs could not be drawn: {error}')
+            self.grid.show_series(rao_view.GRID, {}, '', lambda dof: '')
+            return
         xlabel = 'Period (s)' if selection['x_axis'] == 'period' else 'Frequency (rad/s)'
         kind = 'Amplitude' if selection['display'] == 'amplitude' else 'Phase'
-        self.grid.show_series(rao_view.grid_for(selection['owner']), data, xlabel,
+        self.grid.show_series(rao_view.grid_for(selection['owner'], self.table['dof_keys']), data, xlabel,
                               lambda dof: f"{kind} ({rao_view.unit(dof, selection['quantity'], selection['display'])})")
 
     def refresh(self):

@@ -60,7 +60,7 @@ def test_frequency_series_on_a_period_axis_sorted_with_units():
 def test_time_and_compare_and_amplitude_selection():
     time_only = rv.series(TABLE, REPORT, owner='hull', heading=0.0, source='time', x_axis='frequency')
     labels = [x.label for x in time_only['heave']]
-    assert labels == ['TD a=0.5 m', 'TD a=1 m'] and all(x.kind == 'marker' for x in time_only['heave'])
+    assert labels == ['TD a=0.5 m', 'TD a=1.0 m'] and all(x.kind == 'marker' for x in time_only['heave'])
     assert time_only['heave'][0].xs == (0.5, 2.0)
     both = rv.series(TABLE, REPORT, owner='hull', heading=0.0, source='compare', amplitude=1.0)
     assert [x.kind for x in both['surge']] == ['line', 'marker']
@@ -87,3 +87,42 @@ def test_node_owner_and_refusals():
         rv.series(TABLE, None, owner='hull', heading=0.0, source='both')
     with pytest.raises(ValueError, match='contribution'):
         rv.series(TABLE, None, owner='hull', heading=0.0, quantity='force')
+
+
+# ---------------------------------------------------------------- review round 10
+def _with(entries=None, runs=None, keys=KEYS):
+    return dict(dof_keys=keys, entries=entries if entries is not None else TABLE['entries']), dict(runs=runs or [])
+
+
+def test_g2_td_forces_exist_for_body_dofs_only():
+    body_only = [dict(r, forces={'potential_flow': dict(phasor=r['forces']['potential_flow']['phasor'][:6], mean=[])})
+                 for r in REPORT['runs']]
+    table, report = _with(runs=body_only)
+    s = rv.series(table, report, owner='node0', heading=0.0, quantity='force', contribution='potential_flow')
+    assert all(x.kind == 'line' for series in s.values() for x in series)      # FD only, no IndexError
+    hull = rv.series(table, report, owner='hull', heading=0.0, quantity='force', contribution='potential_flow')
+    assert [x.kind for x in hull['surge']][-1] == 'marker'
+
+
+def test_g3_td_dry_wrench_maps_to_fd_dry_inertia_with_opposite_sign():
+    F = [pair(complex(100.0 * (i + 1), 50.0)) for i in range(len(KEYS))]
+    entries = [dict(e, forces={'dry-inertia': F}) for e in TABLE['entries']]
+    runs = [dict(r, forces={'dry': dict(phasor=[[-a, -b] for a, b in F], mean=[])}) for r in REPORT['runs']]
+    table, report = _with(entries, runs)
+    assert rv.available(table, report)['contributions'] == ['dry-inertia']
+    s = rv.series(table, report, owner='hull', heading=0.0, quantity='force', contribution='dry-inertia',
+                  display='phase', x_axis='frequency', amplitude=1.0)
+    fd, td = s['heave']
+    assert td.ys[0] == pytest.approx(dict(zip(fd.xs, fd.ys))[td.xs[0]])
+
+
+def test_g4_owner_kind_comes_from_its_dof_keys():
+    keys = [k.replace('hull::', 'nodeship::') for k in KEYS]
+    assert rv.grid_for('nodeship', keys) == rv.GRID and rv.grid_for('node0', keys) == rv.NODE_GRID
+    with pytest.raises(ValueError, match='no DOFs'):
+        rv.grid_for('ghost', keys)
+
+
+def test_g5_amplitude_labels_are_exact():
+    assert rv.amplitude_label(0.05000001) != rv.amplitude_label(0.05000002)
+    assert rv.amplitude_label(0.5) == '0.5 m'

@@ -402,3 +402,64 @@ def test_v1c_near_slack_line_is_never_admitted_taut():
     p, *_ = _taut_parts(rest=SPAN - 1e-7)
     c = rr.prepare_case(p, mooring_spec())
     assert c.features['mooring_taut'] is False and c.category == 'nonlinear_reported'
+
+
+# ---------------------------------------------------------------- round 10
+def _artifacts(tmp_path, mutate_table=None, mutate_report=None):
+    """A complete hash-consistent case/table/report set, optionally mutated and re-hashed."""
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    import json
+    c = case()
+    t = table(c, BASE)
+    t.update(artifact='anymarine_rao_table', project_input_hash=c.project_input_hash)
+    t['table_hash'] = rr._hash(t)
+    report = rr.compare(c, t, [extraction(0.1, BASE), extraction(0.05, BASE)])
+    report = json.loads(json.dumps(report))
+    if mutate_table:                                 # after the report: the loader checks entries first
+        mutate_table(t)
+        t['table_hash'] = rr._hash(t)
+    if mutate_report:
+        mutate_report(report)
+        report['report_hash'] = rr._hash(report)
+    (tmp_path / 'case.json').write_text(json.dumps(dict(case=c.to_dict(), case_hash=c.case_hash)), encoding='utf-8')
+    (tmp_path / 'rao_table.json').write_text(json.dumps(t), encoding='utf-8')
+    (tmp_path / 'rao_report.json').write_text(json.dumps(report), encoding='utf-8')
+    return tmp_path
+
+
+def test_g1_loader_validates_every_field_the_graphs_read(tmp_path):
+    from anymarine.qtapp import rao_panel
+    rao_panel.load_results(_artifacts(tmp_path / 'ok'))            # the unmutated set loads
+    cases = {
+        'omega_zero': (lambda t: t['entries'][0].update(omega=0.0), None, 'entries'),
+        'heading_off_grid': (lambda t: t['entries'][0].update(heading_degrees=45.0), None, 'entries'),
+        'amplitude_bool': (lambda t: t['entries'][0].update(amplitude=True), None, 'entries'),
+        'missing_phasor': (None, lambda r: r['runs'][0]['forces']['x'].pop('phasor'), 'grid'),
+        'boolean_phasor': (None, lambda r: r['runs'][0]['forces']['x'].update(phasor=[[True, False]] * N), 'grid'),
+        'short_phasor': (None, lambda r: r['runs'][0]['forces']['x'].update(phasor=[[0.0, 0.0]] * 3), 'grid'),
+        'huge_integer': (None, lambda r: r['runs'][0]['forces']['x'].update(phasor=[[10 ** 400, 0]] * N), 'grid'),
+    }
+    for name, (mt, mr, match) in cases.items():
+        with pytest.raises(rao_panel.RaoResultError, match=match):
+            rao_panel.load_results(_artifacts(tmp_path / name, mt, mr))
+
+
+def test_b1_reach_norm_does_not_underflow():
+    assert rl._norm([1e-170, 0.0, 0.0]) == 1e-170
+    assert rl._norm(np.array([3e-200, 4e-200j])) == pytest.approx(5e-200, rel=1e-15)
+    assert rl._norm([3e200, 4e200]) == pytest.approx(5e200, rel=1e-15)
+    assert rl._norm([]) == 0.0
+
+
+@requires_solver
+def test_b1_tiny_reach_with_huge_damping_is_not_certified():
+    """Review B1: node phasor 1e-170 m with axial damping 1e171 N.s/m must lower the bound (c w D = 10 N)."""
+    project, model, states, nodes, _ = _taut_parts()
+    lines = project.native_inputs.to_dict()['mooring']['data']['lines']
+    for line in lines:
+        line['axial_damping'] = [1e171, 1e171]
+    q = np.zeros(18, complex)
+    q[12] = 1e-170
+    bound = rl.mooring_tension_lower_bound(model, lines, states, nodes, q, 1.0)
+    from test_rao_mooring import TENSION
+    assert bound[0] < TENSION - 9.0 and bound[1] < TENSION - 9.0

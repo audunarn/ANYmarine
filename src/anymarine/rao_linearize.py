@@ -473,6 +473,13 @@ def mooring_tension_gradient(model, states, nodes, *, step=1e-6, rates=False, mi
                                 '(near slack); the taut linearization is not admitted')
 
 
+def _norm(v):
+    """Euclidean norm of a (complex) vector without underflow or overflow (scaled by its max)."""
+    v = np.abs(np.asarray(v, dtype=complex))
+    peak = float(np.max(v, initial=0.0))
+    return 0.0 if peak == 0.0 else peak * float(np.sqrt(np.sum((v / peak) ** 2)))
+
+
 def mooring_tension_lower_bound(model, lines, states, nodes, response, omega):
     """Rigorous per-segment lower bound of the full assembly's tension along ``Re{Q exp(-i w t)}``.
 
@@ -506,13 +513,13 @@ def mooring_tension_lower_bound(model, lines, states, nodes, response, omega):
             return np.asarray(ep['position'], dtype=float), 0.0
         if kind == 'node':
             k = int(ep['node_index'])
-            return node_positions[k], float(np.linalg.norm(q[n + 3 * k:n + 3 * k + 3]))
+            return node_positions[k], _norm(q[n + 3 * k:n + 3 * k + 3])
         if kind == 'rigid':
             i = body_ids.index(ep['body_id'])
             rho = np.asarray(ep['point_body'], dtype=float)
             state = base[ep['body_id']]
             position = np.asarray(state.position, dtype=float) + np.asarray(state.rotation) @ rho
-            reach = np.linalg.norm(q[6 * i:6 * i + 3]) + np.linalg.norm(q[6 * i + 3:6 * i + 6]) * np.linalg.norm(rho)
+            reach = _norm(q[6 * i:6 * i + 3]) + _norm(q[6 * i + 3:6 * i + 6]) * float(np.linalg.norm(rho))
             return position, float(reach)
         raise RaoLinearizationError(f'unsupported mooring endpoint type {kind!r} for the taut bound')
 

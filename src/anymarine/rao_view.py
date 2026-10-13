@@ -23,6 +23,10 @@ SOURCES = ('frequency', 'time', 'compare')
 QUANTITIES = ('displacement', 'force')
 DISPLAYS = ('amplitude', 'phase')
 X_AXES = ('period', 'frequency')
+# Contribution identities that differ between the FD table and the TD runs: the TD
+# ``dry`` wrench is the internal inertial covector, the FD ``dry-inertia`` force its
+# external equivalent (same mapping as the report's power closure).
+TD_ALIASES = {'dry': ('dry-inertia', -1.0)}
 
 
 @dataclass(frozen=True)
@@ -31,6 +35,11 @@ class Series:
     kind: str          # 'line' (FD) or 'marker' (TD)
     xs: tuple
     ys: tuple
+
+
+def amplitude_label(a) -> str:
+    """Exact, round-trip label of a wave amplitude (distinct values never share a label)."""
+    return f'{float(a)!r} m'
 
 
 def _owners(table):
@@ -49,12 +58,20 @@ def available(table, report=None) -> dict:
     headings = sorted({e['heading_degrees'] for e in entries} | {r['heading_degrees'] for r in runs})
     amplitudes = sorted({e['amplitude'] for e in entries if e.get('amplitude') is not None}
                         | {r['amplitude'] for r in runs})
-    contributions = sorted({c for e in entries for c in e['forces']} | {c for r in runs for c in r.get('forces', {})})
+    contributions = sorted({c for e in entries for c in e['forces']}
+                           | {TD_ALIASES.get(c, (c, 1.0))[0] for r in runs for c in r.get('forces', {})})
     return dict(owners=[] if table is None else _owners(table), headings=headings, amplitudes=amplitudes,
                 contributions=contributions, has_frequency=bool(entries), has_time=bool(runs))
 
 
-def grid_for(owner: str):
+def grid_for(owner: str, dof_keys=None):
+    """The owner's grid from its DOF keys (rigid body: surge..yaw; mooring node: x, y, z)."""
+    if dof_keys is not None:
+        if f'{owner}::surge' in dof_keys:
+            return GRID
+        if f'{owner}::x' in dof_keys:
+            return NODE_GRID
+        raise ValueError(f'no DOFs of {owner!r} in the artifacts')
     return NODE_GRID if owner.startswith('node') else GRID
 
 
@@ -97,7 +114,7 @@ def series(table, report, *, owner, heading, quantity='displacement', contributi
         raise ValueError('a contribution is required for contribution forces')
     keys = list(table['dof_keys'])
     out = {}
-    for row in grid_for(owner):
+    for row in grid_for(owner, keys):
         for dof in row:
             if dof is None:
                 continue
@@ -120,25 +137,32 @@ def series(table, report, *, owner, heading, quantity='displacement', contributi
                         (_x(e['omega'], x_axis), _value(complex(*values[k]), dof, quantity, display)))
                 for (fd_source, a), points in curves.items():
                     points.sort()
-                    label = f'FD {fd_source}' + ('' if a is None else f' a={a:g} m')
+                    label = f'FD {fd_source}' + ('' if a is None else f' a={amplitude_label(a)}')
                     found.append(Series(label, 'line', tuple(p[0] for p in points), tuple(p[1] for p in points)))
             if source in ('time', 'compare') and report is not None:
                 markers = {}
                 for run in report['runs']:
                     if run['heading_degrees'] != heading or (amplitude is not None and run['amplitude'] != amplitude):
                         continue
+                    sign = 1.0
                     if quantity == 'displacement':
                         values = run['rao']
                     else:
-                        force = run.get('forces', {}).get(contribution)
+                        # TD wrenches are recorded for body DOFs only (no mooring-node channel).
+                        td_id = next((c for c, (alias, _) in TD_ALIASES.items() if alias == contribution), contribution)
+                        force = run.get('forces', {}).get(td_id)
+                        if td_id != contribution:
+                            sign = TD_ALIASES[td_id][1]
                         values = None if force is None else force['phasor']
+                        if values is not None and k >= len(values):
+                            values = None
                     if values is None:
                         continue
                     markers.setdefault(run['amplitude'], []).append(
-                        (_x(run['omega'], x_axis), _value(complex(*values[k]), dof, quantity, display)))
+                        (_x(run['omega'], x_axis), _value(sign * complex(*values[k]), dof, quantity, display)))
                 for a, points in sorted(markers.items()):
                     points.sort()
-                    found.append(Series(f'TD a={a:g} m', 'marker', tuple(p[0] for p in points),
+                    found.append(Series(f'TD a={amplitude_label(a)}', 'marker', tuple(p[0] for p in points),
                                         tuple(p[1] for p in points)))
             out[dof] = found
     return out
