@@ -415,13 +415,18 @@ def _perturbed(states, nodes, body_ids, q, v=None):
 
 
 def mooring_tension_gradient(model, states, nodes, *, step=1e-6, rates=False, min_step=1e-13,
-                             agreement=1e-6):
+                             agreement=1e-5):
     """d(segment tension)/dq (or d/dqdot with ``rates``) by central differences of the public assembly.
 
-    Tension is clipped at zero, so a step that crosses the clipping boundary averages
-    two branches. The step is reduced tenfold until two successive steps agree to
-    ``agreement`` (relative to the gradient scale); if no step down to ``min_step``
-    agrees, the point is too close to slack for a local derivative and is refused.
+    The assembly's tension is piecewise smooth: it is clipped where the stretch or
+    the raw (elastic + damping) tension reaches zero. A segment's central difference
+    is accepted only when that segment is on the SAME branch (active: elastic and
+    total tension positive; or inactive) at the point and at both probes of every
+    column; otherwise the step is reduced tenfold. Two successive accepted steps
+    must then agree segment by segment (each row against its own scale, so weak
+    segments are not hidden by stiff ones). If no step down to ``min_step``
+    qualifies, the point is too close to a branch boundary for a local derivative
+    and is refused (the taut admission maps this to not taut).
     """
     mooring = model.mooring
     body_ids = tuple(model.body_ids)
@@ -429,26 +434,38 @@ def mooring_tension_gradient(model, states, nodes, *, step=1e-6, rates=False, mi
     nodes = stationary_nodes(nodes)
     zero = np.zeros(mooring.size)
 
+    def evaluate(q, v):
+        assembly = mooring.evaluate(*_perturbed(states, nodes, body_ids, q, v), time=0.0)
+        tension = np.asarray(assembly.tensions, dtype=float)
+        active = (np.asarray(assembly.elastic_tensions, dtype=float) > 0.0) & (tension > 0.0)
+        return tension, active
+
+    _, centre = evaluate(zero, None)
+
     def gradient(h):
+        """Central-difference matrix, or None when a probe leaves a segment's branch."""
         columns = []
         for j in range(mooring.size):
             e = np.zeros(mooring.size)
             e[j] = h
             args = ((zero, e), (zero, -e)) if rates else ((e, None), (-e, None))
-            plus = mooring.evaluate(*_perturbed(states, nodes, body_ids, *args[0]), time=0.0).tensions
-            minus = mooring.evaluate(*_perturbed(states, nodes, body_ids, *args[1]), time=0.0).tensions
-            columns.append((np.asarray(plus) - np.asarray(minus)) / (2 * h))
+            plus, plus_active = evaluate(*args[0])
+            minus, minus_active = evaluate(*args[1])
+            if np.any(plus_active != centre) or np.any(minus_active != centre):
+                return None
+            columns.append((plus - minus) / (2 * h))
         return np.column_stack(columns)
 
-    previous = gradient(step)
+    previous = None
     h = step
-    while h / 10.0 >= min_step:
-        h /= 10.0
+    while h >= min_step:
         current = gradient(h)
-        scale = max(float(np.max(np.abs(current))), float(np.max(np.abs(previous))), 1e-300)
-        if float(np.max(np.abs(current - previous))) <= agreement * scale:
-            return current
+        if current is not None and previous is not None:
+            scale = np.maximum(np.max(np.abs(current), axis=1), np.max(np.abs(previous), axis=1))
+            if np.all(np.max(np.abs(current - previous), axis=1) <= agreement * scale):
+                return previous           # the larger accepted step: least roundoff
         previous = current
+        h /= 10.0
     raise RaoLinearizationError('segment tension is not differentiable at the linearization point '
                                 '(near slack); the taut linearization is not admitted')
 

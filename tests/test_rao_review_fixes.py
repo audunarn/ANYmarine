@@ -1,4 +1,6 @@
 """RAO review findings F1-F9 (Codex round 1 on slices 1-6)."""
+from types import SimpleNamespace
+
 import numpy as np
 import pytest
 
@@ -268,6 +270,65 @@ def test_v1_near_slack_gradient_stays_on_the_active_branch():
     model, states, spec = prepare_native_run(calm)
     G = rl.mooring_tension_gradient(model, states, prepare_native_nodes(calm))
     assert G[1, 0] == pytest.approx(EA / rest, rel=1e-6)     # not the branch-averaged ~EA/(2 L0)
+
+
+# ---------------------------------------------------------------- round 8
+class _TwoSegmentMooring:
+    """Two segments from fixed anchors to one free node, with the public assembly's clipping."""
+
+    def __init__(self, anchors, rest, ea, damping=0.0):
+        self.anchors, self.rest, self.ea, self.c = (np.asarray(x, float) for x in (anchors, rest, ea, damping))
+        self.size = 3
+
+    def evaluate(self, body_states, nodes, time):
+        p = np.asarray(nodes.positions, float)[0]
+        v = np.asarray(nodes.velocities, float)[0]
+        delta = p - self.anchors
+        length = np.linalg.norm(delta, axis=1)
+        rate = (delta / length[:, None]) @ v
+        stretch = np.maximum(length - self.rest, 0.0)
+        elastic = self.ea * stretch / self.rest
+        raw = elastic + np.where(stretch > 0.0, self.c, 0.0) * rate
+        return SimpleNamespace(tensions=np.maximum(raw, 0.0), elastic_tensions=elastic)
+
+
+def _two_segment(rest, ea, damping=0.0):
+    from anysolver.marine_mooring import MooringNodeState
+    mooring = _TwoSegmentMooring([[-2.5, 0, 0], [2.5, 0, 0]], rest, ea, damping)
+    node = MooringNodeState(np.zeros((1, 3)), np.zeros((1, 3)), np.zeros((1, 3)))
+    return SimpleNamespace(mooring=mooring, body_ids=()), {}, node
+
+
+@requires_solver
+def test_v1b_weak_segment_gradient_is_not_hidden_by_a_stiff_one():
+    """Review counterexample: a 1e-8 m extension next to a stiff pretensioned segment."""
+    rest = [2.5 - 1e-8, 2.5 - 1e-3]
+    model, states, node = _two_segment(rest, [40.0, 1e7])
+    G = rl.mooring_tension_gradient(model, states, node)
+    # Node moves +x: segment 0 (anchor at -2.5) lengthens, segment 1 shortens.
+    assert G[0, 0] == pytest.approx(40.0 / rest[0], rel=1e-5)
+    assert G[1, 0] == pytest.approx(-1e7 / rest[1], rel=1e-5)
+
+
+@requires_solver
+def test_v1b_extension_below_every_admissible_step_is_refused():
+    """Review counterexample: a 1e-14 m extension; no step stays on the branch, so not taut."""
+    model, states, node = _two_segment([2.5 - 1e-14, 2.5 - 1e-3], [40.0, 1e7])
+    with pytest.raises(rl.RaoLinearizationError, match='near slack'):
+        rl.mooring_tension_gradient(model, states, node)
+
+
+@requires_solver
+def test_v1b_rate_gradient_respects_the_damping_branch():
+    rest = [2.5 - 1e-3, 2.5 - 1e-3]
+    model, states, node = _two_segment(rest, [40.0, 40.0], damping=[3.0, 5.0])
+    G = rl.mooring_tension_gradient(model, states, node, rates=True)
+    assert G[0, 0] == pytest.approx(3.0, rel=1e-6) and G[1, 0] == pytest.approx(-5.0, rel=1e-6)
+    # Damping strong enough that the default step turns the raw tension negative.
+    weak = [2.5 - 1e-9, 2.5 - 1e-3]
+    model, states, node = _two_segment(weak, [40.0, 40.0], damping=[1e3, 5.0])
+    G = rl.mooring_tension_gradient(model, states, node, rates=True)
+    assert G[0, 0] == pytest.approx(1e3, rel=1e-6)
 
 
 def test_v2_non_finite_or_boolean_numbers_are_refused():
