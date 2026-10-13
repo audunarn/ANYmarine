@@ -117,7 +117,8 @@ def test_child_environment_start_failure_and_exit_codes(window):
     finally:
         sys.executable = executable
     assert not panel.busy and 'could not start' in panel.status.text()
-    # exit code 2 is a valid outcome only for rao-run; registration without its file fails
+    # rao-run: 0 pass, 3 nogo are outcomes; 2 is an argparse usage error. Registration
+    # without its file fails.
     class Finished:                                       # stands in for a child that already exited
         def readAllStandardOutput(self):
             return b'usage: error'
@@ -142,3 +143,24 @@ def test_incomplete_report_is_refused(tmp_path):
     (tmp_path / 'rao_report.json').write_text(json.dumps(report), encoding='utf-8')
     with pytest.raises(rao_panel.RaoResultError, match='case grid'):
         rao_panel.load_results(tmp_path)
+
+
+@requires_qt
+def test_rao_run_exit_codes(window):
+    from PySide6.QtCore import QProcess
+    app, w, root, tmp_path = window
+    panel = w._rao
+
+    class Finished:
+        def readAllStandardOutput(self):
+            return b''
+    opened = []
+    panel.open_results = lambda directory: opened.append(directory)
+    for code, accepted in ((3, True), (0, True), (2, False), (1, False)):
+        opened.clear()
+        panel._command, panel.process, panel._pending_open = 'rao-run', Finished(), tmp_path / f'out-{code}'
+        panel._finished(code, QProcess.ExitStatus.NormalExit)
+        assert bool(opened) is accepted, code
+    panel._command, panel.process, panel._pending_open = 'rao-run', Finished(), tmp_path / 'crash'
+    panel._finished(0, QProcess.ExitStatus.CrashExit)
+    assert not opened or opened[-1] != tmp_path / 'crash'

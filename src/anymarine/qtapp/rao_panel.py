@@ -51,6 +51,18 @@ def load_results(directory):
     """
     from ..rao_case import RaoCaseError, read_case_artifact
     from ..rao_report import _hash
+    try:
+        return _load_results(directory, read_case_artifact, RaoCaseError, _hash)
+    except (TypeError, KeyError, AttributeError) as error:
+        raise RaoResultError(f'RAO artifacts are malformed: {error!r}') from error
+
+
+def _is_vector(value, length):
+    return isinstance(value, list) and len(value) == length and all(
+        isinstance(p, list) and len(p) == 2 and all(isinstance(x, (int, float)) for x in p) for p in value)
+
+
+def _load_results(directory, read_case_artifact, RaoCaseError, _hash):
     root = Path(directory)
     try:
         case = read_case_artifact(root / 'case.json')
@@ -63,8 +75,10 @@ def load_results(directory):
         raise RaoResultError('rao_table.json fails its hash verification')
     if table['case_hash'] != case.case_hash or table['project_input_hash'] != case.project_input_hash:
         raise RaoResultError('rao_table.json is not bound to this case')
-    if not isinstance(table['entries'], list) or not all(
-            isinstance(e, dict) and len(e.get('rao', ())) == len(table['dof_keys']) for e in table['entries']):
+    n = len(table['dof_keys']) if isinstance(table['dof_keys'], list) else -1
+    if not isinstance(table['entries'], list) or not table['entries'] or not all(
+            isinstance(e, dict) and _is_vector(e.get('rao'), n) and isinstance(e.get('forces'), dict)
+            and all(_is_vector(f, n) for f in e['forces'].values()) for e in table['entries']):
         raise RaoResultError('rao_table.json entries are malformed')
     report = None
     if (root / 'rao_report.json').exists():
@@ -77,9 +91,12 @@ def load_results(directory):
             raise RaoResultError('rao_report.json is not bound to this table and case')
         runs, checks = report['runs'], report['checks']
         expected = len(case.omegas) * len(case.headings_degrees) * len(case.amplitudes)
+        grid = sorted((w, h, a) for w in case.omegas for h in case.headings_degrees for a in case.amplitudes)
         if not isinstance(runs, list) or len(runs) != expected or not all(
-                isinstance(r, dict) and len(r.get('rao', ())) == len(table['dof_keys']) for r in runs):
+                isinstance(r, dict) and _is_vector(r.get('rao'), n) for r in runs):
             raise RaoResultError(f'rao_report.json runs do not cover the case grid ({expected} runs expected)')
+        if sorted((r.get('omega'), r.get('heading_degrees'), r.get('amplitude')) for r in runs) != grid:
+            raise RaoResultError('rao_report.json runs do not match the case grid point for point')
         if not isinstance(checks, list) or not checks or not all(
                 isinstance(c, dict) and all(k in c for k in _CHECK_KEYS) for c in checks):
             raise RaoResultError('rao_report.json checks are missing or malformed')

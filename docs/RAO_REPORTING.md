@@ -74,9 +74,13 @@ Per frequency: `Z(w) = K - w^2 (M + A_rad(w)) - i w (C + B_rad(w))`, `Z q = X`.
 
 - Mooring (slice 7): node DOFs are kept (3 per free node after the bodies) with the
   assembler's exact sparse K/C/M; the static audit includes node residuals. A case is taut
-  when every segment tension is positive at the linearization point and the FD-predicted
-  tension amplitude at the largest declared amplitude (finite-difference tension gradient
-  of the public assembly) stays below the static tension; otherwise `nonlinear_reported`.
+  when every segment tension is positive at the linearization point and, at the largest
+  declared amplitude, (a) the exact minimum of each segment's linearized tension
+  `T_s - |G q + G_v (-i w q)|` (position and rate gradients of the public assembly) and (b)
+  the sampled minimum of the full nonlinear assembly along the predicted orbit (1024
+  samples, every discrete local minimum refined) both stay above 5 % of that segment's
+  static tension; otherwise `nonlinear_reported`. Observed slack (stored tensions) or
+  missing tension evidence demotes a run.
   Line fluid inertia excitation uses three public force evaluations. Seabed contact and
   line drag are refused for now. Verified: exact taut-line equilibrium, mooring tangent vs
   central differences, axial EA/L0 tension gradient, and a native campaign with node DOFs
@@ -155,8 +159,9 @@ The category is derived from the inputs at case registration and cannot be chose
   (dry inertia included) must close. Each run's record, partial or failed evidence is stored
   as soon as it exists; the per-run wall limit is enforced through the solver's cancel hook.
 - Service (with slice 9): table/campaign snapshots and output re-admission for the GUI job.
-- CLI: `rao-prepare`, `rao-table`, `rao-run`, `rao-export-csv`, `rao-adjudicate`; nonzero
-  exit for nogo or refusal.
+- CLI: `rao-prepare`, `rao-table`, `rao-run` (the FD table, campaign, comparison, report, CSV and
+  run records). Exit codes: 0 pass (or table written), 3 nogo, 1 refusal/failure (a
+  `failure.json` marker is written once an output directory exists), 2 usage error.
 - Artifacts: `rao_table.json`, `rao_extraction.json` per run and `rao_report.json`
   (hashes exclude `created_utc`), plus CSV files `rao_table.csv`, `rao_td.csv`,
   `contribution_forces.csv` and `comparison.csv`. Stored under `<project>/rao/`. Campaign

@@ -208,7 +208,13 @@ class _Linear:
             # derivative of the drag fundamental (body DOFs only), with backtracking.
             zr = np.block([[z.real, -z.imag], [z.imag, z.real]])
             current = residual(q)
-            size = lambda v: float(np.max(np.abs(v), initial=0.0))   # max-norm: no underflow
+            def size(v):
+                """max(|Re|, |Im|) over components: no underflow or complex-abs overflow."""
+                v = np.asarray(v)
+                value = float(max(np.max(np.abs(v.real), initial=0.0), np.max(np.abs(v.imag), initial=0.0)))
+                if not math.isfinite(value):
+                    raise RaoReportError('drag harmonic balance left the finite range')
+                return value
 
             for iteration in range(1, DRAG_BALANCE_ITERATIONS + 1):
                 balance = max(size(total), size(z @ q))
@@ -281,8 +287,12 @@ def features(project, spec):
                 # Linearization valid only while every segment stays taut along the predicted
                 # orbit at the largest amplitude (public assembly at moving states: finite
                 # rotation and axial damping included).
+                # Both the linear model's exact tension minimum and the sampled nonlinear
+                # orbit minimum must keep the declared margin of each segment's static tension.
+                static = lin.linear.mooring_tension
+                linear = rl.mooring_linear_tension_minimum(lin.model, lin.states, lin.nodes, q, omega, static)
                 orbit = rl.mooring_orbit_tensions(lin.model, lin.states, lin.nodes, q, omega)
-                if np.any(orbit <= TAUT_ORBIT_MARGIN * lin.linear.mooring_tension):
+                if np.any(linear <= TAUT_ORBIT_MARGIN * static) or np.any(orbit <= TAUT_ORBIT_MARGIN * static):
                     taut = False
             for i in range(len(lin.model.body_ids)):
                 # Peak vector magnitude of Re{Q exp(-iwt)} is bounded by ||Q|| (all phases).
