@@ -56,8 +56,9 @@ def test_register_table_and_verified_display(window):
     wait(app, panel)
     assert panel.table is not None and panel.report is None, panel.status.text()
     assert 'FD table only' in panel.case_label.text() and 'DETACHED' not in panel.case_label.text()
-    lines, markers = panel.plot.series()
-    assert lines and not markers and panel.forces.rowCount() >= 3
+    surge = panel.grid.cell('surge').series()
+    assert surge and all(x.kind == 'line' for x in surge) and panel.forces.rowCount() >= 3
+    assert not panel.source_buttons['time'].isEnabled() and panel.source_buttons['frequency'].isChecked()
     assert panel.point.count() == 1 and 'omega=1' in panel.point.currentText()
     out = next((root / 'rao').glob('table-*'))
     # tampered table, or a table re-hashed but no longer bound to its case: refused
@@ -164,3 +165,48 @@ def test_rao_run_exit_codes(window):
     panel._command, panel.process, panel._pending_open = 'rao-run', Finished(), tmp_path / 'crash'
     panel._finished(0, QProcess.ExitStatus.CrashExit)
     assert not opened or opened[-1] != tmp_path / 'crash'
+
+
+@requires_qt
+def test_rao_graph_grid_sources_units_and_layout(tmp_path):
+    """3 x 2 OrcaWave-style grid: translations left, rotations right; sources by availability."""
+    from types import SimpleNamespace
+    from PySide6.QtWidgets import QApplication
+    from anymarine.qtapp.rao_panel import RaoPanel
+    from test_rao_view import TABLE, REPORT
+    app = QApplication.instance() or QApplication([])
+    panel = RaoPanel(SimpleNamespace(_project_root=None, _project=None, _dirty=False))
+    panel.resize(900, 900)
+    panel.table, panel.report = TABLE, None
+    panel._fill_graph_controls()
+    titles = [[axes.title() for axes in row] for row in panel.grid.axes]
+    assert titles == [['Surge', 'Roll'], ['Sway', 'Pitch'], ['Heave', 'Yaw']]
+    assert panel.grid.cell('roll').labels() == ('Period (s)', 'Amplitude (deg/m)')
+    assert not panel.source_buttons['time'].isEnabled() and not panel.source_buttons['compare'].isEnabled()
+    panel.report = REPORT
+    panel._fill_graph_controls()
+    assert panel.source_buttons['compare'].isChecked()
+    assert [x.kind for x in panel.grid.cell('heave').series()] == ['line', 'marker', 'marker']
+    panel.source_buttons['time'].setChecked(True)
+    assert all(x.kind == 'marker' for x in panel.grid.cell('heave').series())
+    panel.source_buttons['compare'].setChecked(True)
+    panel.quantity.setCurrentIndex(panel.quantity.findData('force'))
+    panel.contribution.setCurrentIndex(panel.contribution.findData('potential_flow'))
+    assert panel.contribution.isEnabled() and panel.grid.cell('yaw').labels()[1] == 'Amplitude (kN.m/m)'
+    panel.quantity.setCurrentIndex(panel.quantity.findData('displacement'))
+    panel.x_axis.setCurrentIndex(panel.x_axis.findData('frequency'))
+    panel.display_buttons['phase'].setChecked(True)
+    assert panel.grid.cell('surge').labels() == ('Frequency (rad/s)', 'Phase (deg)')
+    panel.display_buttons['amplitude'].setChecked(True)
+    panel.x_axis.setCurrentIndex(panel.x_axis.findData('period'))
+    panel.show()
+    app.processEvents()
+    image = panel.grab()
+    assert not image.isNull()
+    image.save(str(tmp_path / 'rao-grid.png'))
+    out = os.environ.get('ANYMARINE_RAO_GRID_PNG')
+    if out:
+        image.save(out)
+    panel.owner.setCurrentIndex(panel.owner.findData('node0'))
+    assert [[a.isVisible() for a in row] for row in panel.grid.axes] == [[True, False]] * 3
+    panel.close()

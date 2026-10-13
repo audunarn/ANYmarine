@@ -172,9 +172,16 @@ The category is derived from the inputs at case registration and cannot be chose
   (hashes exclude `created_utc`), plus CSV files `rao_table.csv`, `rao_td.csv`,
   `contribution_forces.csv` and `comparison.csv`. Stored under `<project>/rao/`. Campaign
   runs are project results, labelled as campaign runs bound to their case.
-- GUI: an "RAO" dock beside Assessment/Waves. It shows amplitude/phase plots against
-  omega (FD curve, TD markers per amplitude), a per-contribution force table, a checks
-  table and scope/verdict labels, with detached labelling after edits. A RAO menu has
+- GUI: an "RAO" dock beside Assessment/Waves. Its Graphs tab is an OrcaWave-style grid of
+  3 rows x 2 columns (translations left, rotations right: surge/roll, sway/pitch,
+  heave/yaw; mooring nodes show x/y/z) with selectors for body, graph type (displacement
+  RAOs, or one contribution's force; a contribution force is X_c - Z_c q, not an
+  excitation-only load RAO), wave heading, wave amplitude and x axis (period s or
+  frequency rad/s), source Frequency (FD table lines), Time (TD run markers) or Compare,
+  and Amplitude or Phase. A source without data is disabled. Units follow OrcaWave: m/m,
+  deg/m, kN/m, kN.m/m (Qt-free series in rao_view.py). The Details tab keeps the
+  per-contribution force table for one exact table entry, the checks table and the
+  scope/verdict labels, with detached labelling after edits. A RAO menu has
   Register case, Compute FD table (job), Run TD campaign (job), Export CSV and Reopen
   report. The panel never computes.
 

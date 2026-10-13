@@ -15,9 +15,10 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from PySide6.QtCore import QPointF, QProcess, QProcessEnvironment, Signal
-from PySide6.QtGui import QColor, QFont, QPainter, QPen
-from PySide6.QtWidgets import (QComboBox, QFileDialog, QHBoxLayout, QLabel, QPushButton, QTableWidget,
+from PySide6.QtCore import QPointF, QProcess, QProcessEnvironment, Qt, Signal
+from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen
+from PySide6.QtWidgets import (QButtonGroup, QComboBox, QFileDialog, QGridLayout, QHBoxLayout, QLabel,
+                               QPushButton, QRadioButton, QTabWidget, QTableWidget,
                                QTableWidgetItem, QVBoxLayout, QWidget)
 
 _TABLE_KEYS = ('artifact', 'case_hash', 'project_input_hash', 'dof_keys', 'entries', 'table_hash')
@@ -116,60 +117,161 @@ def _load_results(directory, read_case_artifact, RaoCaseError, _hash):
     return case, table, report
 
 
-class RaoPlot(QWidget):
-    """Amplitude (top) and phase (bottom) against omega; FD lines, TD markers."""
+def _nice_ticks(lo, hi, count=5):
+    """Round tick values covering [lo, hi] (1, 2, 5 x 10^k steps)."""
+    if not (math.isfinite(lo) and math.isfinite(hi)) or hi <= lo:
+        return [lo]
+    raw = (hi - lo) / max(count - 1, 1)
+    power = 10.0 ** math.floor(math.log10(raw))
+    step = next(m * power for m in (1.0, 2.0, 5.0, 10.0) if m * power >= raw)
+    first = math.floor(lo / step) * step
+    ticks, value = [], first
+    while value <= hi + 0.5 * step and len(ticks) < 50:
+        ticks.append(round(value, 12))
+        value += step
+    return ticks
+
+
+class RaoAxes(QWidget):
+    """One RAO graph: FD lines (dark red), TD markers (blue crosses), labelled axes and grid."""
+
+    LINE_COLORS = ('#8b0000', '#d1801f', '#3a9a3a', '#9a3a9a')
+    MARKER_COLORS = ('#1f4fb5', '#0f8f8f', '#5a5a5a', '#b51f8f')
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setMinimumHeight(220)
-        self._lines, self._markers, self._title = [], [], ''
+        self.setMinimumSize(220, 170)
+        self._title, self._xlabel, self._ylabel, self._series = '', '', '', []
 
-    def set_data(self, title, lines, markers):
-        """``lines``: [(label, omegas, complex values)], ``markers``: [(label, omega, complex)]."""
-        self._title, self._lines, self._markers = title, list(lines), list(markers)
+    def set_data(self, title, xlabel, ylabel, series):
+        """``series``: rao_view.Series items (kind 'line' or 'marker')."""
+        self._title, self._xlabel, self._ylabel, self._series = title, xlabel, ylabel, list(series)
         self.update()
 
     def series(self):
-        return list(self._lines), list(self._markers)
+        return list(self._series)
+
+    def title(self):
+        return self._title
+
+    def labels(self):
+        return self._xlabel, self._ylabel
 
     def paintEvent(self, event):  # noqa: N802
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.fillRect(self.rect(), QColor('#ffffff'))
-        painter.setPen(QColor('#202020'))
-        painter.setFont(QFont(painter.font().family(), 8))
-        painter.drawText(6, 12, self._title or 'No RAO data')
-        omegas = [w for _, ws, _ in self._lines for w in ws] + [w for _, w, _ in self._markers]
-        if not omegas:
-            return
-        lo, hi = min(omegas), max(omegas)
-        pad = 0.1 * (hi - lo) if hi > lo else 0.5          # a single frequency sits mid-panel
-        lo, hi = lo - pad, hi + pad
+        font = QFont(painter.font().family(), 8)
+        painter.setFont(font)
         width, height = self.width(), self.height()
-        panels = ((18, height / 2 - 6, 'amplitude'), (height / 2 + 6, height - 8, 'phase'))
-        amps = [abs(v) for _, _, vs in self._lines for v in vs] + [abs(v) for *_, v in self._markers]
-        top = max(amps) if amps and max(amps) > 0 else 1.0
-        colors = ['#1f6fb5', '#d1801f', '#3a9a3a', '#9a3a9a']
-        for y0, y1, kind in panels:
-            painter.setPen(QPen(QColor('#c8c8c8')))
-            painter.drawRect(40, int(y0), int(width - 48), int(y1 - y0))
-            painter.setPen(QColor('#505050'))
-            painter.drawText(2, int(y0) + 10, 'amp' if kind == 'amplitude' else 'deg')
-            x = lambda w: 40 + (w - lo) / (hi - lo) * (width - 48)
-            y = (lambda v: y1 - abs(v) / top * (y1 - y0)) if kind == 'amplitude' else \
-                (lambda v: y0 + (180.0 - math.degrees(math.atan2(v.imag, v.real))) / 360.0 * (y1 - y0))
-            for i, (_, ws, vs) in enumerate(self._lines):
-                painter.setPen(QPen(QColor(colors[i % len(colors)]), 1.6))
-                points = [QPointF(x(w), y(v)) for w, v in zip(ws, vs)]
-                for a, b in zip(points, points[1:]):
-                    painter.drawLine(a, b)
-                for pnt in points:
-                    painter.drawEllipse(pnt, 2.0, 2.0)
-            painter.setPen(QPen(QColor('#c0392b'), 1.4))
-            for _, w, v in self._markers:
-                pnt = QPointF(x(w), y(v))
+        metrics = QFontMetrics(font)
+        left, right, top, bottom = 30 + metrics.horizontalAdvance('-00000.0'), 10, 10, 46
+        x0, x1, y0, y1 = left, width - right, top, height - bottom
+        painter.setPen(QColor('#202020'))
+        bold = QFont(font)
+        bold.setBold(True)
+        painter.setFont(bold)
+        painter.drawText(6, height - 6, self._title)
+        painter.setFont(font)
+        xs = [x for item in self._series for x in item.xs]
+        ys = [y for item in self._series for y in item.ys]
+        painter.setPen(QPen(QColor('#000000')))
+        painter.drawRect(int(x0), int(y0), int(x1 - x0), int(y1 - y0))
+        if not xs:
+            painter.drawText(int(x0) + 8, int(y0) + 16, 'no data for this selection')
+            return
+        xlo, xhi = min(xs), max(xs)
+        if xhi <= xlo:
+            xlo, xhi = xlo - 0.5, xhi + 0.5
+        ylo, yhi = min(min(ys), 0.0), max(ys)
+        if yhi <= ylo:
+            yhi = ylo + 1.0
+        xt, yt = _nice_ticks(xlo, xhi), _nice_ticks(ylo, yhi)
+        xlo, xhi = min(xlo, xt[0]), max(xhi, xt[-1])
+        ylo, yhi = min(ylo, yt[0]), max(yhi, yt[-1])
+        fx = lambda v: x0 + (v - xlo) / (xhi - xlo) * (x1 - x0)
+        fy = lambda v: y1 - (v - ylo) / (yhi - ylo) * (y1 - y0)
+        grid = QPen(QColor('#a0a0a0'), 1.0, Qt.PenStyle.DashLine)
+        for v in xt:
+            painter.setPen(grid)
+            painter.drawLine(QPointF(fx(v), y0), QPointF(fx(v), y1))
+            painter.setPen(QColor('#202020'))
+            painter.drawText(QPointF(fx(v) - 10, y1 + 13), f'{v:g}')
+        for v in yt:
+            painter.setPen(grid)
+            painter.drawLine(QPointF(x0, fy(v)), QPointF(x1, fy(v)))
+            painter.setPen(QColor('#202020'))
+            text = f'{v:.4g}'
+            painter.drawText(QPointF(x0 - 4 - metrics.horizontalAdvance(text), fy(v) + 4), text)
+        painter.drawText(QPointF((x0 + x1 - metrics.horizontalAdvance(self._xlabel)) / 2, y1 + 27), self._xlabel)
+        painter.save()
+        painter.translate(12, (y0 + y1 + metrics.horizontalAdvance(self._ylabel)) / 2)
+        painter.rotate(-90)
+        painter.drawText(0, 0, self._ylabel)
+        painter.restore()
+        lines = [item for item in self._series if item.kind == 'line']
+        markers = [item for item in self._series if item.kind != 'line']
+        for i, item in enumerate(lines):
+            painter.setPen(QPen(QColor(self.LINE_COLORS[i % len(self.LINE_COLORS)]), 1.4))
+            points = [QPointF(fx(x), fy(y)) for x, y in zip(item.xs, item.ys)]
+            for a, b in zip(points, points[1:]):
+                painter.drawLine(a, b)
+            if len(points) == 1:
+                painter.drawEllipse(points[0], 2.5, 2.5)
+        for i, item in enumerate(markers):
+            painter.setPen(QPen(QColor(self.MARKER_COLORS[i % len(self.MARKER_COLORS)]), 1.6))
+            for x, y in zip(item.xs, item.ys):
+                pnt = QPointF(fx(x), fy(y))
                 painter.drawLine(pnt + QPointF(-4, -4), pnt + QPointF(4, 4))
                 painter.drawLine(pnt + QPointF(-4, 4), pnt + QPointF(4, -4))
+        if len(self._series) > 1:
+            # Legend in the bottom strip, right of the DOF title (never over the curves).
+            legend_x = x1
+            for i, item in reversed(list(enumerate(lines + markers))):
+                color = (self.LINE_COLORS[i % len(self.LINE_COLORS)] if item.kind == 'line'
+                         else self.MARKER_COLORS[(i - len(lines)) % len(self.MARKER_COLORS)])
+                legend_x -= metrics.horizontalAdvance(item.label) + 26
+                painter.setPen(QPen(QColor(color), 1.6))
+                if item.kind == 'line':
+                    painter.drawLine(QPointF(legend_x, height - 10), QPointF(legend_x + 14, height - 10))
+                else:
+                    centre = QPointF(legend_x + 7, height - 10)
+                    painter.drawLine(centre + QPointF(-3, -3), centre + QPointF(3, 3))
+                    painter.drawLine(centre + QPointF(-3, 3), centre + QPointF(3, -3))
+                painter.setPen(QColor('#202020'))
+                painter.drawText(QPointF(legend_x + 18, height - 6), item.label)
+
+
+class RaoGrid(QWidget):
+    """3 rows x 2 columns of RAO graphs: translations left, rotations right."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        layout = QGridLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        self.axes = [[RaoAxes(), RaoAxes()] for _ in range(3)]
+        for r, row in enumerate(self.axes):
+            for c, axes in enumerate(row):
+                layout.addWidget(axes, r, c)
+
+    def show_series(self, grid, data, xlabel, ylabel_for):
+        """``grid``: rao_view grid of DOF names (None = empty cell); ``data``: {dof: [Series]}."""
+        for r, row in enumerate(grid):
+            for c, dof in enumerate(row):
+                axes = self.axes[r][c]
+                if dof is None:
+                    axes.set_data('', xlabel, '', [])
+                    axes.setVisible(False)
+                    continue
+                axes.setVisible(True)
+                axes.set_data(dof.capitalize(), xlabel, ylabel_for(dof), data.get(dof, []))
+
+    def cell(self, dof):
+        for row in self.axes:
+            for axes in row:
+                if axes.title().lower() == dof.lower():
+                    return axes
+        return None
 
 
 class RaoPanel(QWidget):
@@ -204,21 +306,66 @@ class RaoPanel(QWidget):
         self.status = QLabel('')
         self.status.setWordWrap(True)
         layout.addWidget(self.status)
+        self.tabs = QTabWidget()
+        layout.addWidget(self.tabs, 1)
+        # Graphs: OrcaWave-style RAO grid; frequency (FD table), time (TD runs) or both.
+        graphs = QWidget()
+        graphs_layout = QVBoxLayout(graphs)
+        controls = QGridLayout()
+        self.owner = QComboBox()
+        self.quantity = QComboBox()
+        self.quantity.addItem('Displacement RAOs', 'displacement')
+        self.quantity.addItem('Contribution forces', 'force')
+        self.contribution = QComboBox()
+        self.heading = QComboBox()
+        self.amplitude = QComboBox()
+        self.x_axis = QComboBox()
+        self.x_axis.addItem('Period (s)', 'period')
+        self.x_axis.addItem('Frequency (rad/s)', 'frequency')
+        for i, (label, combo) in enumerate((('Body', self.owner), ('Graph type', self.quantity),
+                                            ('Contribution', self.contribution), ('Wave heading (deg)', self.heading),
+                                            ('Wave amplitude', self.amplitude), ('X axis', self.x_axis))):
+            controls.addWidget(QLabel(label), i // 3 * 2, i % 3)
+            controls.addWidget(combo, i // 3 * 2 + 1, i % 3)
+        graphs_layout.addLayout(controls)
+        options = QHBoxLayout()
+        self.source_group, self.display_group = QButtonGroup(self), QButtonGroup(self)
+        self.source_buttons = {}
+        for key, text in (('frequency', 'Frequency'), ('time', 'Time'), ('compare', 'Compare')):
+            button = QRadioButton(text)
+            self.source_buttons[key] = button
+            self.source_group.addButton(button)
+            options.addWidget(button)
+        options.addSpacing(16)
+        self.display_buttons = {}
+        for key, text in (('amplitude', 'Amplitude'), ('phase', 'Phase')):
+            button = QRadioButton(text)
+            self.display_buttons[key] = button
+            self.display_group.addButton(button)
+            options.addWidget(button)
+        options.addStretch(1)
+        self.display_buttons['amplitude'].setChecked(True)
+        graphs_layout.addLayout(options)
+        self.grid = RaoGrid()
+        graphs_layout.addWidget(self.grid, 1)
+        self.tabs.addTab(graphs, 'Graphs')
+        # Details: one exact table entry, its contribution forces, and the report checks.
+        details = QWidget()
+        details_layout = QVBoxLayout(details)
         self.dof = QComboBox()
         self.point = QComboBox()        # one exact table entry: omega, heading, source, amplitude
         for label, combo in (('DOF', self.dof), ('Point', self.point)):
             row = QHBoxLayout()
             row.addWidget(QLabel(label))
             row.addWidget(combo, 1)
-            layout.addLayout(row)
-        self.plot = RaoPlot()
-        layout.addWidget(self.plot, 2)
+            details_layout.addLayout(row)
         self.forces = QTableWidget(0, 4)
         self.forces.setHorizontalHeaderLabels(['contribution', '|F| per m', 'phase deg', 'mean power W'])
-        layout.addWidget(self.forces, 1)
+        details_layout.addWidget(self.forces, 1)
         self.checks = QTableWidget(0, 4)
         self.checks.setHorizontalHeaderLabels(['check', 'value', 'limit', 'passed'])
-        layout.addWidget(self.checks, 1)
+        details_layout.addWidget(self.checks, 1)
+        self.tabs.addTab(details, 'Details')
         self.note = QLabel('RAO reporting is development evidence only (docs/RAO_REPORTING.md); unqualified.')
         self.note.setWordWrap(True)
         layout.addWidget(self.note)
@@ -229,6 +376,10 @@ class RaoPanel(QWidget):
         self.cancel_button.clicked.connect(self.cancel)
         self.dof.currentIndexChanged.connect(self.refresh)
         self.point.currentIndexChanged.connect(self.refresh)
+        for combo in (self.owner, self.quantity, self.contribution, self.heading, self.amplitude, self.x_axis):
+            combo.currentIndexChanged.connect(self.refresh_graphs)
+        self.source_group.buttonToggled.connect(lambda *_: self.refresh_graphs())
+        self.display_group.buttonToggled.connect(lambda *_: self.refresh_graphs())
         self._enable()
 
     @property
@@ -372,6 +523,7 @@ class RaoPanel(QWidget):
                 self.point.addItem(f"omega={e['omega']:g}, heading={e['heading_degrees']:g}, {e['source']}{amplitude}")
             self.dof.blockSignals(False)
             self.point.blockSignals(False)
+            self._fill_graph_controls()
             self.project_changed()
             self.refresh()
             self._fill_checks()
@@ -387,7 +539,7 @@ class RaoPanel(QWidget):
             combo.blockSignals(True)
             combo.clear()
             combo.blockSignals(False)
-        self.plot.set_data('', [], [])
+        self._fill_graph_controls()
         self.forces.setRowCount(0)
         self.checks.setRowCount(0)
         self.case_label.setText('No RAO results shown.')
@@ -413,31 +565,68 @@ class RaoPanel(QWidget):
         i = self.point.currentIndex()
         return None if self.table is None or i < 0 else self.table['entries'][i]
 
+    def _graph_combos(self):
+        return (self.owner, self.quantity, self.contribution, self.heading, self.amplitude, self.x_axis)
+
+    def _fill_graph_controls(self):
+        """Selectors from the open artifacts; a source without data is disabled, not hidden."""
+        from .. import rao_view
+        combos = self._graph_combos()
+        for combo in combos:
+            combo.blockSignals(True)
+        for button in list(self.source_buttons.values()) + list(self.display_buttons.values()):
+            button.blockSignals(True)
+        info = rao_view.available(self.table, self.report)
+        for combo, values, text in ((self.owner, info['owners'], str),
+                                    (self.contribution, info['contributions'], str),
+                                    (self.heading, info['headings'], lambda v: f'{v:g}')):
+            combo.clear()
+            for v in values:
+                combo.addItem(text(v), v)
+        self.amplitude.clear()
+        self.amplitude.addItem('All', None)
+        for a in info['amplitudes']:
+            self.amplitude.addItem(f'{a:g} m', a)
+        self.source_buttons['frequency'].setEnabled(info['has_frequency'])
+        self.source_buttons['time'].setEnabled(info['has_time'])
+        self.source_buttons['compare'].setEnabled(info['has_frequency'] and info['has_time'])
+        preferred = 'compare' if info['has_frequency'] and info['has_time'] else (
+            'time' if info['has_time'] else 'frequency')
+        self.source_buttons[preferred].setChecked(True)
+        self.contribution.setEnabled(self.quantity.currentData() == 'force')
+        for combo in combos:
+            combo.blockSignals(False)
+        for button in list(self.source_buttons.values()) + list(self.display_buttons.values()):
+            button.blockSignals(False)
+        self.refresh_graphs()
+
+    def graph_selection(self):
+        source = next((k for k, b in self.source_buttons.items() if b.isChecked()), 'frequency')
+        display = next((k for k, b in self.display_buttons.items() if b.isChecked()), 'amplitude')
+        return dict(owner=self.owner.currentData(), heading=self.heading.currentData(),
+                    quantity=self.quantity.currentData(), contribution=self.contribution.currentData(),
+                    source=source, display=display, x_axis=self.x_axis.currentData(),
+                    amplitude=self.amplitude.currentData())
+
+    def refresh_graphs(self):
+        from .. import rao_view
+        self.contribution.setEnabled(self.quantity.currentData() == 'force')
+        selection = self.graph_selection()
+        if self.table is None or selection['owner'] is None or selection['heading'] is None or (
+                selection['quantity'] == 'force' and selection['contribution'] is None):
+            self.grid.show_series(rao_view.GRID, {}, '', lambda dof: '')
+            return
+        data = rao_view.series(self.table, self.report, **selection)
+        xlabel = 'Period (s)' if selection['x_axis'] == 'period' else 'Frequency (rad/s)'
+        kind = 'Amplitude' if selection['display'] == 'amplitude' else 'Phase'
+        self.grid.show_series(rao_view.grid_for(selection['owner']), data, xlabel,
+                              lambda dof: f"{kind} ({rao_view.unit(dof, selection['quantity'], selection['display'])})")
+
     def refresh(self):
         entry = self._entry()
         if entry is None or self.dof.currentIndex() < 0:
             return
-        k = self.dof.currentIndex()
-        heading = entry['heading_degrees']
-        lines = {}
-        for e in self.table['entries']:
-            if e['heading_degrees'] != heading:
-                continue
-            # Curves are identified by the exact source and amplitude, not by a rounded label.
-            lines.setdefault((e['source'], e.get('amplitude')), []).append((e['omega'], complex(*e['rao'][k])))
-        series = []
-        for (source, amplitude), pts in lines.items():
-            pts = sorted(pts, key=lambda p: p[0])
-            label = source + ('' if amplitude is None else f' a={amplitude!r}')
-            series.append((label, [w for w, _ in pts], [v for _, v in pts]))
-        markers = []
-        if self.report is not None:
-            for run in self.report['runs']:
-                if run.get('heading_degrees') == heading:
-                    markers.append((f"TD a={run['amplitude']:g}", run['omega'], complex(*run['rao'][k])))
-        self.plot.set_data(f"{self.table['dof_keys'][k]}, heading {heading:g}: RAO amplitude and phase "
-                           f"(FD lines, TD x)", series, markers)
-        self._fill_forces(entry, k)
+        self._fill_forces(entry, self.dof.currentIndex())
 
     def _fill_forces(self, entry, k):
         rows = sorted(entry['forces'].items())
