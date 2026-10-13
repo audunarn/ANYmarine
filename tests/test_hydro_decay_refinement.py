@@ -745,7 +745,6 @@ def test_paired_refinement_combined_pass(decay_pair):
 
 
 @requires_solver
-@requires_solver
 def test_same_hydro_source_compares_frozen_regular_wave_selections(decay_pair):
     """Regular-wave members carry a frozen (read-only) wave selection: equal ones pair, different ones refuse."""
     import dataclasses
@@ -767,6 +766,7 @@ def test_same_hydro_source_compares_frozen_regular_wave_selections(decay_pair):
         _same_hydro_source(member("coarse", wave), member("fine", dict(wave, phase=0.4)))
 
 
+@requires_solver
 def test_zero_energy_hydro_free_decay_notmeasured(decay_pair):
     """A zero-state hydro free decay is NOTMEASURED, never a trivial PASS."""
 
