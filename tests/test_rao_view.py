@@ -140,3 +140,12 @@ def test_g4b_a_body_and_a_node_sharing_a_name_stay_distinct():
     with pytest.raises(ValueError, match='ambiguous'):
         rv.series(table, None, owner='node0', heading=0.0)
     assert rv.owner_label(owners[1]) == 'node0 (mooring node)'
+
+
+def test_g4c_body_ids_containing_the_delimiter():
+    """Review round 11: a body named 'namespace::body' is a body, not a node named 'namespace'."""
+    keys = [f'namespace::body::{d}' for d in ('surge', 'sway', 'heave', 'roll', 'pitch', 'yaw')] + ['node0::x', 'node0::y', 'node0::z']
+    table = dict(dof_keys=keys, entries=TABLE['entries'])
+    assert rv.available(table)['owners'] == [('namespace::body', rv.BODY), ('node0', rv.NODE)]
+    assert set(rv.series(table, None, owner=('namespace::body', rv.BODY), heading=0.0)) == {
+        'surge', 'sway', 'heave', 'roll', 'pitch', 'yaw'}

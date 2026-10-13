@@ -470,3 +470,12 @@ def test_b1b_lever_arm_norm_does_not_underflow():
     assert rl._norm([0.0, 1e-170, 0.0]) == 1e-170 and float(np.linalg.norm([0.0, 1e-170, 0.0])) == 0.0
     import inspect
     assert '_norm(rho)' in inspect.getsource(rl.mooring_tension_lower_bound)
+
+
+def test_g4c_loader_counts_body_dofs_of_ids_with_the_delimiter(tmp_path):
+    from anymarine.qtapp import rao_panel
+    import json
+    path = _artifacts(tmp_path / 'ok')
+    table = json.loads((path / 'rao_table.json').read_text(encoding='utf-8'))
+    assert sum(1 for k in table['dof_keys'] if k.rsplit('::', 1)[1] in rl.DOF_NAMES) == N
+    assert "rsplit('::', 1)[1]" in open(rao_panel.__file__, encoding='utf-8').read()

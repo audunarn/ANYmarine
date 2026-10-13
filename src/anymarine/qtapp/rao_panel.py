@@ -94,7 +94,7 @@ def _load_results(directory, read_case_artifact, RaoCaseError, _hash):
     n = len(table['dof_keys']) if isinstance(table['dof_keys'], list) else -1
     if n < 0 or not all(isinstance(k, str) and '::' in k for k in table['dof_keys']):
         raise RaoResultError('rao_table.json dof_keys are malformed')
-    n_body = sum(1 for k in table['dof_keys'] if k.split('::', 1)[1] in ('surge', 'sway', 'heave', 'roll', 'pitch', 'yaw'))
+    n_body = sum(1 for k in table['dof_keys'] if k.rsplit('::', 1)[1] in ('surge', 'sway', 'heave', 'roll', 'pitch', 'yaw'))
     grid = {(w, h) for w in case.omegas for h in case.headings_degrees}
     if not isinstance(table['entries'], list) or not table['entries'] or not all(
             isinstance(e, dict) and _is_vector(e.get('rao'), n) and isinstance(e.get('forces'), dict)

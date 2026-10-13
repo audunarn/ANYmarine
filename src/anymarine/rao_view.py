@@ -50,7 +50,7 @@ def _owners(table):
     """``(name, kind)`` owners in DOF order; a body and a mooring node may share a name."""
     owners = []
     for key in table['dof_keys']:
-        name, dof = key.split('::', 1)
+        name, dof = key.rsplit('::', 1)          # body ids may contain '::'; DOF suffixes never do
         owner = (name, BODY if dof in _BODY_DOFS else NODE)
         if owner not in owners:
             owners.append(owner)
