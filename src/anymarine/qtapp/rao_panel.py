@@ -592,7 +592,7 @@ class RaoPanel(QWidget):
         for button in list(self.source_buttons.values()) + list(self.display_buttons.values()):
             button.blockSignals(True)
         info = rao_view.available(self.table, self.report)
-        for combo, values, text in ((self.owner, info['owners'], str),
+        for combo, values, text in ((self.owner, info['owners'], rao_view.owner_label),
                                     (self.contribution, info['contributions'], str),
                                     (self.heading, info['headings'], lambda v: f'{v:g}')):
             combo.clear()

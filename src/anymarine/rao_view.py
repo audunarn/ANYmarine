@@ -42,13 +42,36 @@ def amplitude_label(a) -> str:
     return f'{float(a)!r} m'
 
 
+BODY, NODE = 'body', 'node'
+_BODY_DOFS = {'surge', 'sway', 'heave', 'roll', 'pitch', 'yaw'}
+
+
 def _owners(table):
+    """``(name, kind)`` owners in DOF order; a body and a mooring node may share a name."""
     owners = []
     for key in table['dof_keys']:
-        owner = key.split('::', 1)[0]
+        name, dof = key.split('::', 1)
+        owner = (name, BODY if dof in _BODY_DOFS else NODE)
         if owner not in owners:
             owners.append(owner)
     return owners
+
+
+def owner_label(owner) -> str:
+    name, kind = owner
+    return f"{name} ({'body' if kind == BODY else 'mooring node'})"
+
+
+def _resolve(owner, dof_keys):
+    """A ``(name, kind)`` owner, or a plain name when exactly one owner carries it."""
+    if isinstance(owner, (tuple, list)) and len(owner) == 2:     # Qt returns combo data as a list
+        return (str(owner[0]), str(owner[1]))
+    matches = [o for o in _owners(dict(dof_keys=list(dof_keys))) if o[0] == owner]
+    if not matches:
+        raise ValueError(f'no DOFs of {owner!r} in the artifacts')
+    if len(matches) > 1:
+        raise ValueError(f'owner {owner!r} is ambiguous (a body and a mooring node); pass (name, kind)')
+    return matches[0]
 
 
 def available(table, report=None) -> dict:
@@ -64,14 +87,16 @@ def available(table, report=None) -> dict:
                 contributions=contributions, has_frequency=bool(entries), has_time=bool(runs))
 
 
-def grid_for(owner: str, dof_keys=None):
-    """The owner's grid from its DOF keys (rigid body: surge..yaw; mooring node: x, y, z)."""
+def grid_for(owner, dof_keys=None):
+    """The owner's grid (rigid body: surge..yaw; mooring node: x, y, z) from its kind or DOF keys."""
     if dof_keys is not None:
-        if f'{owner}::surge' in dof_keys:
-            return GRID
-        if f'{owner}::x' in dof_keys:
-            return NODE_GRID
-        raise ValueError(f'no DOFs of {owner!r} in the artifacts')
+        name, kind = _resolve(owner, dof_keys)
+        key = f'{name}::surge' if kind == BODY else f'{name}::x'
+        if key not in dof_keys:
+            raise ValueError(f'no DOFs of {owner!r} in the artifacts')
+        return GRID if kind == BODY else NODE_GRID
+    if isinstance(owner, (tuple, list)) and len(owner) == 2:
+        return GRID if owner[1] == BODY else NODE_GRID
     return NODE_GRID if owner.startswith('node') else GRID
 
 
@@ -113,12 +138,13 @@ def series(table, report, *, owner, heading, quantity='displacement', contributi
     if quantity == 'force' and contribution is None:
         raise ValueError('a contribution is required for contribution forces')
     keys = list(table['dof_keys'])
+    owner = _resolve(owner, keys)
     out = {}
     for row in grid_for(owner, keys):
         for dof in row:
             if dof is None:
                 continue
-            key = f'{owner}::{dof}'
+            key = f'{owner[0]}::{dof}'
             if key not in keys:
                 continue
             k = keys.index(key)

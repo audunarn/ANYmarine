@@ -463,3 +463,10 @@ def test_b1_tiny_reach_with_huge_damping_is_not_certified():
     bound = rl.mooring_tension_lower_bound(model, lines, states, nodes, q, 1.0)
     from test_rao_mooring import TENSION
     assert bound[0] < TENSION - 9.0 and bound[1] < TENSION - 9.0
+
+
+def test_b1b_lever_arm_norm_does_not_underflow():
+    """Review B1 remainder: the rigid-point reach scales the rotation by _norm(rho), not np.linalg.norm."""
+    assert rl._norm([0.0, 1e-170, 0.0]) == 1e-170 and float(np.linalg.norm([0.0, 1e-170, 0.0])) == 0.0
+    import inspect
+    assert '_norm(rho)' in inspect.getsource(rl.mooring_tension_lower_bound)

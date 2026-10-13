@@ -37,7 +37,7 @@ def test_grid_is_three_rows_two_columns_translations_left():
 
 def test_available_lists_owners_headings_amplitudes_and_sources():
     info = rv.available(TABLE, REPORT)
-    assert info['owners'] == ['hull', 'node0'] and info['headings'] == [0.0, 90.0]
+    assert info['owners'] == [('hull', rv.BODY), ('node0', rv.NODE)] and info['headings'] == [0.0, 90.0]
     assert info['amplitudes'] == [0.5, 1.0] and info['contributions'] == ['mooring', 'potential_flow']
     assert info['has_frequency'] and info['has_time']
     assert not rv.available(TABLE)['has_time']
@@ -126,3 +126,17 @@ def test_g4_owner_kind_comes_from_its_dof_keys():
 def test_g5_amplitude_labels_are_exact():
     assert rv.amplitude_label(0.05000001) != rv.amplitude_label(0.05000002)
     assert rv.amplitude_label(0.5) == '0.5 m'
+
+
+def test_g4b_a_body_and_a_node_sharing_a_name_stay_distinct():
+    """Review G4 remainder: a rigid body named node0 next to mooring node node0."""
+    keys = [f'node0::{d}' for d in ('surge', 'sway', 'heave', 'roll', 'pitch', 'yaw')] + ['node0::x', 'node0::y', 'node0::z']
+    table = dict(dof_keys=keys, entries=TABLE['entries'])
+    owners = rv.available(table)['owners']
+    assert owners == [('node0', rv.BODY), ('node0', rv.NODE)]
+    assert rv.grid_for(owners[0], keys) == rv.GRID and rv.grid_for(owners[1], keys) == rv.NODE_GRID
+    assert set(rv.series(table, None, owner=owners[1], heading=0.0)) == {'x', 'y', 'z'}
+    assert set(rv.series(table, None, owner=owners[0], heading=0.0)) == {'surge', 'sway', 'heave', 'roll', 'pitch', 'yaw'}
+    with pytest.raises(ValueError, match='ambiguous'):
+        rv.series(table, None, owner='node0', heading=0.0)
+    assert rv.owner_label(owners[1]) == 'node0 (mooring node)'

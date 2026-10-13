@@ -207,6 +207,6 @@ def test_rao_graph_grid_sources_units_and_layout(tmp_path):
     out = os.environ.get('ANYMARINE_RAO_GRID_PNG')
     if out:
         image.save(out)
-    panel.owner.setCurrentIndex(panel.owner.findData('node0'))
+    panel.owner.setCurrentIndex(panel.owner.findData(('node0', 'node')))
     assert [[a.isVisible() for a in row] for row in panel.grid.axes] == [[True, False]] * 3
     panel.close()

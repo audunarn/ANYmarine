@@ -519,7 +519,7 @@ def mooring_tension_lower_bound(model, lines, states, nodes, response, omega):
             rho = np.asarray(ep['point_body'], dtype=float)
             state = base[ep['body_id']]
             position = np.asarray(state.position, dtype=float) + np.asarray(state.rotation) @ rho
-            reach = _norm(q[6 * i:6 * i + 3]) + _norm(q[6 * i + 3:6 * i + 6]) * float(np.linalg.norm(rho))
+            reach = _norm(q[6 * i:6 * i + 3]) + _norm(q[6 * i + 3:6 * i + 6]) * _norm(rho)
             return position, float(reach)
         raise RaoLinearizationError(f'unsupported mooring endpoint type {kind!r} for the taut bound')
 
