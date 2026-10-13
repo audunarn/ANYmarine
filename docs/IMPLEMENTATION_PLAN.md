@@ -2711,6 +2711,15 @@ contribution power closure 1 %; advisory RAO bands 10 % / 10 deg for linearized-
 observed motion outside them demotes the case to nogo. Category is derived, never chosen.
 Development evidence only; no qualification follows from an RAO pass.
 
+#### RAO taut-mooring admission (adopted by the owner, 2026-10-13)
+
+The taut check's linearized tension minimum (finite-difference gradients of the clipped
+tension) failed review three times near slack (Q1, V1, V1b). It is replaced by a rigorous
+derivative-free lower bound per segment, `EA/L0 (L_s - L0 - D) - c w D`, D being the
+orbit reach of the segment's endpoints; with the unchanged sampled nonlinear orbit check,
+both must keep 5 % of the static tension. Conservative by construction: uncertified cases
+are reported as nonlinear. Design and status: docs/RAO_REPORTING.md.
+
 #### W5 kernel reconstruction criteria K1-K3 (adopted by the owner, 2026-10-12)
 
 These replace, for gate line 1 ("reconstructing the frequency response from the kernel

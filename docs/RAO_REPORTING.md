@@ -75,11 +75,15 @@ Per frequency: `Z(w) = K - w^2 (M + A_rad(w)) - i w (C + B_rad(w))`, `Z q = X`.
 - Mooring (slice 7): node DOFs are kept (3 per free node after the bodies) with the
   assembler's exact sparse K/C/M; the static audit includes node residuals. A case is taut
   when every segment tension is positive at the linearization point and, at the largest
-  declared amplitude, (a) the exact minimum of each segment's linearized tension
-  `T_s - |G q + G_v (-i w q)|` (position and rate gradients of the public assembly) and (b)
-  the sampled minimum of the full nonlinear assembly along the predicted orbit (1024
-  samples, every discrete local minimum refined) both stay above 5 % of that segment's
-  static tension; otherwise `nonlinear_reported`. Observed slack (stored tensions) or
+  declared amplitude, (a) a rigorous derivative-free lower bound of each segment's tension,
+  `EA/L0 (L_s - L0 - D) - c w D` with `D` the orbit reach of its two endpoints (fixed 0,
+  node `||Q_node||`, rigid point `||Q_x|| + ||Q_theta|| |rho|`), cross-checked against the
+  public assembly's segment lengths and elastic tensions (owner decision 2026-10-13, after
+  finite-difference tension gradients near slack failed review three times), and (b) the
+  sampled minimum of the full nonlinear assembly along the predicted orbit (1024 samples,
+  every discrete local minimum refined) both stay above 5 % of that segment's static
+  tension; otherwise `nonlinear_reported`. The bound is conservative: a case it cannot
+  certify is reported as nonlinear, never linearized. Observed slack (stored tensions) or
   missing tension evidence demotes a run.
   Line fluid inertia excitation uses three public force evaluations. Seabed contact and
   line drag are refused for now. Verified: exact taut-line equilibrium, mooring tangent vs

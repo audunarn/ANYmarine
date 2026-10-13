@@ -286,17 +286,15 @@ def features(project, spec):
                 # Linearization valid only while every segment stays taut along the predicted
                 # orbit at the largest amplitude (public assembly at moving states: finite
                 # rotation and axial damping included).
-                # Both the linear model's exact tension minimum and the sampled nonlinear
-                # orbit minimum must keep the declared margin of each segment's static tension.
+                # Both the rigorous derivative-free tension bound (owner decision 2026-10-13)
+                # and the sampled nonlinear orbit minimum must keep the declared margin of
+                # each segment's static tension.
                 static = lin.linear.mooring_tension
-                try:
-                    linear = rl.mooring_linear_tension_minimum(lin.model, lin.states, lin.nodes, q, omega, static)
-                except rl.RaoLinearizationError:
-                    taut = False            # near slack: no local tension derivative
-                else:
-                    orbit = rl.mooring_orbit_tensions(lin.model, lin.states, lin.nodes, q, omega)
-                    if np.any(linear <= TAUT_ORBIT_MARGIN * static) or np.any(orbit <= TAUT_ORBIT_MARGIN * static):
-                        taut = False
+                bound = rl.mooring_tension_lower_bound(lin.model, lin.native.mooring.data['lines'], lin.states,
+                                                       lin.nodes, q, omega)
+                orbit = rl.mooring_orbit_tensions(lin.model, lin.states, lin.nodes, q, omega)
+                if np.any(bound <= TAUT_ORBIT_MARGIN * static) or np.any(orbit <= TAUT_ORBIT_MARGIN * static):
+                    taut = False
             for i in range(len(lin.model.body_ids)):
                 # Peak vector magnitude of Re{Q exp(-iwt)} is bounded by ||Q|| (all phases).
                 if np.linalg.norm(q[6 * i:6 * i + 3]) > criteria['small_excursion_m'] \

@@ -337,3 +337,68 @@ def test_v2_non_finite_or_boolean_numbers_are_refused():
     assert not rao_panel._is_vector([[10 ** 1000, 0]], 1)
     assert not rao_panel._is_vector([[float('nan'), 0.0]], 1)
     assert rao_panel._is_vector([[1, 0.5]], 1)
+
+
+# ---------------------------------------------------------------- round 9
+def _taut_parts(rest=None):
+    from anymarine.native_inputs import NativeMechanicalInputs
+    from anymarine.mechanics import prepare_native_nodes
+    from test_rao_mooring import taut_project, SPAN, EA
+    p = taut_project()
+    if rest is not None:
+        data = p.native_inputs.to_dict()
+        for line in data['mooring']['data']['lines']:
+            line['rest_lengths'] = [rest, rest]
+        k = data['links'][0]['stiffness'][0][0]
+        data['links'][0]['rest_translation'][0] = 4.0 - EA * (SPAN - rest) / rest / k
+        p = p.with_edits(native_inputs=NativeMechanicalInputs.from_dict(data))
+    calm = rl.wave_free_project(p)
+    model, states, _ = prepare_native_run(calm)
+    return p, model, states, prepare_native_nodes(calm), calm.native_inputs.mooring.data['lines']
+
+
+@requires_solver
+def test_v1c_tension_bound_is_exact_at_rest_and_analytic_for_node_and_rotation_reach():
+    from test_rao_mooring import EA, REST, SPAN, TENSION
+    _, model, states, nodes, lines = _taut_parts()
+    q = np.zeros(18, complex)
+    assert rl.mooring_tension_lower_bound(model, lines, states, nodes, q, 1.0) == pytest.approx([TENSION] * 4, rel=1e-12)
+    q[12] = 0.01                                    # node 0, x: both segments of line 0 reach 0.01 m
+    bound = rl.mooring_tension_lower_bound(model, lines, states, nodes, q, 2.0)
+    expected = EA / REST * (SPAN - REST - 0.01) - 1.0 * 2.0 * 0.01      # axial damping 1.0, w = 2
+    assert bound[:2] == pytest.approx([expected] * 2, rel=1e-12) and bound[2:] == pytest.approx([TENSION] * 2, rel=1e-12)
+    q[:] = 0.0
+    q[5] = 0.002j                                   # body a yaw: the fairlead point reaches |theta| |rho|
+    bound = rl.mooring_tension_lower_bound(model, lines, states, nodes, q, 1.0)
+    reach = 0.002 * np.linalg.norm(lines[0]['endpoints'][2]['point_body'])
+    assert bound[1] == pytest.approx(EA / REST * (SPAN - REST - reach) - reach, rel=1e-12)
+    assert bound[0] == pytest.approx(TENSION, rel=1e-12)
+
+
+@requires_solver
+def test_v1c_tension_bound_never_exceeds_the_sampled_nonlinear_orbit_minimum():
+    _, model, states, nodes, lines = _taut_parts()
+    rng = np.random.default_rng(7)
+    for scale, omega in ((1e-3, 0.5), (1e-2, 1.0), (3e-2, 3.0)):
+        q = scale * (rng.standard_normal(18) + 1j * rng.standard_normal(18))
+        bound = rl.mooring_tension_lower_bound(model, lines, states, nodes, q, omega)
+        orbit = rl.mooring_orbit_tensions(model, states, nodes, q, omega, samples=256)
+        assert np.all(bound <= orbit + 1e-9)
+
+
+@requires_solver
+def test_v1c_lines_that_do_not_reproduce_the_assembly_are_refused():
+    project, model, states, nodes, _ = _taut_parts()
+    altered = project.native_inputs.to_dict()['mooring']['data']['lines']        # plain JSON copies
+    altered[1] = dict(altered[1], rest_lengths=[2.39, 2.4])
+    with pytest.raises(rl.RaoLinearizationError, match='do not reproduce'):
+        rl.mooring_tension_lower_bound(model, altered, states, nodes, np.zeros(18, complex), 1.0)
+
+
+@requires_solver
+def test_v1c_near_slack_line_is_never_admitted_taut():
+    """Review V1 family: an extension far below the orbit reach is not taut, without any derivative."""
+    from test_rao_mooring import spec as mooring_spec, SPAN
+    p, *_ = _taut_parts(rest=SPAN - 1e-7)
+    c = rr.prepare_case(p, mooring_spec())
+    assert c.features['mooring_taut'] is False and c.category == 'nonlinear_reported'

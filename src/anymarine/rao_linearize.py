@@ -418,6 +418,9 @@ def mooring_tension_gradient(model, states, nodes, *, step=1e-6, rates=False, mi
                              agreement=1e-5):
     """d(segment tension)/dq (or d/dqdot with ``rates``) by central differences of the public assembly.
 
+    Diagnostic only: the taut admission uses :func:`mooring_tension_lower_bound`, which
+    needs no derivatives.
+
     The assembly's tension is piecewise smooth: it is clipped where the stretch or
     the raw (elastic + damping) tension reaches zero. A segment's central difference
     is accepted only when that segment is on the SAME branch (active: elastic and
@@ -470,17 +473,67 @@ def mooring_tension_gradient(model, states, nodes, *, step=1e-6, rates=False, mi
                                 '(near slack); the taut linearization is not admitted')
 
 
-def mooring_linear_tension_minimum(model, states, nodes, response, omega, static_tension):
-    """Exact minimum of each segment's linearized tension ``T_s + Re{T exp(-i w t)}``.
+def mooring_tension_lower_bound(model, lines, states, nodes, response, omega):
+    """Rigorous per-segment lower bound of the full assembly's tension along ``Re{Q exp(-i w t)}``.
 
-    ``T = G q + G_v (-i w q)`` with the position and rate gradients of the public
-    assembly (stiffness and axial damping); the minimum over a period is
-    ``T_s - |T|`` exactly, without sampling.
+    Derivative-free (owner decision 2026-10-13, after finite-difference gradients of the
+    clipped tension failed review three times). Over the orbit every endpoint moves by at
+    most ``D_e``: 0 (fixed), ``||Q_node||`` (node), ``||Q_x|| + ||Q_theta|| |rho|`` (rigid
+    point: the chord of a rotation never exceeds its arc), and with speed at most
+    ``w D_e`` (the left Jacobian of SO(3) has singular values <= 1). A segment's length
+    and length rate therefore stay within ``D = D_1 + D_2`` and ``w D`` of the static
+    values, so with the assembly's law ``T = max(EA/L0 * stretch + c * rate, 0)``::
+
+        T(t) >= EA/L0 * (L_s - L0 - D) - c w D   while L_s - L0 - D > 0.
+
+    ``lines`` are the native line declarations; their per-segment law and endpoints are
+    cross-checked against the public assembly at the static state (segment lengths and
+    elastic tensions) and any mismatch is refused.
     """
     q = np.asarray(response, dtype=complex)
-    g = mooring_tension_gradient(model, states, nodes)
-    gv = mooring_tension_gradient(model, states, nodes, rates=True)
-    return np.asarray(static_tension, dtype=float) - np.abs(g @ q + gv @ (-1j * omega * q))
+    body_ids = tuple(model.body_ids)
+    base = stationary_states({bid: states[bid] for bid in body_ids})
+    nodes = stationary_nodes(nodes)
+    assembly = model.mooring.evaluate(base, nodes, time=0.0)
+    lengths = np.asarray(assembly.lengths, dtype=float)
+    elastic = np.asarray(assembly.elastic_tensions, dtype=float)
+    n = 6 * len(body_ids)
+    node_positions = np.asarray(nodes.positions, dtype=float)
+
+    def endpoint(ep):
+        kind = ep['type']
+        if kind == 'fixed':
+            return np.asarray(ep['position'], dtype=float), 0.0
+        if kind == 'node':
+            k = int(ep['node_index'])
+            return node_positions[k], float(np.linalg.norm(q[n + 3 * k:n + 3 * k + 3]))
+        if kind == 'rigid':
+            i = body_ids.index(ep['body_id'])
+            rho = np.asarray(ep['point_body'], dtype=float)
+            state = base[ep['body_id']]
+            position = np.asarray(state.position, dtype=float) + np.asarray(state.rotation) @ rho
+            reach = np.linalg.norm(q[6 * i:6 * i + 3]) + np.linalg.norm(q[6 * i + 3:6 * i + 6]) * np.linalg.norm(rho)
+            return position, float(reach)
+        raise RaoLinearizationError(f'unsupported mooring endpoint type {kind!r} for the taut bound')
+
+    bounds = []
+    for line in lines:
+        points = [endpoint(ep) for ep in line['endpoints']]
+        for j in range(len(points) - 1):
+            segment = len(bounds)
+            rest = float(line['rest_lengths'][j])
+            stiffness = float(line['axial_rigidity'][j]) / rest
+            damping = float(line['axial_damping'][j])
+            length = float(np.linalg.norm(points[j + 1][0] - points[j][0]))
+            if segment >= lengths.size or abs(length - lengths[segment]) > 1e-9 * max(length, 1.0) or abs(
+                    stiffness * max(length - rest, 0.0) - elastic[segment]) > 1e-9 * max(abs(elastic[segment]), 1.0):
+                raise RaoLinearizationError('the declared mooring lines do not reproduce the public assembly '
+                                            'segments; the taut bound is refused')
+            reach = points[j][1] + points[j + 1][1]
+            bounds.append(stiffness * (length - rest - reach) - damping * omega * reach)
+    if len(bounds) != lengths.size:
+        raise RaoLinearizationError('the declared mooring lines do not cover the assembly segments')
+    return np.asarray(bounds, dtype=float)
 
 
 def mooring_wave_excitation(model, states, nodes, omega):
@@ -536,8 +589,8 @@ def mooring_orbit_tensions(model, states, nodes, response, omega, *, samples=102
     rates), so finite rotations, finite orbits and axial damping are included.
     Every discrete local minimum of each segment's sampled tension (periodic) is
     refined by golden-section search between its neighbouring samples. This is a
-    sampled check of the nonlinear tension; the linear model's own minimum is
-    exact (:func:`mooring_linear_tension_minimum`).
+    sampled check of the nonlinear tension; :func:`mooring_tension_lower_bound` is the
+    rigorous (derivative-free) bound.
     """
     _, rigid = _solver()
     from anysolver.marine_mooring import MooringNodeState
