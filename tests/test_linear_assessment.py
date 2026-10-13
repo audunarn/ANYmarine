@@ -1662,6 +1662,39 @@ def test_hydro_sensitivity_counterexample(hydro_flow):
     assert len(sensitivity["q_raw"]) == 4 and len(sensitivity["q_processed"]) == 4
 
 
+@requires_solver
+def test_hydro_impedance_sensitivity_full_block_form(hydro_flow):
+    """Prospective full-block form: ||Z_raw - Z_proc||_F / ||Z_raw||_F against the declared limit."""
+    service, project = hydro_flow["service"], hydro_flow["project"]
+    inputs, provenance = hydro_flow["inputs"], hydro_flow["provenance"]
+    result, f_hat = hydro_flow["result"], hydro_flow["f_hat"]
+    reports = {}
+    for limit in (0.01, 1.0e-14):
+        criteria = json.loads(json.dumps(CRITERIA))
+        criteria["impedance_full_block_relative"] = limit
+        case = service.prepare_linear_assessment(
+            project, _hydro_case_spec(project, inputs, provenance, f_hat, criteria=criteria))
+        reports[limit] = service.assess_linear_result(project, result, case)
+    loose = reports[0.01].arrays["hydro_sensitivity"]["impedance"]
+    assert loose["form"] == "full_block" and loose["value"] <= 0.01
+    assert "hydro_impedance_sensitivity" not in reports[0.01].failed
+    assert "hydro_impedance_sensitivity" in reports[1.0e-14].failed
+    check = next(c for c in reports[1.0e-14].checks if c["name"] == "hydro_impedance_sensitivity")
+    assert check["unit"] == "relative (Frobenius)" and "max coefficient deviation" in check["detail"]
+
+
+def test_full_block_impedance_criterion_is_optional_and_bounded():
+    from anymarine.linear_assessment import validate_assessment_controls, AssessmentCaseError
+    fit = {"intercepts": True, "drift": "none", "max_condition": 1.0e12}
+    criteria = json.loads(json.dumps(CRITERIA))
+    assert "impedance_full_block_relative" not in validate_assessment_controls(criteria, fit)["criteria"]
+    criteria["impedance_full_block_relative"] = 0.005
+    assert validate_assessment_controls(criteria, fit)["criteria"]["impedance_full_block_relative"] == 0.005
+    criteria["impedance_full_block_relative"] = 0.02
+    with pytest.raises(AssessmentCaseError, match="looser"):
+        validate_assessment_controls(criteria, fit)
+
+
 def test_hydro_sensitivity_singular_raw_refusal(hydro_flow):
     artifact = hydro_flow["artifact"]
     a_proc = np.asarray(artifact.derived_added_mass[0], dtype=float)

@@ -174,6 +174,10 @@ _CRITERIA_MAXIMA = {
     "kernel_match_relative": None,
     "small_excursion_length_scale_m": None,
     "impedance_relative_limit": 0.01,
+    # Optional (owner decision 2026-10-13, prospective): when declared, the raw-vs-
+    # processed impedance check is full-block, ||Z_raw - Z_proc||_F <= limit ||Z_raw||_F
+    # (+ impedance_absolute_j), instead of per coefficient.
+    "impedance_full_block_relative": 0.01,
     "impedance_floor_j": 1.0e-9,
     "impedance_absolute_j": 1.0e-9,
     "response_relative_limit": 0.02,
@@ -184,6 +188,7 @@ _CRITERIA_MAXIMA = {
     "refinement_absolute": 1.0e-8,
 }
 _CRITERIA_KEYS = frozenset(_CRITERIA_MAXIMA)
+_OPTIONAL_CRITERIA = ("impedance_full_block_relative",)
 
 _CASE_KEYS = (
     "schema_version",
@@ -266,9 +271,11 @@ def _exact_keys(name: str, data, allowed: tuple, optional: tuple = ()) -> None:
 
 
 def _validate_criteria(data) -> dict:
-    _exact_keys("criteria", data, tuple(sorted(_CRITERIA_KEYS)))
+    _exact_keys("criteria", data, tuple(sorted(_CRITERIA_KEYS)), optional=_OPTIONAL_CRITERIA)
     validated = {}
     for key in sorted(_CRITERIA_KEYS):
+        if key in _OPTIONAL_CRITERIA and key not in data:
+            continue
         value = _require_positive(f"criteria.{key}", data[key])
         maximum = _CRITERIA_MAXIMA[key]
         if maximum is not None and value > maximum:
@@ -983,6 +990,21 @@ def _fd_reference(inputs: LinearDevelopmentInputs, case: AssessmentCase, spectru
     return qhat, a_omega, b_omega
 
 
+def fd_reference_response(case: AssessmentCase, inputs: LinearDevelopmentInputs, provenance,
+                          project_root) -> np.ndarray:
+    """The source-proved FD reference response phasor of a hydro_spectrum case.
+
+    The same reference the assessment compares against (actual stored spectrum,
+    re-proved from the project's sidecars); used, e.g., to start a regular-wave run
+    from its declared FD steady state.
+    """
+    if case.reference["kind"] != REFERENCE_HYDRO_SPECTRUM:
+        raise AssessmentRefusalError("an FD steady state needs a hydro_spectrum reference")
+    spectrum = load_hydro_spectrum(case, inputs, provenance, project_root)
+    qhat, _, _ = _fd_reference(inputs, case, spectrum)
+    return qhat
+
+
 def _phasor_array(pairs) -> np.ndarray:
     """Build the complex force-phasor vector from [real, imag] pairs."""
 
@@ -1305,6 +1327,8 @@ def hydro_reciprocal_sensitivity(artifact, inputs: LinearDevelopmentInputs,
     impedance_floor = float(criteria["impedance_floor_j"])
     impedance_relative = float(criteria["impedance_relative_limit"])
     impedance_absolute = float(criteria["impedance_absolute_j"])
+    impedance_form = "per_coefficient"
+    impedance_metric = float(np.max(impedance_deviation))
     impedance_pass = bool(
         np.all(
             impedance_deviation
@@ -1312,6 +1336,16 @@ def hydro_reciprocal_sensitivity(artifact, inputs: LinearDevelopmentInputs,
             + impedance_absolute
         )
     )
+    if "impedance_full_block_relative" in criteria:
+        # Full-block form (prospective owner decision): the per-coefficient maximum
+        # stays recorded as a diagnostic (max_coefficient_deviation).
+        impedance_form = "full_block"
+        impedance_relative = float(criteria["impedance_full_block_relative"])
+        block_deviation = float(np.linalg.norm(z_raw_c - z_processed_c))
+        block_scale = float(np.linalg.norm(z_raw_c))
+        impedance_metric = block_deviation / block_scale if block_scale > 0 else (
+            0.0 if block_deviation == 0 else float("inf"))
+        impedance_pass = bool(block_deviation <= impedance_relative * block_scale + impedance_absolute)
 
     solutions = {}
     for label, matrix in (("raw", z_raw), ("processed", z_processed)):
@@ -1362,6 +1396,9 @@ def hydro_reciprocal_sensitivity(artifact, inputs: LinearDevelopmentInputs,
             "floor": impedance_floor,
             "absolute": impedance_absolute,
             "passed": impedance_pass,
+            "form": impedance_form,
+            "value": impedance_metric,
+            "max_coefficient_deviation": float(np.max(impedance_deviation)),
         },
         "response": {
             "unit": "dimensionless (S^-1 qhat)",
@@ -2288,14 +2325,18 @@ def _assess_regular_wave(case, inputs, channels, spectrum, checks, arrays):
                 ("response", "hydro_response_sensitivity"),
             ):
                 metrics = sensitivity[quantity]
+                full_block = metrics.get("form") == "full_block"
                 checks.append(
                     {
                         "name": key,
-                        "unit": metrics["unit"],
-                        "value": metrics["max_deviation"],
+                        "unit": "relative (Frobenius)" if full_block else metrics["unit"],
+                        "value": metrics["value"] if full_block else metrics["max_deviation"],
                         "limit": metrics["relative_limit"],
                         "passed": metrics["passed"],
                         "detail": (
+                            (f"raw vs processed {quantity}, full block ||dZ||_F/||Z_raw||_F; max "
+                             f"coefficient deviation {metrics['max_coefficient_deviation']:.6g} reported")
+                            if full_block else
                             f"raw vs processed {quantity}, max scale "
                             f"{metrics['max_scale']:.6g}, floor "
                             f"{metrics['floor']:.6g}, abs {metrics['absolute']:.6g}"

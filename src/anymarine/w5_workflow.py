@@ -170,7 +170,13 @@ def _validate(data):
         _require(isinstance(data['regular_waves'], list) and data['regular_waves'],
                  'at least one regular-wave case is required')
         for wave in data['regular_waves']:
-            _keys(wave, ('omega', 'heading', 'amplitude', 'phase', 'windows', 'q0', 'v0'), 'wave')
+            # Either an explicit initial state, or (owner decision 2026-10-13) the declared
+            # FD reference steady state, computed by the workflow before registration.
+            if 'initial_state' in wave:
+                _keys(wave, ('omega', 'heading', 'amplitude', 'phase', 'windows', 'initial_state'), 'wave')
+                _require(wave['initial_state'] == 'fd_steady_state', "wave.initial_state must be 'fd_steady_state'")
+            else:
+                _keys(wave, ('omega', 'heading', 'amplitude', 'phase', 'windows', 'q0', 'v0'), 'wave')
             omega = _number(wave['omega'], 'omega', positive=True)
             heading = _number(wave['heading'], 'heading')
             _require(omega in source.omegas and heading in source.wave_directions,
@@ -179,7 +185,8 @@ def _validate(data):
                      'wave frequency lies outside the reconstruction window')
             _number(wave['amplitude'], 'amplitude', positive=True)
             _number(wave['phase'], 'phase')
-            _vector(wave['q0'], 'wave.q0'); _vector(wave['v0'], 'wave.v0')
+            if 'initial_state' not in wave:
+                _vector(wave['q0'], 'wave.q0'); _vector(wave['v0'], 'wave.v0')
             _require(omega * kernels['coarse'].dt < math.pi, 'wave exceeds coarse Nyquist limit')
             _keys(wave['windows'], ('start', 'mid', 'end'), 'wave.windows')
             start, mid, end = [_number(wave['windows'][k], k) for k in ('start', 'mid', 'end')]
@@ -413,13 +420,42 @@ def execute_w5_case(out_dir, *, backend, execution_limits, should_cancel=None):
             kernels[role] = path
         runs = [dict(id=f'decay-{i}', mode='free_decay', state=s, wave=None)
                 for i, s in enumerate(data['free_decay_initial_states'])]
-        runs += [dict(id=f'wave-{i}', mode='regular_wave', state=dict(q0=w['q0'], v0=w['v0']), wave=w)
+        runs += [dict(id=f'wave-{i}', mode='regular_wave',
+                      state=None if 'initial_state' in w else dict(q0=w['q0'], v0=w['v0']), wave=w)
                  for i, w in enumerate(data['regular_waves'])]
+
+        def fd_steady_state(run):
+            """FD reference steady state at t0 (fine member, from-rest import kept as evidence)."""
+            import numpy as np
+            from .linear_assessment import fd_reference_response
+            start_root = root / run['id'] / 'fd-start'
+            service = ApplicationService()
+            project = _project(source_case, level)
+            service.save_current(project, start_root)
+            wave = {k: run['wave'][k] for k in ('omega', 'heading', 'amplitude', 'phase')}
+            zero = [0.0] * 4
+            options = dict(n_steps=data['frames']['fine'], t0=data['t0'], criteria=data['reconstruction_criteria'],
+                           q0=zero, v0=zero, surge_link_stiffness=data['surge_link_stiffness'], wave=wave,
+                           execution_limits=data['linear_execution_limits']['fine'])
+            project = service.import_derived_hydro_inputs(project, dataset_path, operators_path, kernels['fine'], options)
+            service.save(project)
+            reference_case = service.prepare_linear_assessment(project,
+                _case_spec(case, project, run, 'fine', None, artifact))
+            qhat = fd_reference_response(reference_case, project.linear_inputs, project.hydro_provenance, service.root)
+            phase = np.exp(-1j * wave['omega'] * float(data['t0']))
+            state = dict(q0=[float(v) for v in (qhat * phase).real],
+                         v0=[float(v) for v in (-1j * wave['omega'] * qhat * phase).real])
+            _write(start_root / 'fd-start.json', dict(reference_case_hash=reference_case.case_hash,
+                   qhat=[[float(v.real), float(v.imag)] for v in qhat], t0=float(data['t0']), **state))
+            return state
+
         pairs = []
         registrations = []
         for run in runs:
             phase = f"registration:{run['id']}"
             _state(root, case, 'running', phase=phase)
+            if run['state'] is None:
+                run['state'] = fd_steady_state(run)
             members = {}
             # Every member case persists before ANY dynamics solve starts.
             for role in ('fine', 'coarse'):

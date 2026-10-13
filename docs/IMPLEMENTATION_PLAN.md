@@ -2646,6 +2646,21 @@ A has no weak mode there (retained eigenvalues 350-445), so R5 currently concern
 
 Failed or unresolved outcomes are recorded as such; nothing here is changed after evaluation.
 
+#### W5 regular-wave start and impedance sensitivity form (adopted by the owner, 2026-10-13)
+
+Prospective, after W5 v6 (free decay passed; regular wave wave-0 nogo, records retained):
+- A regular-wave case may declare `initial_state: fd_steady_state`. The workflow then starts
+  both members from the declared FD reference steady state at t0, q0 = Re(q exp(-i w t0)),
+  v0 = Re(-i w q exp(-i w t0)), q being the source-proved hydro_spectrum reference response of
+  the fine member (computed from a from-rest import kept as evidence under fd-start/). This
+  removes the start-from-rest transient of the free common-surge mode (no restoring, little
+  low-frequency damping), which in v6 drifted 1.5 m. Windows, fits and criteria are unchanged.
+- The raw-vs-processed impedance sensitivity may be judged in full-block form,
+  ||Z_raw - Z_proc||_F <= 1 % ||Z_raw||_F (case criterion `impedance_full_block_relative`,
+  ceiling 0.01), as K1. The per-coefficient maximum stays reported; the response
+  sensitivity check (2 % per DOF) is unchanged. Cases without the key keep the
+  per-coefficient rule, so earlier records adjudicate unchanged.
+
 #### RAO reporting criteria (adopted by the owner, 2026-10-12)
 
 Design: docs/RAO_REPORTING.md (FD table and time-domain extraction, compared). Matched

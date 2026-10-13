@@ -309,7 +309,7 @@ def test_actual_first_slice_project_geometry(spec):
         assert app.mass==512.5
 
 
-@pytest.mark.parametrize('quadrature_method', ['frequency_trapezoid', 'piecewise_linear_exact', 'band_shared'])
+@pytest.mark.parametrize('quadrature_method', ['frequency_trapezoid', 'piecewise_linear_exact', 'band_shared', 'fd_start'])
 def test_real_public_source_kernel_import_registration_join_without_solver(spec,tmp_path,monkeypatch,quadrature_method):
     """Analytic source fixture; mock ONLY source-study admission, never claim BEM.
 
@@ -322,6 +322,12 @@ def test_real_public_source_kernel_import_registration_join_without_solver(spec,
     from anymarine.linear_assessment import read_case_artifact
     from anymarine.linear import linear_input_hash
     band=quadrature_method=='band_shared'
+    fd_start=quadrature_method=='fd_start'
+    if fd_start:
+        quadrature_method='frequency_trapezoid'
+        for wave in spec['regular_waves']:
+            del wave['q0'], wave['v0']
+            wave['initial_state']='fd_steady_state'
     for controls in spec['kernel_settings'].values():
         if quadrature_method != 'frequency_trapezoid': controls['quadrature_method']='piecewise_linear_exact'
         if band:
@@ -389,6 +395,12 @@ def test_real_public_source_kernel_import_registration_join_without_solver(spec,
             assert registered.mode==('free_decay' if run=='decay-0' else 'regular_wave')
         if band:  # one physical model at both time steps
             assert a_inf['coarse']==a_inf['fine']
+        if fd_start and run=='wave-0':
+            start=json.loads((out/'wave-0'/'fd-start'/'fd-start.json').read_text())
+            for role in ('coarse','fine'):
+                inputs=ApplicationService().load(out/run/role).linear_inputs
+                assert list(inputs.q0)==start['q0'] and list(inputs.v0)==start['v0']
+            assert any(start['q0']) and any(start['v0'])
     assert json.loads((out/'status.json').read_text())['state']=='cancelled'
 
 
@@ -439,4 +451,19 @@ def test_band_consistent_pair_calibration_grid_must_equal_the_fine_grid(spec):
     spec['kernel_settings']['coarse'].update(dt=1e-12,n_time=501,a_inf_calibration_dt=5e-13)
     spec['kernel_settings']['fine'].update(dt=5e-13,n_time=1000,a_inf_calibration_dt=5e-13)
     with pytest.raises(w5.W5Error,match='nested sample counts'):
+        w5.W5Case.from_dict(spec)
+
+
+def test_regular_wave_fd_steady_state_start_is_declared(spec):
+    wave = spec['regular_waves'][0]
+    del wave['q0'], wave['v0']
+    wave['initial_state'] = 'fd_steady_state'
+    case = w5.W5Case.from_dict(spec)
+    assert case.to_dict()['regular_waves'][0]['initial_state'] == 'fd_steady_state'
+    wave['initial_state'] = 'rest'
+    with pytest.raises(w5.W5Error, match='fd_steady_state'):
+        w5.W5Case.from_dict(spec)
+    wave['initial_state'] = 'fd_steady_state'
+    wave['q0'] = [0.0] * 4
+    with pytest.raises(w5.W5Error):
         w5.W5Case.from_dict(spec)
