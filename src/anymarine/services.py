@@ -922,6 +922,14 @@ class ApplicationService:
                 "hydro provenance may only accompany linear inputs imported from "
                 "an ANYhydro dataset"
             )
+        wave = provenance.to_dict()["wave"]
+        if provenance.derived_bundle is None and wave is not None and wave.get("prehistory") is not None:
+            # The import refuses a prehistory on the raw route; a stored raw project
+            # carrying one (e.g. edited and re-hashed) is refused here too.
+            raise ServiceError(
+                "a periodic prehistory is supported on the derived-operator route "
+                "only; a raw-route project declaring one is refused"
+            )
         if linear_input_hash(inputs) != provenance.linear_input_hash:
             raise ServiceError(
                 "the stored linear inputs do not reproduce the hydro "

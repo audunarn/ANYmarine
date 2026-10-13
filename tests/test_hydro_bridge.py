@@ -418,6 +418,25 @@ def test_surge_link_stiffness(tmp_path, artifacts):
     assert project.hydro_provenance.surge_link_stiffness == 1250.0
 
 
+def test_raw_project_with_a_prehistory_declaration_is_refused_on_verification(tmp_path, artifacts):
+    """Review P2: the raw route has no prehistory; a stored raw project carrying one is refused."""
+    import dataclasses
+    wave = {"omega": 1.0, "heading": 0.0, "amplitude": 2.5, "phase": 0.3}
+    service, project = _import(tmp_path, artifacts, _base_options(wave=wave))
+    service.verify_hydro_provenance(project)
+    from anymarine.linear import linear_input_hash
+    provenance = project.hydro_provenance
+    declared = dict(provenance.to_dict()["wave"], prehistory={"kind": "periodic", "qhat": [[0.1, 0.0]] * 4})
+    # Both copies edited and the bookkeeping re-hashed; the forces stay F_wave.
+    inputs = project.linear_inputs
+    details = dict(inputs.provenance.to_dict()["details"], wave=declared)
+    inputs = dataclasses.replace(inputs, provenance=dataclasses.replace(inputs.provenance, details=details))
+    tampered = project.with_edits(linear_inputs=inputs, hydro_provenance=dataclasses.replace(
+        provenance, wave=declared, linear_input_hash=linear_input_hash(inputs)))
+    with pytest.raises(ServiceError, match="derived-operator route only"):
+        service.verify_hydro_provenance(tampered)
+
+
 def test_wave_forcing_phase_and_phasor(tmp_path, artifacts):
     wave = {
         "omega": 1.0,
