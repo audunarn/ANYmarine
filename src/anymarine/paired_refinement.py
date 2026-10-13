@@ -519,9 +519,13 @@ def _same_hydro_source(member_coarse: PairedMember,
             "imported with a regular-wave selection and the other as free "
             "decay"
         )
+    # The provenance freezes the wave selection (read-only mappings); compare and
+    # record its own JSON form.
+    wave_coarse = provenance_coarse.to_dict()["wave"]
+    wave_fine = provenance_fine.to_dict()["wave"]
     if provenance_coarse.wave is not None and (
-        json.loads(json.dumps(provenance_coarse.wave, allow_nan=False))
-        != json.loads(json.dumps(provenance_fine.wave, allow_nan=False))
+        json.loads(json.dumps(wave_coarse, allow_nan=False))
+        != json.loads(json.dumps(wave_fine, allow_nan=False))
     ):
         _refusal(
             "refinement pairs the SAME physical forcing: the recorded "
@@ -549,7 +553,7 @@ def _same_hydro_source(member_coarse: PairedMember,
             else "raw_dataset"
         ),
         "wave": json.loads(
-            json.dumps(provenance_coarse.wave, allow_nan=False)
+            json.dumps(wave_coarse, allow_nan=False)
         ),
         "kernel_settings_shared": settings_coarse,
     }

@@ -745,6 +745,28 @@ def test_paired_refinement_combined_pass(decay_pair):
 
 
 @requires_solver
+@requires_solver
+def test_same_hydro_source_compares_frozen_regular_wave_selections(decay_pair):
+    """Regular-wave members carry a frozen (read-only) wave selection: equal ones pair, different ones refuse."""
+    import dataclasses
+    from types import MappingProxyType, SimpleNamespace
+    from anymarine.paired_refinement import PairedRefinementRefusalError, _same_hydro_source
+
+    def member(role, wave):
+        project = decay_pair[role]["project"]
+        provenance = dataclasses.replace(project.hydro_provenance, wave=wave)
+        assert isinstance(provenance.wave, MappingProxyType)
+        return SimpleNamespace(project=SimpleNamespace(hydro_provenance=provenance,
+                                                       linear_inputs=project.linear_inputs))
+
+    wave = dict(omega=2.0, heading=0.0, amplitude=0.02, phase=0.3)
+    identity = _same_hydro_source(member("coarse", wave), member("fine", dict(wave)))
+    assert identity["wave"] == wave
+    json.dumps(identity, allow_nan=False)
+    with pytest.raises(PairedRefinementRefusalError, match="wave selections differ"):
+        _same_hydro_source(member("coarse", wave), member("fine", dict(wave, phase=0.4)))
+
+
 def test_zero_energy_hydro_free_decay_notmeasured(decay_pair):
     """A zero-state hydro free decay is NOTMEASURED, never a trivial PASS."""
 
