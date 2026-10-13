@@ -2665,6 +2665,41 @@ Prospective, after W5 v6 (free decay passed; regular wave wave-0 nogo, records r
   sensitivity check (2 % per DOF) is unchanged. Cases without the key keep the
   per-coefficient rule, so earlier records adjudicate unchanged.
 
+#### W5 periodic radiation prehistory for regular waves (adopted by the owner, 2026-10-13)
+
+Prospective, before W5 v7 was run. A diagnostic re-run of the v7 wave members from v6's
+source and kernels (anymarine-evidence/w5-v7-prerun-diagnostic-20261013, not evidence)
+showed the q/v-only FD start still excites the undamped relative-surge link mode
+(w 0.343 rad/s, zeta ~1e-4) to 1.3-19.5 mm through the solver's zero radiation prehistory;
+fit RMS failed on all three waves. Declaring the periodic motion before t0 removed it
+(free mode 3-30 um, fit RMS <= 10 um vs limits 60-420 um).
+
+- A regular wave with `initial_state: fd_steady_state` may declare `prehistory: periodic`:
+  the motion before t0 is q_p(t) = Re(q exp(-i w t)) with the same declared FD steady-state
+  phasor q as the start state (one physical prehistory for both members).
+- Each member's external force is F_wave(t_n) - H_n with the history force
+  H_n = M_periodic,n - M_solver,n: the trapezoid memory of q_p over every stored kernel lag
+  minus the part the public solver computes itself from t0 (memory_0 = 0; lags 0..n with
+  half weight on v_0). Computed from the member's own admitted kernel; the solver is unchanged.
+- The declaration (kind, q) is recorded in the hydro provenance wave selection (hash bound,
+  reproduced on reload, compared by the pairing) and in the assessment case reference; the
+  assessment recomputes H from the stored kernel and checks the stored forces against
+  F_wave - H with the unchanged force-match limits. Windows, fits and criteria unchanged.
+
+Slices and acceptance:
+1. `prehistory.periodic_prehistory_force`: equals an independent per-step brute-force sum
+   to 1e-12 relative; a solver run on an analytic-kernel fixture started from the discrete
+   steady state with F - H stays periodic (transient <= 1e-6 of |q|), measurably not without H.
+2. Derived hydro import: `wave.prehistory` validated (closed world, finite 4 complex
+   values); q0/v0 must equal the periodic state at t0; forces = F_wave - H; raw route refuses;
+   reload reproduces the inputs hash.
+3. Assessment: declaration must match the provenance both ways; expected forces use the
+   recomputed H; missing, extra or different declarations are refused.
+4. Pairing: members with different declared q refuse (same-forcing check).
+5. W5 workflow: `prehistory: periodic` accepted only with `fd_steady_state`; members imported
+   with it; real-import test variant; cancellation behaviour unchanged.
+6. v7 registration amended before it runs; Codex review; then the v7 run.
+
 #### RAO reporting criteria (adopted by the owner, 2026-10-12)
 
 Design: docs/RAO_REPORTING.md (FD table and time-domain extraction, compared). Matched

@@ -764,6 +764,15 @@ def test_same_hydro_source_compares_frozen_regular_wave_selections(decay_pair):
     json.dumps(identity, allow_nan=False)
     with pytest.raises(PairedRefinementRefusalError, match="wave selections differ"):
         _same_hydro_source(member("coarse", wave), member("fine", dict(wave, phase=0.4)))
+    # A declared periodic prehistory is part of the same forcing (plan slice 4).
+    history = dict(kind="periodic", qhat=[[0.01, 0.002], [0.0, 0.0], [-0.01, 0.001], [0.0, 0.0]])
+    declared = dict(wave, prehistory=history)
+    assert _same_hydro_source(member("coarse", declared), member("fine", json.loads(json.dumps(declared))))
+    changed = json.loads(json.dumps(declared))
+    changed["prehistory"]["qhat"][0][0] = 0.011
+    for coarse, fine in ((declared, changed), (declared, wave)):
+        with pytest.raises(PairedRefinementRefusalError, match="wave selections differ"):
+            _same_hydro_source(member("coarse", coarse), member("fine", fine))
 
 
 @requires_solver

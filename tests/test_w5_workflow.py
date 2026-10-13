@@ -309,7 +309,8 @@ def test_actual_first_slice_project_geometry(spec):
         assert app.mass==512.5
 
 
-@pytest.mark.parametrize('quadrature_method', ['frequency_trapezoid', 'piecewise_linear_exact', 'band_shared', 'fd_start', 'fd_cancel'])
+@pytest.mark.parametrize('quadrature_method', ['frequency_trapezoid', 'piecewise_linear_exact', 'band_shared', 'fd_start', 'fd_cancel',
+                                               'fd_prehistory'])
 def test_real_public_source_kernel_import_registration_join_without_solver(spec,tmp_path,monkeypatch,quadrature_method):
     """Analytic source fixture; mock ONLY source-study admission, never claim BEM.
 
@@ -323,13 +324,15 @@ def test_real_public_source_kernel_import_registration_join_without_solver(spec,
     from anymarine.linear import linear_input_hash
     band=quadrature_method=='band_shared'
     fd_cancel=quadrature_method=='fd_cancel'   # cancellation pending before the FD bootstrap
-    fd_start=quadrature_method in ('fd_start','fd_cancel')
+    fd_prehistory=quadrature_method=='fd_prehistory'   # + declared periodic prehistory
+    fd_start=quadrature_method in ('fd_start','fd_cancel','fd_prehistory')
     if fd_start:
         quadrature_method='frequency_trapezoid'
         spec['t0']=.7   # nonzero start time: the start-state phase is exercised
         for wave in spec['regular_waves']:
             del wave['q0'], wave['v0']
             wave['initial_state']='fd_steady_state'
+            if fd_prehistory: wave['prehistory']='periodic'
     for controls in spec['kernel_settings'].values():
         if quadrature_method != 'frequency_trapezoid': controls['quadrature_method']='piecewise_linear_exact'
         if band:
@@ -423,6 +426,23 @@ def test_real_public_source_kernel_import_registration_join_without_solver(spec,
             q=np.linalg.solve(Z,F)*np.exp(-1j*w*.7)
             assert np.allclose(start['q0'],q.real,rtol=1e-9,atol=1e-15)
             assert np.allclose(start['v0'],(-1j*w*q).real,rtol=1e-9,atol=1e-15)
+            if fd_prehistory:
+                # Both members: the same declaration in provenance and case; forces = wave - H
+                # with H from an independent brute-force sum over each member's stored kernel.
+                from test_prehistory import brute_force
+                qd=np.array([complex(*p) for p in start['qhat']])
+                declaration=dict(kind='periodic',qhat=start['qhat'])
+                for role in ('coarse','fine'):
+                    project=ApplicationService().load(out/run/role)
+                    inputs=project.linear_inputs
+                    member_case=read_case_artifact(out/run/role/'registered-case.json')
+                    assert member_case.reference['prehistory']==declaration
+                    assert project.hydro_provenance.to_dict()['wave']['prehistory']==declaration
+                    times=np.asarray(inputs.times)
+                    wave_force=(F[None,:]*np.exp(-1j*w*times)[:,None]).real
+                    H=brute_force(np.asarray(inputs.radiation_kernel),inputs.dt,inputs.t0,inputs.n_steps,w,qd,-1j*w*qd)
+                    assert np.max(np.abs(H))>0
+                    assert np.max(np.abs(np.asarray(inputs.forces)-(wave_force-H)))<=1e-9*np.max(np.abs(wave_force))
     assert json.loads((out/'status.json').read_text())['state']=='cancelled'
 
 
@@ -473,6 +493,19 @@ def test_band_consistent_pair_calibration_grid_must_equal_the_fine_grid(spec):
     spec['kernel_settings']['coarse'].update(dt=1e-12,n_time=501,a_inf_calibration_dt=5e-13)
     spec['kernel_settings']['fine'].update(dt=5e-13,n_time=1000,a_inf_calibration_dt=5e-13)
     with pytest.raises(w5.W5Error,match='nested sample counts'):
+        w5.W5Case.from_dict(spec)
+
+
+def test_periodic_prehistory_requires_the_fd_steady_state_start(spec):
+    wave = spec['regular_waves'][0]
+    wave['prehistory'] = 'periodic'
+    with pytest.raises(w5.W5Error):                      # explicit q0/v0 start: refused
+        w5.W5Case.from_dict(spec)
+    del wave['q0'], wave['v0']
+    wave['initial_state'] = 'fd_steady_state'
+    assert w5.W5Case.from_dict(spec).to_dict()['regular_waves'][0]['prehistory'] == 'periodic'
+    wave['prehistory'] = 'ramp'
+    with pytest.raises(w5.W5Error, match="prehistory must be 'periodic'"):
         w5.W5Case.from_dict(spec)
 
 

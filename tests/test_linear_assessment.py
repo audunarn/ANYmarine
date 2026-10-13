@@ -1513,6 +1513,7 @@ def hydro_flow(tmp_path_factory):
     q0, v0, f_hat = _hydro_steady_initial_state(
         artifact, omega_index, direction_index, mass_dry
     )
+    qhat = q0 + 1j * v0 / HYDRO_OMEGA      # q0 = Re(qhat), v0 = Re(-i w qhat) = w Im(qhat)
     service = ApplicationService(root / "project")
     service.save(project)
     options = {
@@ -1546,6 +1547,8 @@ def hydro_flow(tmp_path_factory):
         "result": result,
         "report": report,
         "f_hat": f_hat,
+        "qhat": qhat,
+        "q0_v0_fhat": (q0, v0, f_hat),
         "artifact": artifact,
         "dataset": dataset,
         "dataset_path": dataset_path,
@@ -1553,6 +1556,110 @@ def hydro_flow(tmp_path_factory):
         "kernel_path": kernel_path,
         "root": root,
     }
+
+
+@pytest.fixture(scope="module")
+def prehistory_flow(hydro_flow):
+    """The same derived source imported with a declared periodic prehistory."""
+    from anymarine.prehistory import periodic_state
+    q0, v0, f_hat = hydro_flow["q0_v0_fhat"]
+    qhat = hydro_flow["qhat"]
+    t0 = 0.35
+    declaration = {"kind": "periodic", "qhat": [[float(v.real), float(v.imag)] for v in qhat]}
+    q_start, v_start = periodic_state(qhat, HYDRO_OMEGA, t0)
+    service = ApplicationService(hydro_flow["root"] / "prehistory-project")
+    project = _hydro_project()
+    service.save(project)
+    options = {
+        "n_steps": HYDRO_N_STEPS,
+        "criteria": dict(HYDRO_CRITERIA),
+        "t0": t0,
+        "wave": {"omega": HYDRO_OMEGA, "heading": HYDRO_HEADING, "amplitude": HYDRO_AMPLITUDE,
+                 "phase": HYDRO_PHASE, "prehistory": declaration},
+        "q0": [float(v) for v in q_start],
+        "v0": [float(v) for v in v_start],
+    }
+    paths = (hydro_flow["dataset_path"], hydro_flow["operators_path"], hydro_flow["kernel_path"])
+    project = service.import_derived_hydro_inputs(project, *paths, options)
+    service.save(project)
+    return dict(service=service, project=project, options=options, paths=paths, f_hat=f_hat,
+                declaration=declaration, t0=t0, qhat=qhat, baseline_fits=hydro_flow["report"].arrays["fits"])
+
+
+def _prehistory_case_spec(flow, declaration):
+    project = flow["project"]
+    spec = _hydro_case_spec(project, project.linear_inputs, project.hydro_provenance, flow["f_hat"])
+    spec["windows"] = {key: value + flow["t0"] for key, value in HYDRO_WINDOWS.items()}
+    if declaration is not None:
+        spec["reference"]["prehistory"] = declaration
+    return spec
+
+
+@requires_solver
+def test_prehistory_import_stores_wave_minus_history_force(prehistory_flow):
+    from test_prehistory import brute_force
+    inputs = prehistory_flow["project"].linear_inputs
+    qhat = np.array([complex(*p) for p in prehistory_flow["declaration"]["qhat"]])
+    times = np.asarray(inputs.times, dtype=float)
+    wave = (prehistory_flow["f_hat"][None, :] * np.exp(-1j * HYDRO_OMEGA * times)[:, None]).real
+    kernel = np.asarray(inputs.radiation_kernel, dtype=float)
+    history = brute_force(kernel, inputs.dt, inputs.t0, inputs.n_steps, HYDRO_OMEGA, qhat, -1j * HYDRO_OMEGA * qhat)
+    stored = np.asarray(inputs.forces, dtype=float)
+    tolerance = 1e-9 * np.max(np.abs(wave))
+    assert np.max(np.abs(history)) > 1e3 * tolerance        # the check distinguishes F from F - H
+    assert np.max(np.abs(stored - (wave - history))) <= tolerance
+    provenance = prehistory_flow["project"].hydro_provenance
+    assert provenance.to_dict()["wave"]["prehistory"] == prehistory_flow["declaration"]
+    prehistory_flow["service"].verify_hydro_provenance(prehistory_flow["project"])   # reload reproduces
+
+
+@requires_solver
+def test_prehistory_import_refuses_a_start_state_off_the_declared_motion(prehistory_flow):
+    service = ApplicationService(prehistory_flow["service"].root.parent / "prehistory-refused")
+    project = _hydro_project()
+    service.save(project)
+    options = json.loads(json.dumps(prehistory_flow["options"]))
+    options["q0"][1] += 1e-6
+    with pytest.raises(ServiceError, match="periodic prehistory state"):
+        service.import_derived_hydro_inputs(project, *prehistory_flow["paths"], options)
+
+
+@requires_solver
+def test_prehistory_assessment_recomputes_the_history_force_and_binds_the_declaration(prehistory_flow):
+    service, project = prehistory_flow["service"], prehistory_flow["project"]
+    declaration = prehistory_flow["declaration"]
+    case = service.prepare_linear_assessment(project, _prehistory_case_spec(prehistory_flow, declaration))
+    result = service.run_linear_local(project)
+    report = service.assess_linear_result(project, result, case)
+    match = next(c for c in report.checks if c["name"] == "input_force_match")
+    assert match["passed"] and "prehistory" in match["detail"]
+    assert report.arrays["prehistory"]["max_abs_history_force_n"] > 0.0
+    # Less start transient than the same continuous FD start without the prehistory (the rest
+    # is the continuous-vs-discrete start-state difference of this coarse fixture).
+    for fit, baseline in zip(report.arrays["fits"], prehistory_flow["baseline_fits"]):
+        assert max(fit["residual_rms"]) < 0.75 * max(baseline["residual_rms"])
+    # The declaration is bound both ways and exactly.
+    with pytest.raises((AssessmentRefusalError, ServiceError), match="prehistory"):
+        service.assess_linear_result(project, result, service.prepare_linear_assessment(
+            project, _prehistory_case_spec(prehistory_flow, None)))
+    other = json.loads(json.dumps(declaration))
+    other["qhat"][0][0] *= 1.001
+    with pytest.raises((AssessmentRefusalError, ServiceError), match="prehistory"):
+        service.assess_linear_result(project, result, service.prepare_linear_assessment(
+            project, _prehistory_case_spec(prehistory_flow, other)))
+
+
+def test_prehistory_reference_is_hydro_spectrum_only_and_validated():
+    from anymarine.linear_assessment import _validate_reference
+    declaration = {"kind": "periodic", "qhat": [[0.1, 0.0]] * 4}
+    with pytest.raises(AssessmentCaseError, match="only a hydro_spectrum"):
+        _validate_reference({"kind": REFERENCE_ANALYTIC_EXPONENTIAL, "coefficient_matrix": np.eye(4).tolist(),
+                             "decay": 1.0, "prehistory": declaration})
+    with pytest.raises(AssessmentCaseError, match="reference.prehistory"):
+        _validate_reference({"kind": REFERENCE_HYDRO_SPECTRUM, "route": "derived_operators", "omega": 1.0,
+                             "heading": 0.0, "wave_amplitude": 1.0, "wave_phase": 0.0,
+                             "dataset_content_hash": "a" * 64, "derived_content_hash": "b" * 64,
+                             "operators_raw_sha256": "c" * 64, "prehistory": dict(declaration, kind="ramp")})
 
 
 @requires_solver

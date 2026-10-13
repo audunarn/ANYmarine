@@ -86,6 +86,8 @@ from .domain import (
 )
 from .hashing import equilibrium_hash, mesh_hash
 from .linear import linear_input_hash
+from .prehistory import (PrehistoryError, declaration_phasor, periodic_prehistory_force, periodic_state,
+                         validated_declaration)
 
 __all__ = [
     "HydroAdmissionError",
@@ -340,6 +342,17 @@ def expected_world_lid(body, waterline_z: float = 0.0):
     return result
 
 
+def _prehistory_declaration(value) -> dict:
+    """Validated periodic-prehistory declaration (frozen provenance values accepted)."""
+    data = dict(value) if isinstance(value, Mapping) else value
+    if isinstance(data, dict) and isinstance(data.get("qhat"), (list, tuple)):
+        data["qhat"] = [list(pair) if isinstance(pair, (list, tuple)) else pair for pair in data["qhat"]]
+    try:
+        return validated_declaration(data)
+    except PrehistoryError as error:
+        raise HydroOptionsError(f"wave.prehistory: {error}") from error
+
+
 def _require_mapping(value, name: str, keys: tuple) -> dict:
     if not isinstance(value, Mapping):
         raise HydroOptionsError(f"{name} must be a JSON object")
@@ -445,7 +458,9 @@ def _parse_options(options) -> dict:
         raise HydroOptionsError("surge_link_stiffness must be a nonnegative finite number")
     wave = None
     if data.get("wave") is not None:
-        wave_data = _require_mapping(data["wave"], "wave", _WAVE_KEYS)
+        raw_wave = dict(data["wave"]) if isinstance(data["wave"], Mapping) else data["wave"]
+        prehistory = raw_wave.pop("prehistory", None) if isinstance(raw_wave, dict) else None
+        wave_data = _require_mapping(raw_wave, "wave", _WAVE_KEYS)
         wave = {
             "omega": _finite_float(wave_data["omega"], "wave.omega"),
             "heading": _finite_float(wave_data["heading"], "wave.heading"),
@@ -457,6 +472,8 @@ def _parse_options(options) -> dict:
                 "wave amplitude must be a real nonnegative finite number; "
                 f"received {wave['amplitude']!r}"
             )
+        if prehistory is not None:
+            wave["prehistory"] = _prehistory_declaration(prehistory)
     return {
         "n_steps": int(n_steps),
         "criteria": criteria_data,
@@ -863,6 +880,11 @@ def import_hydro_inputs(
             "omega_index": omega_index,
             "direction_index": direction_index,
         }
+        if wave.get("prehistory") is not None:
+            raise HydroOptionsError(
+                "a periodic prehistory is supported on the explicit derived-operator "
+                "route only; the raw route refuses it"
+            )
     else:
         forces = np.zeros((n_steps, LINEAR_DOF_COUNT), dtype=np.float64)
 
@@ -1311,6 +1333,23 @@ def _assemble_derived_inputs(
             "omega_index": omega_index,
             "direction_index": direction_index,
         }
+        if wave.get("prehistory") is not None:
+            # Declared periodic motion before t0 (owner decision 2026-10-13): the start
+            # state must be that motion at t0, and the solver's zero-prehistory memory is
+            # completed by the history force from the stored (run-length) kernel.
+            declaration = wave["prehistory"]
+            qhat = declaration_phasor(declaration)
+            q_start, v_start = periodic_state(qhat, wave["omega"], opt["t0"])
+            scale = max(float(np.max(np.abs(qhat))), 1e-300)
+            if (np.max(np.abs(np.asarray(opt["q0"]) - q_start)) > 1e-12 * scale
+                    or np.max(np.abs(np.asarray(opt["v0"]) - v_start)) > 1e-12 * wave["omega"] * scale):
+                raise HydroOptionsError(
+                    "q0/v0 must equal the declared periodic prehistory state at t0, "
+                    "Re(q exp(-i w t0)) and Re(-i w q exp(-i w t0))"
+                )
+            forces = forces - periodic_prehistory_force(
+                kernel_4, dt, opt["t0"], n_steps, wave["omega"], qhat)
+            wave_selection["prehistory"] = declaration
     else:
         forces = np.zeros((n_steps, LINEAR_DOF_COUNT), dtype=np.float64)
 
@@ -1484,6 +1523,8 @@ def recompile_derived_inputs(
     wave = None
     if wave_data is not None:
         wave = {key: float(wave_data[key]) for key in _WAVE_KEYS}
+        if wave_data.get("prehistory") is not None:
+            wave["prehistory"] = _prehistory_declaration(wave_data["prehistory"])
     opt = {
         "n_steps": int(provenance_data["n_steps"]),
         "criteria": {

@@ -572,6 +572,10 @@ def test_refuses_insufficient_kernel(tmp_path, artifacts):
         ({"omega": 1.0, "heading": 9.9, "amplitude": 1.0, "phase": 0.0}, "not an exact stored dataset heading"),
         ({"omega": 1.0, "heading": 0.0, "amplitude": -1.0, "phase": 0.0}, "nonnegative"),
         ({"omega": 1.0, "heading": 0.0, "amplitude": 1.0}, "missing required option"),
+        ({"omega": 1.0, "heading": 0.0, "amplitude": 1.0, "phase": 0.0,
+          "prehistory": {"kind": "periodic", "qhat": [[0.0, 0.0]] * 4}}, "derived-operator route only"),
+        ({"omega": 1.0, "heading": 0.0, "amplitude": 1.0, "phase": 0.0,
+          "prehistory": {"kind": "ramp", "qhat": [[0.0, 0.0]] * 4}}, "wave.prehistory"),
     ],
 )
 def test_refuses_invalid_waves(tmp_path, artifacts, wave, fragment):

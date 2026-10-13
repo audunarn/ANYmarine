@@ -72,6 +72,8 @@ from .domain import (
 )
 from .hashing import canonical_json
 from .linear import linear_input_hash, verify_linear_binding, verify_linear_result
+from .prehistory import (PrehistoryError, declaration_phasor, periodic_prehistory_force,
+                         validated_declaration)
 from .persistence import (
     atomic_write_bytes,
     check_relative_reference,
@@ -188,6 +190,9 @@ _CRITERIA_MAXIMA = {
     "refinement_absolute": 1.0e-8,
 }
 _CRITERIA_KEYS = frozenset(_CRITERIA_MAXIMA)
+# Roundoff identity bound for the shared wave forcing of a prehistory pair, where each
+# member's stored force is F_wave - H and H is added back (not an adopted criterion).
+PREHISTORY_FORCING_IDENTITY_RELATIVE = 1.0e-12
 _OPTIONAL_CRITERIA = ("impedance_full_block_relative",)
 
 _CASE_KEYS = (
@@ -313,8 +318,10 @@ def _validate_reference(data) -> dict:
             "dataset_content_hash",
             "derived_content_hash",
             "operators_raw_sha256",
+            "prehistory",
         ),
         optional=(
+            "prehistory",
             "coefficient_matrix",
             "decay",
             "route",
@@ -335,6 +342,15 @@ def _validate_reference(data) -> dict:
             "kernel-quadrature self-reference cannot yield RAO admission."
         )
     reference: dict[str, Any] = {"kind": kind}
+    if "prehistory" in data:
+        # Declared periodic prehistory (owner decision 2026-10-13): hydro_spectrum only,
+        # bound to the provenance's recorded declaration at assessment.
+        if kind != REFERENCE_HYDRO_SPECTRUM:
+            raise AssessmentCaseError("only a hydro_spectrum reference may declare a prehistory")
+        try:
+            reference["prehistory"] = validated_declaration(data["prehistory"])
+        except PrehistoryError as error:
+            raise AssessmentCaseError(f"reference.prehistory: {error}") from error
     if kind == REFERENCE_ANALYTIC_EXPONENTIAL:
         if "coefficient_matrix" not in data or "decay" not in data:
             raise AssessmentCaseError(
@@ -1557,6 +1573,13 @@ def load_hydro_spectrum(case: AssessmentCase, inputs: LinearDevelopmentInputs,
                 f"match the provenance's recorded wave selection "
                 f"({wave[key]!r}); the case selection is bound prospectively"
             )
+    recorded = provenance.to_dict()["wave"].get("prehistory")
+    if (recorded is None) != ("prehistory" not in reference) or (
+            recorded is not None and json.loads(json.dumps(recorded)) != reference["prehistory"]):
+        raise AssessmentRefusalError(
+            "the case's declared prehistory does not match the provenance's recorded "
+            "regular-wave prehistory (both absent, or identical)"
+        )
 
     anyhydro = _import_anyhydro()
     dataset_payload = _read_project_sidecar(
@@ -2160,6 +2183,17 @@ def _assess_regular_wave(case, inputs, channels, spectrum, checks, arrays):
     expected_forces = (
         f_hat[None, :] * np.exp(-1j * omega * times)[:, None]
     ).real
+    detail = "stored input forces vs Re(F_hat exp(-i omega t)) at absolute times"
+    if "prehistory" in case.reference:
+        # The history force of the declared periodic prehistory, recomputed from the
+        # stored kernel (the same lags the solver integrates).
+        history = _history_force(case, inputs)
+        expected_forces = expected_forces - history
+        detail += " minus the recomputed periodic-prehistory history force"
+        arrays["prehistory"] = {
+            "kind": case.reference["prehistory"]["kind"],
+            "max_abs_history_force_n": float(np.max(np.abs(history))),
+        }
     stored_forces = np.asarray(inputs.forces, dtype=float)
     checks.append(
         _plain(
@@ -2169,7 +2203,7 @@ def _assess_regular_wave(case, inputs, channels, spectrum, checks, arrays):
             np.abs(expected_forces),
             criteria["force_match_relative"],
             criteria["force_match_absolute_n"],
-            "stored input forces vs Re(F_hat exp(-i omega t)) at absolute times",
+            detail,
         )
     )
     qhat_fd, a_omega, b_omega = _fd_reference(inputs, case, spectrum)
@@ -2708,7 +2742,7 @@ def assess_result(case: AssessmentCase, result: ResultRecord,
     return _build_report(case, result, checks, arrays)
 
 
-def _same_physical_model(inputs_coarse, inputs_fine, ratio: int) -> None:
+def _same_physical_model(inputs_coarse, inputs_fine, ratio: int, history=None) -> None:
     for name in ("mass_dry", "added_mass_infinite", "damping", "stiffness"):
         coarse = np.asarray(getattr(inputs_coarse, name), dtype=float)
         fine = np.asarray(getattr(inputs_fine, name), dtype=float)
@@ -2736,11 +2770,30 @@ def _same_physical_model(inputs_coarse, inputs_fine, ratio: int) -> None:
         )
     fine_forces = np.asarray(inputs_fine.forces, dtype=float)
     coarse_forces = np.asarray(inputs_coarse.forces, dtype=float)
-    if not np.array_equal(coarse_forces, fine_forces[::ratio]):
+    if history is None:
+        same = np.array_equal(coarse_forces, fine_forces[::ratio])
+    else:
+        # Declared periodic prehistory: each member stores F_wave - H with its own
+        # kernel's history force H. The same physical (wave) forcing is compared after
+        # adding each member's recomputed H back, to a roundoff identity bound.
+        coarse_wave = coarse_forces + history[0]
+        fine_wave = (fine_forces + history[1])[::ratio]
+        bound = PREHISTORY_FORCING_IDENTITY_RELATIVE * max(
+            float(np.max(np.abs(coarse_wave))), float(np.max(np.abs(history[0]))),
+            float(np.max(np.abs(history[1]))), 1.0e-300)
+        same = coarse_wave.shape == fine_wave.shape and bool(
+            np.max(np.abs(coarse_wave - fine_wave)) <= bound)
+    if not same:
         raise AssessmentRefusalError(
             "the sampled forcing differs at the shared times; refinement "
             "compares the same physical forcing"
         )
+
+
+def _history_force(case: AssessmentCase, inputs) -> np.ndarray:
+    return periodic_prehistory_force(
+        np.asarray(inputs.radiation_kernel, dtype=float), inputs.dt, inputs.t0, inputs.n_steps,
+        case.omega, declaration_phasor(case.reference["prehistory"]))
 
 
 def assess_refinement(case_coarse: AssessmentCase, case_fine: AssessmentCase,
@@ -2787,7 +2840,13 @@ def assess_refinement(case_coarse: AssessmentCase, case_fine: AssessmentCase,
             "the fine case's refinement partner hash does not match the "
             "coarse case"
         )
-    _same_physical_model(inputs_coarse, inputs_fine, ratio)
+    if case_coarse.reference.get("prehistory") != case_fine.reference.get("prehistory"):
+        raise AssessmentRefusalError(
+            "refinement compares the same declared prehistory; it differs between the cases")
+    history = None
+    if case_coarse.reference.get("prehistory") is not None:
+        history = (_history_force(case_coarse, inputs_coarse), _history_force(case_fine, inputs_fine))
+    _same_physical_model(inputs_coarse, inputs_fine, ratio, history)
     if case_coarse.reference["kind"] != case_fine.reference["kind"]:
         raise AssessmentRefusalError("refinement requires the same reference kind")
     if case_coarse.reference["kind"] == REFERENCE_ANALYTIC_EXPONENTIAL:

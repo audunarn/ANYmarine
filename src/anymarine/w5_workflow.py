@@ -172,9 +172,13 @@ def _validate(data):
         for wave in data['regular_waves']:
             # Either an explicit initial state, or (owner decision 2026-10-13) the declared
             # FD reference steady state, computed by the workflow before registration.
+            # Optionally (owner decision 2026-10-13) the same FD motion is declared as the
+            # periodic prehistory before t0, completing the solver's zero-prehistory memory.
             if 'initial_state' in wave:
-                _keys(wave, ('omega', 'heading', 'amplitude', 'phase', 'windows', 'initial_state'), 'wave')
+                optional = ('prehistory',) if 'prehistory' in wave else ()
+                _keys(wave, ('omega', 'heading', 'amplitude', 'phase', 'windows', 'initial_state') + optional, 'wave')
                 _require(wave['initial_state'] == 'fd_steady_state', "wave.initial_state must be 'fd_steady_state'")
+                _require(wave.get('prehistory', 'periodic') == 'periodic', "wave.prehistory must be 'periodic'")
             else:
                 _keys(wave, ('omega', 'heading', 'amplitude', 'phase', 'windows', 'q0', 'v0'), 'wave')
             omega = _number(wave['omega'], 'omega', positive=True)
@@ -309,6 +313,8 @@ def _case_spec(case, project, run, role, partner, artifact):
         omega = wave['omega']
         reference.update(omega=omega, heading=wave['heading'], wave_amplitude=wave['amplitude'],
                          wave_phase=wave['phase'])
+        if run.get('prehistory') is not None:
+            reference['prehistory'] = run['prehistory']
         wi = list(artifact.omegas).index(omega)
         di = list(artifact.wave_directions).index(wave['heading'])
         force = artifact.excitation_force[wi, di] * wave['amplitude'] * np.exp(1j * wave['phase'])
@@ -451,6 +457,8 @@ def execute_w5_case(out_dir, *, backend, execution_limits, should_cancel=None):
                          v0=[float(v) for v in (-1j * wave['omega'] * qhat * phase).real])
             _write(start_root / 'fd-start.json', dict(reference_case_hash=reference_case.case_hash,
                    qhat=[[float(v.real), float(v.imag)] for v in qhat], t0=float(data['t0']), **state))
+            if run['wave'].get('prehistory') == 'periodic':
+                run['prehistory'] = dict(kind='periodic', qhat=[[float(v.real), float(v.imag)] for v in qhat])
             return state
 
         pairs = []
@@ -470,6 +478,8 @@ def execute_w5_case(out_dir, *, backend, execution_limits, should_cancel=None):
                 project = _project(source_case, level)
                 service.save_current(project, member_root)
                 wave = None if run['wave'] is None else {k: run['wave'][k] for k in ('omega', 'heading', 'amplitude', 'phase')}
+                if run.get('prehistory') is not None:
+                    wave['prehistory'] = run['prehistory']
                 options = dict(n_steps=data['frames'][role], t0=data['t0'],
                     criteria=data['reconstruction_criteria'], q0=run['state']['q0'], v0=run['state']['v0'],
                     surge_link_stiffness=data['surge_link_stiffness'], wave=wave,
