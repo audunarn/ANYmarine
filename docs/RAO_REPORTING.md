@@ -160,8 +160,10 @@ The category is derived from the inputs at case registration and cannot be chose
   as soon as it exists; the per-run wall limit is enforced through the solver's cancel hook.
 - Service (with slice 9): table/campaign snapshots and output re-admission for the GUI job.
 - CLI: `rao-prepare`, `rao-table`, `rao-run` (the FD table, campaign, comparison, report, CSV and
-  run records). Exit codes: 0 pass (or table written), 3 nogo, 1 refusal/failure (a
-  `failure.json` marker is written once an output directory exists), 2 usage error.
+  run records). Exit codes: 0 completed (table written, or a report whose verdict is pass,
+  reported_only or not_adjudicated: read the verdict in the report), 3 report verdict nogo,
+  1 refusal/failure (a `failure.json` marker is written once an output directory exists),
+  2 usage error.
 - Artifacts: `rao_table.json`, `rao_extraction.json` per run and `rao_report.json`
   (hashes exclude `created_utc`), plus CSV files `rao_table.csv`, `rao_td.csv`,
   `contribution_forces.csv` and `comparison.csv`. Stored under `<project>/rao/`. Campaign

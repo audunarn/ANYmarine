@@ -414,22 +414,43 @@ def _perturbed(states, nodes, body_ids, q, v=None):
     return out, MooringNodeState(positions, v[n:].reshape(-1, 3), np.zeros_like(positions))
 
 
-def mooring_tension_gradient(model, states, nodes, *, step=1e-6, rates=False):
-    """d(segment tension)/dq (or d/dqdot with ``rates``) by central differences of the public assembly."""
+def mooring_tension_gradient(model, states, nodes, *, step=1e-6, rates=False, min_step=1e-13,
+                             agreement=1e-6):
+    """d(segment tension)/dq (or d/dqdot with ``rates``) by central differences of the public assembly.
+
+    Tension is clipped at zero, so a step that crosses the clipping boundary averages
+    two branches. The step is reduced tenfold until two successive steps agree to
+    ``agreement`` (relative to the gradient scale); if no step down to ``min_step``
+    agrees, the point is too close to slack for a local derivative and is refused.
+    """
     mooring = model.mooring
     body_ids = tuple(model.body_ids)
     states = stationary_states({bid: states[bid] for bid in body_ids})
     nodes = stationary_nodes(nodes)
     zero = np.zeros(mooring.size)
-    columns = []
-    for j in range(mooring.size):
-        e = np.zeros(mooring.size)
-        e[j] = step
-        args = ((zero, e), (zero, -e)) if rates else ((e, None), (-e, None))
-        plus = mooring.evaluate(*_perturbed(states, nodes, body_ids, *args[0]), time=0.0).tensions
-        minus = mooring.evaluate(*_perturbed(states, nodes, body_ids, *args[1]), time=0.0).tensions
-        columns.append((np.asarray(plus) - np.asarray(minus)) / (2 * step))
-    return np.column_stack(columns)
+
+    def gradient(h):
+        columns = []
+        for j in range(mooring.size):
+            e = np.zeros(mooring.size)
+            e[j] = h
+            args = ((zero, e), (zero, -e)) if rates else ((e, None), (-e, None))
+            plus = mooring.evaluate(*_perturbed(states, nodes, body_ids, *args[0]), time=0.0).tensions
+            minus = mooring.evaluate(*_perturbed(states, nodes, body_ids, *args[1]), time=0.0).tensions
+            columns.append((np.asarray(plus) - np.asarray(minus)) / (2 * h))
+        return np.column_stack(columns)
+
+    previous = gradient(step)
+    h = step
+    while h / 10.0 >= min_step:
+        h /= 10.0
+        current = gradient(h)
+        scale = max(float(np.max(np.abs(current))), float(np.max(np.abs(previous))), 1e-300)
+        if float(np.max(np.abs(current - previous))) <= agreement * scale:
+            return current
+        previous = current
+    raise RaoLinearizationError('segment tension is not differentiable at the linearization point '
+                                '(near slack); the taut linearization is not admitted')
 
 
 def mooring_linear_tension_minimum(model, states, nodes, response, omega, static_tension):

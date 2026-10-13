@@ -249,3 +249,30 @@ def test_p6_case_id_is_ascii_only():
     for bad in ('é', '١', 'naïve-case'):
         with pytest.raises(rc.RaoCaseError, match='case_id'):
             case(case_id=bad)
+
+
+# ---------------------------------------------------------------- round 7
+@requires_solver
+def test_v1_near_slack_gradient_stays_on_the_active_branch():
+    from anymarine.native_inputs import NativeMechanicalInputs
+    from anymarine.mechanics import prepare_native_nodes
+    from test_rao_mooring import taut_project, SPAN, EA
+    p = taut_project()
+    data = p.native_inputs.to_dict()
+    rest = SPAN - 1e-7                                     # static extension far below the default FD step
+    for line in data['mooring']['data']['lines']:
+        line['rest_lengths'] = [rest, rest]
+    k = data['links'][0]['stiffness'][0][0]
+    data['links'][0]['rest_translation'][0] = 4.0 - EA * (SPAN - rest) / rest / k
+    calm = rl.wave_free_project(p.with_edits(native_inputs=NativeMechanicalInputs.from_dict(data)))
+    model, states, spec = prepare_native_run(calm)
+    G = rl.mooring_tension_gradient(model, states, prepare_native_nodes(calm))
+    assert G[1, 0] == pytest.approx(EA / rest, rel=1e-6)     # not the branch-averaged ~EA/(2 L0)
+
+
+def test_v2_non_finite_or_boolean_numbers_are_refused():
+    from anymarine.qtapp import rao_panel
+    assert not rao_panel._is_vector([[True, False]], 1)
+    assert not rao_panel._is_vector([[10 ** 1000, 0]], 1)
+    assert not rao_panel._is_vector([[float('nan'), 0.0]], 1)
+    assert rao_panel._is_vector([[1, 0.5]], 1)

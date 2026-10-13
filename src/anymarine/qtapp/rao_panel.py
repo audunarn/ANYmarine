@@ -53,13 +53,24 @@ def load_results(directory):
     from ..rao_report import _hash
     try:
         return _load_results(directory, read_case_artifact, RaoCaseError, _hash)
-    except (TypeError, KeyError, AttributeError) as error:
+    except RaoResultError:
+        raise
+    except (TypeError, KeyError, AttributeError, ValueError, OverflowError) as error:
         raise RaoResultError(f'RAO artifacts are malformed: {error!r}') from error
+
+
+def _finite_number(x):
+    if type(x) not in (int, float):          # bool is refused (type(True) is bool)
+        return False
+    try:
+        return math.isfinite(float(x))
+    except OverflowError:
+        return False
 
 
 def _is_vector(value, length):
     return isinstance(value, list) and len(value) == length and all(
-        isinstance(p, list) and len(p) == 2 and all(isinstance(x, (int, float)) for x in p) for p in value)
+        isinstance(p, list) and len(p) == 2 and all(_finite_number(x) for x in p) for p in value)
 
 
 def _load_results(directory, read_case_artifact, RaoCaseError, _hash):
@@ -364,7 +375,7 @@ class RaoPanel(QWidget):
             self.project_changed()
             self.refresh()
             self._fill_checks()
-        except (KeyError, TypeError, ValueError, IndexError) as error:
+        except (KeyError, TypeError, ValueError, IndexError, OverflowError) as error:
             self._clear()
             self.status.setText(f'results could not be displayed: {error}')
             return

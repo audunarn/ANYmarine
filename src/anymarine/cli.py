@@ -857,8 +857,12 @@ def _cmd_rao_run(args) -> int:
             (out / 'rao_report.json').write_text(json.dumps(report, indent=1), encoding='utf-8')
             rao_report.write_csv(out, table, report)
         except BaseException as error:
-            # Any failure (interrupts included) after the output directory exists leaves a marker.
-            (out / 'failure.json').write_text(json.dumps(dict(error=repr(error))), encoding='utf-8')
+            # Any failure (interrupts included) after the output directory exists leaves a marker;
+            # a failure to write the marker never replaces the original exception.
+            try:
+                (out / 'failure.json').write_text(json.dumps(dict(error=repr(error))), encoding='utf-8')
+            except Exception:
+                pass
             raise
     except (OSError, ValueError) as error:
         raise ServiceError(f'RAO run refused: {error}') from error
