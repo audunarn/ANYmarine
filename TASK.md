@@ -1,3 +1,16 @@
+## Current — W5 v6: free decay passes; regular-wave case wave-0 NOGO, 2026-10-13
+
+v6 (w5-physical-20261013c; dt 0.025/0.0125, kernel horizon 250 s, A_inf calibrated on the fine
+grid): source PASS, reconstruction PASS, free decay decay-0 PASS (both members and the paired
+time-step refinement). Regular-wave wave-0 (omega 2, amplitude 0.02 m, start from rest) fine
+member NOGO; wave-1/wave-2 not reached. Two independent causes, nothing tuned:
+1. Start-from-rest transient in the free common-surge mode (no restoring, little low-frequency
+   damping) does not decay: surge max |q| 1.52 m vs heave 0.03 m, surge fit residual 0.017 m
+   (heave 2.8e-4 m), surge RAO 7 % / 4 deg off while heave matches FD to ~1e-3 relative.
+2. hydro_impedance_sensitivity (raw vs processed impedance, per-coefficient 1 %) fails: max
+   deviation 1.80 J on a small coupling entry vs matrix scale 6512 J (0.03 % of the scale);
+   hydro_response_sensitivity (2 %) passes. Owner decisions requested. W5 NO_GO.
+
 ## Current — W5 v4/v5, R5 evaluated, RAO reporting in progress, 2026-10-12
 
 W5 v4 (owner: extended band; evidence w5-physical-20261013, case v4 band10 l1015): source
