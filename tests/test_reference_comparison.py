@@ -287,3 +287,23 @@ def test_non_simple_deck_outlines_are_refused():
     collinear = np.array([[0.0, 0.0], [1.0, 0.0], [2.0, 0.0]])
     with pytest.raises(ValueError):
         tool._ear_clip([0, 1, 2], collinear)
+
+
+def test_extractor_mean_drift_block_is_si_and_omits_missing_methods():
+    extractor = _load_tool('orcawave_extract')
+
+    class Fake:
+        meanDriftHeadingPairs = np.array([[0.0, 0.0], [0.0, 90.0]])
+        meanDriftLoadControlSurface = np.ones((2, 3, 6), complex) * (2.0 + 0.5j)
+        meanDriftLoadMomentumConservation = np.full((2, 3, 6), 1.5 + 0j)
+        meanDriftLoadPressureIntegration = None          # not calculated by OrcaWave
+
+    block = extractor._mean_drift(Fake())
+    assert set(block['methods']) == {'control_surface', 'momentum_conservation'}
+    assert block['methods']['control_surface'][1][2][5] == [2000.0, 500.0]
+    assert block['methods']['momentum_conservation'][0][0][0] == [1500.0, 0.0]
+    assert block['heading_pairs_deg'] == [[0.0, 0.0], [0.0, 90.0]]
+
+    class Empty:
+        meanDriftHeadingPairs = np.zeros((0, 2))
+    assert extractor._mean_drift(Empty()) is None

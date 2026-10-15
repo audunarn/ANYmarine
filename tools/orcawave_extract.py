@@ -39,6 +39,33 @@ def _matrix(m, scale=1.0):
     return [[float(v) * scale for v in row] for row in m]
 
 
+def _mean_drift(d):
+    """OrcaWave mean drift loads per unit wave amplitude squared, SI (kN -> N, kN.m -> N.m), or None.
+
+    Methods are included only when OrcaWave calculated them (an empty array is omitted). Values stay complex as
+    reported ([heading pair][period][dof] [re, im]); equal-heading pairs are real by construction.
+    """
+    import numpy as np
+    pairs = np.asarray(d.meanDriftHeadingPairs, dtype=float)
+    if pairs.ndim != 2 or pairs.size == 0:
+        return None
+    methods = {}
+    for name, attribute in (('control_surface', 'meanDriftLoadControlSurface'),
+                            ('momentum_conservation', 'meanDriftLoadMomentumConservation'),
+                            ('pressure_integration', 'meanDriftLoadPressureIntegration')):
+        values = getattr(d, attribute, None)
+        array = None if values is None else np.asarray(values)
+        if array is None or array.ndim != 3 or array.size == 0:
+            continue
+        si = array.astype(complex) * KILONEWTON
+        methods[name] = [[_pairs(row) for row in per_pair] for per_pair in si]
+    if not methods:
+        return None
+    return dict(heading_pairs_deg=[[float(a), float(b)] for a, b in pairs], methods=methods,
+                units='N/m^2 (forces), N.m/m^2 (moments) per unit wave amplitude squared',
+                layout='[heading pair][period][dof] complex [re, im] as reported by OrcFxAPI; periods as periods_s')
+
+
 def _optional_text(value):
     return None if value is None else str(value)
 
@@ -133,6 +160,7 @@ def extract(owr: Path, out: Path) -> dict:
         displacement_raos=[[_pairs(row) for row in per_heading] for per_heading in displacement],
         load_raos_diffraction_si=[[_pairs(row) for row in per_heading] for per_heading in load_diffraction],
         load_raos_haskind_si=[[_pairs(row) for row in per_heading] for per_heading in load_haskind],
+        mean_drift=_mean_drift(d),
         layout=dict(raos='[heading][period][dof] complex [re, im] as reported by OrcFxAPI',
                     dofs=['surge', 'sway', 'heave', 'roll', 'pitch', 'yaw'],
                     matrices='[period][6][6]', rotation_units='rad (displacement RAOs rad/m)'),
