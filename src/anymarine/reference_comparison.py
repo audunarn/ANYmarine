@@ -57,10 +57,16 @@ def _require(condition: bool, message: str) -> None:
 
 
 def build(*, title: str, notes: list[str], body: dict, periods_s: list[float], headings_deg: list[float],
-          sources: list[dict]) -> dict:
-    """A complete, hashed artifact; validated exactly as :func:`load` would."""
+          sources: list[dict], environment: dict | None = None) -> dict:
+    """A complete, hashed artifact; validated exactly as :func:`load` would.
+
+    ``environment`` (optional): ``{'water_depth_m': depth or None for infinite depth}`` for the animated
+    incident wave; without it the view assumes deep water.
+    """
     data = dict(artifact=ARTIFACT, title=title, notes=list(notes), body=body, periods_s=list(periods_s),
                 headings_deg=list(headings_deg), dofs=list(DOFS), sources=list(sources))
+    if environment is not None:
+        data['environment'] = dict(environment)
     data['artifact_hash'] = artifact_hash(data)
     validate(data)
     return data
@@ -122,6 +128,11 @@ def validate(data) -> None:
              'display mesh positions must be finite (x, y, z)')
     _require(all(isinstance(t, list) and len(t) == 3 and all(type(i) is int and 0 <= i < n_nodes for i in t)
                  for t in mesh['triangles']), 'display mesh triangles must index the positions')
+    if 'environment' in data:
+        env = data['environment']
+        _require(isinstance(env, dict) and set(env) == {'water_depth_m'}, 'environment holds water_depth_m only')
+        depth = env['water_depth_m']
+        _require(depth is None or (_finite(depth) and depth > 0), 'water depth must be positive or null (infinite)')
     sources = data['sources']
     _require(isinstance(sources, list) and len(sources) >= 1, 'at least one source is required')
     labels = set()
@@ -140,6 +151,40 @@ def validate(data) -> None:
                 _require(isinstance(row, list) and len(row) == len(DOFS) and all(
                     isinstance(z, list) and len(z) == 2 and all(_finite(v) for v in z) for z in row),
                     'each RAO row needs six finite [re, im] pairs')
+
+
+def water_depth(data: dict):
+    """Declared water depth in m, or None for infinite (also when the artifact declares none)."""
+    return data.get('environment', {}).get('water_depth_m')
+
+
+def motion_rao(data: dict, *, source: int, heading: float, period: float) -> list[complex]:
+    """Six complex displacement RAOs (m/m, rad/m) of one source at one heading and period."""
+    h = data['headings_deg'].index(heading)
+    p = data['periods_s'].index(period)
+    return [complex(*z) for z in data['sources'][source]['raos'][h][p]]
+
+
+def pose(rao: list[complex], *, amplitude: float, omega: float, time: float):
+    """Translation (m) and rotation vector (rad) at ``time``: Re{X A exp(-i w t)} per DOF."""
+    phasor = complex(math.cos(omega * time), -math.sin(omega * time))
+    values = [(x * amplitude * phasor).real for x in rao]
+    return values[:3], values[3:]
+
+
+def rigid_motion(translation, rotation):
+    """4 x 4 transform: rotation by the rotation vector (Rodrigues; exact, also for small RAO angles) about the
+    body origin, then the translation."""
+    import numpy as np
+    vector = np.asarray(rotation, dtype=float)
+    angle = float(np.linalg.norm(vector))
+    matrix = np.eye(4)
+    if angle > 0.0:
+        k = vector / angle
+        K = np.array([[0.0, -k[2], k[1]], [k[2], 0.0, -k[0]], [-k[1], k[0], 0.0]])
+        matrix[:3, :3] = np.eye(3) + math.sin(angle) * K + (1.0 - math.cos(angle)) * (K @ K)
+    matrix[:3, 3] = np.asarray(translation, dtype=float)
+    return matrix
 
 
 def series(data: dict, *, heading: float, display: str = 'amplitude', x_axis: str = 'period') -> dict:

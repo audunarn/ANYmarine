@@ -18,9 +18,12 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def synthetic(n_sources=2, periods=(4.0, 8.0, 12.0), headings=(0.0, 90.0)):
+    # closed, outward-oriented box straddling the waterline (the wave preview requires a closed envelope)
+    corners = [[x, y, z] for x in (-2.0, 2.0) for y in (-1.0, 1.0) for z in (-1.0, 0.5)]
+    faces = [[0, 1, 3], [0, 3, 2], [4, 6, 7], [4, 7, 5], [0, 4, 5], [0, 5, 1],
+             [2, 3, 7], [2, 7, 6], [0, 2, 6], [0, 6, 4], [1, 5, 7], [1, 7, 3]]
     body = dict(name='Synthetic box', mass_kg=1000.0, centre_of_mass_m=[0.0, 0.0, -0.5],
-                display_mesh=dict(positions=[[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]],
-                                  triangles=[[0, 1, 2], [0, 1, 3], [0, 2, 3], [1, 2, 3]]))
+                display_mesh=dict(positions=corners, triangles=faces))
     sources = []
     for s in range(n_sources):
         raos = [[[[0.1 * (k + 1) * (1 + s * 0.01), 0.01 * p] for k in range(6)] for p in range(len(periods))]
@@ -122,7 +125,7 @@ def test_builder_tool_mirrors_mesh_and_conjugates_orcawave(tmp_path):
     assert data['body']['name'] == 'Vessel'
     positions = np.array(data['body']['display_mesh']['positions'])
     assert positions[:, 1].min() == -1.0 and positions[:, 1].max() == 1.0      # mirrored across y = 0
-    assert len(data['body']['display_mesh']['triangles']) == 4
+    assert len(data['body']['display_mesh']['triangles']) >= 4         # closed into a box by the display builder
     orcawave, other_source = data['sources']
     assert orcawave['label'] == 'OrcaWave' and orcawave['raos'][0][0][0] == [1.0, -0.5]   # conjugated
     assert other_source['raos'][1][1][5] == [0.9, -0.4]
@@ -199,7 +202,7 @@ def test_single_load_method_provenance(tmp_path):
     ref = json.loads((tmp_path / 'extract' / 'orcawave_reference.json').read_text())
     ref['settings'] = dict(load_rao_method='Diffraction', preferred_load_rao_method=None)
     (tmp_path / 'extract' / 'orcawave_reference.json').write_text(json.dumps(ref))
-    _, source, _, _ = tool.orcawave_parts(tmp_path / 'extract')
+    _, source, _, _, _ = tool.orcawave_parts(tmp_path / 'extract')
     assert source['method'].endswith('from Diffraction loads') and 'None' not in source['method']
 
 
@@ -215,3 +218,72 @@ def test_extractor_writes_a_full_gdf_for_unsymmetric_bodies(tmp_path):
     assert lines[2].split()[:2] == ['0', '0'] and lines[3].split()[0] == '2'
     positions, triangles = _load_tool('reference_comparison').read_gdf(tmp_path / 'full.gdf')
     assert len(positions) == 5 and len(triangles) == 3        # quad -> 2, padded triangle -> 1
+
+
+# ---- L6 motion helpers ----------------------------------------------------------------------------------------
+
+def test_pose_is_the_real_part_of_the_rao_phasor():
+    from anymarine.reference_comparison import motion_rao, pose
+    data = synthetic()
+    rao = motion_rao(data, source=1, heading=90.0, period=8.0)
+    omega, t, a = 2 * math.pi / 8.0, 1.7, 1.3
+    translation, rotation = pose(rao, amplitude=a, omega=omega, time=t)
+    expected = [(x * a * complex(math.cos(omega * t), -math.sin(omega * t))).real for x in rao]
+    assert translation + rotation == pytest.approx(expected, abs=1e-12)
+
+
+def test_rigid_motion_is_a_proper_rotation_about_the_origin():
+    from anymarine.reference_comparison import rigid_motion
+    m = rigid_motion([1.0, 2.0, 3.0], [0.0, 0.0, math.pi / 2])
+    assert np.allclose(m[:3, :3] @ [1.0, 0.0, 0.0], [0.0, 1.0, 0.0])
+    assert np.allclose(m[:3, 3], [1.0, 2.0, 3.0]) and np.isclose(np.linalg.det(m[:3, :3]), 1.0)
+    small = rigid_motion([0, 0, 0], [0.01, -0.02, 0.005])
+    assert np.allclose(small[:3, :3], np.eye(3) + np.array([[0, -0.005, -0.02], [0.005, 0, -0.01], [0.02, 0.01, 0]]),
+                       atol=5e-4)
+    assert np.array_equal(rigid_motion([0, 0, 0], [0, 0, 0]), np.eye(4))
+
+
+def test_environment_depth_is_optional_and_validated():
+    from anymarine.reference_comparison import validate, water_depth
+    data = synthetic()
+    assert water_depth(data) is None
+    data['environment'] = {'water_depth_m': 400.0}
+    data['artifact_hash'] = artifact_hash(data)
+    validate(data)
+    assert water_depth(data) == 400.0
+    data['environment'] = {'water_depth_m': -1.0}
+    data['artifact_hash'] = artifact_hash(data)
+    with pytest.raises(ReferenceComparisonError, match='depth'):
+        validate(data)
+
+
+def test_display_mesh_closes_a_half_hull_with_topsides_and_deck(tmp_path):
+    from collections import Counter
+    tool = _load_tool('reference_comparison')
+    # half box (y >= 0), wet panels to z = 0 and a separate topside panel to z = 2 without shared nodes (as in Rhino)
+    panels = [[[0, 0, -1], [4, 0, -1], [4, 1, -1], [0, 1, -1]],          # bottom
+              [[0, 1, -1], [4, 1, -1], [4, 1, 0], [0, 1, 0]],            # side
+              [[0, 0, -1], [0, 1, -1], [0, 1, 0], [0, 0, 0]],            # stern
+              [[4, 0, -1], [4, 0, 0], [4, 1, 0], [4, 1, -1]],            # bow
+              [[0, 1, 0.0001], [4, 1, 0.0001], [4, 1, 2], [0, 1, 2]]]    # topside (not shared)
+    lines = ['x', '1 9.80665', '0 1', f'{len(panels)}'] + [' '.join(map(str, v)) for p in panels for v in p]
+    (tmp_path / 'h.gdf').write_text('\n'.join(lines) + '\n', encoding='utf-8')
+    positions, triangles = tool.display_mesh(tmp_path / 'h.gdf')
+    v, t = np.asarray(positions), np.asarray(triangles)
+    undirected = Counter(tuple(sorted(e)) for a, b, c in t for e in ((a, b), (b, c), (c, a)))
+    directed = Counter(e for a, b, c in t for e in ((a, b), (b, c), (c, a)))
+    assert all(n == 2 for n in undirected.values()) and all(n == 1 for n in directed.values())
+    volume = sum(np.dot(v[a], np.cross(v[b], v[c])) for a, b, c in t) / 6.0
+    assert volume == pytest.approx(4 * 2 * (1 + 2))               # wet 8 m3 + topsides to the 2 m freeboard 16 m3
+
+
+def test_non_simple_deck_outlines_are_refused():
+    tool = _load_tool('reference_comparison')
+    points = np.array([[0.0, 0.0], [2.0, 2.0], [0.0, 2.0], [2.0, 0.0]])      # bow-tie
+    with pytest.raises(ValueError, match='simple'):
+        tool._ear_clip([0, 1, 2, 3], points)
+    square = np.array([[0.0, 0.0], [2.0, 0.0], [2.0, 2.0], [0.0, 2.0]])
+    assert len(tool._ear_clip([0, 1, 2, 3], square)) == 2
+    collinear = np.array([[0.0, 0.0], [1.0, 0.0], [2.0, 0.0]])
+    with pytest.raises(ValueError):
+        tool._ear_clip([0, 1, 2], collinear)

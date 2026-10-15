@@ -181,10 +181,15 @@ class RaoAxes(QWidget):
         width, height = self.width(), self.height()
         metrics = QFontMetrics(font)
         left, right, top, bottom = 30 + metrics.horizontalAdvance('-00000.0'), 10, 10, 46
-        x0, x1, y0, y1 = left, width - right, top, height - bottom
-        painter.setPen(QColor('#202020'))
         bold = QFont(font)
         bold.setBold(True)
+        lines = [item for item in self._series if item.kind == 'line']
+        markers = [item for item in self._series if item.kind != 'line']
+        legend_rows = self._legend_rows(lines + markers, metrics, QFontMetrics(bold).horizontalAdvance(self._title),
+                                        width - right) if len(self._series) > 1 else []
+        bottom += 14 * max(len(legend_rows) - 1, 0)
+        x0, x1, y0, y1 = left, width - right, top, height - bottom
+        painter.setPen(QColor('#202020'))
         painter.setFont(bold)
         painter.drawText(6, height - 6, self._title)
         painter.setFont(font)
@@ -228,8 +233,6 @@ class RaoAxes(QWidget):
         painter.rotate(-90)
         painter.drawText(0, 0, self._ylabel)
         painter.restore()
-        lines = [item for item in self._series if item.kind == 'line']
-        markers = [item for item in self._series if item.kind != 'line']
         for i, item in enumerate(lines):
             painter.setPen(QPen(QColor(self.LINE_COLORS[i % len(self.LINE_COLORS)]), 1.4))
             points = [QPointF(fx(x), fy(y)) for x, y in zip(item.xs, item.ys)]
@@ -243,22 +246,47 @@ class RaoAxes(QWidget):
                 pnt = QPointF(fx(x), fy(y))
                 painter.drawLine(pnt + QPointF(-4, -4), pnt + QPointF(4, 4))
                 painter.drawLine(pnt + QPointF(-4, 4), pnt + QPointF(4, -4))
-        if len(self._series) > 1:
-            # Legend in the bottom strip, right of the DOF title (never over the curves).
+        # Legend in the bottom strip, right of the DOF title, wrapped upwards (never over the curves).
+        for row_index, row in enumerate(legend_rows):
             legend_x = x1
-            for i, item in reversed(list(enumerate(lines + markers))):
+            baseline = height - 6 - 14 * row_index
+            for i, item, text in reversed(row):
                 color = (self.LINE_COLORS[i % len(self.LINE_COLORS)] if item.kind == 'line'
                          else self.MARKER_COLORS[(i - len(lines)) % len(self.MARKER_COLORS)])
-                legend_x -= metrics.horizontalAdvance(item.label) + 26
+                legend_x -= metrics.horizontalAdvance(text) + 26
                 painter.setPen(QPen(QColor(color), 1.6))
                 if item.kind == 'line':
-                    painter.drawLine(QPointF(legend_x, height - 10), QPointF(legend_x + 14, height - 10))
+                    painter.drawLine(QPointF(legend_x, baseline - 4), QPointF(legend_x + 14, baseline - 4))
                 else:
-                    centre = QPointF(legend_x + 7, height - 10)
+                    centre = QPointF(legend_x + 7, baseline - 4)
                     painter.drawLine(centre + QPointF(-3, -3), centre + QPointF(3, 3))
                     painter.drawLine(centre + QPointF(-3, 3), centre + QPointF(3, -3))
                 painter.setPen(QColor('#202020'))
-                painter.drawText(QPointF(legend_x + 18, height - 6), item.label)
+                painter.drawText(QPointF(legend_x + 18, baseline), text)
+
+    @staticmethod
+    def _legend_rows(items, metrics, title_width, right_edge):
+        """Pack (index, item, text) into rows: the bottom row starts after the title, upper rows at the left.
+
+        An entry wider than an empty row is elided to fit, so no legend text leaves the widget.
+        """
+        rows, row, used = [], [], 0.0
+        for index, item in enumerate(items):
+            capacity = right_edge - (6 + title_width + 12 if not rows else 6)
+            needed = metrics.horizontalAdvance(item.label) + 26
+            if row and used + needed > capacity:
+                rows.append(row)
+                row, used = [], 0.0
+                capacity = right_edge - 6
+            text = item.label
+            if needed > capacity:
+                text = metrics.elidedText(item.label, Qt.TextElideMode.ElideRight, max(int(capacity) - 26, 10))
+                needed = metrics.horizontalAdvance(text) + 26
+            row.append((index, item, text))
+            used += needed
+        if row:
+            rows.append(row)
+        return rows
 
 
 class RaoGrid(QWidget):
@@ -297,6 +325,9 @@ class RaoPanel(QWidget):
     """Dock content; the window supplies ``_project_root``, ``_project`` and ``_dirty``."""
 
     results_loaded = Signal(str)
+    reference_animate = Signal(dict)
+    reference_stop = Signal()
+    reference_changed = Signal(str)        # artifact hash of the newly shown reference comparison
 
     def __init__(self, window, parent=None):
         super().__init__(parent)
@@ -583,9 +614,12 @@ class RaoPanel(QWidget):
         from .reference_view import ReferenceComparisonView
         if self.reference_view is None:
             self.reference_view = ReferenceComparisonView()
+            self.reference_view.animate_requested.connect(self.reference_animate.emit)
+            self.reference_view.stop_requested.connect(self.reference_stop.emit)
             self.tabs.addTab(self.reference_view, 'Reference')
         self.reference_view.set_artifact(data)
         self.tabs.setCurrentWidget(self.reference_view)
+        self.reference_changed.emit(data['artifact_hash'])
         self.status.setText(f"Reference comparison: {data['title']} (external programs, unqualified)")
 
     def _clear(self):

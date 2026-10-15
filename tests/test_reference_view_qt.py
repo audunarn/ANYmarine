@@ -123,3 +123,101 @@ def test_installed_layouts_skip_the_checkout_default_without_failing(qapp, monke
     finally:
         win._dirty = False
         win.close()
+
+
+def test_rao_motion_follows_the_wave_clock_and_stops_cleanly(qapp, window, tmp_path, monkeypatch):
+    import math
+    import numpy as np
+    from anymarine.reference_comparison import motion_rao, pose, rigid_motion
+    data = synthetic()
+    path = write(data, tmp_path / 'ref.json')
+    monkeypatch.setattr(window, '_l01_reference_candidates', lambda: [path])
+    window.load_l01_reference_example()
+    view = window._rao.reference_view
+    assert view.motion_period.currentData() == 4.0          # synthetic periods 4/8/12: nearest to 6 s
+    view.heading.setCurrentIndex(view.heading.findData(90.0))
+    view.motion_period.setCurrentIndex(view.motion_period.findData(8.0))
+    view.motion_source.setCurrentIndex(1)
+    view.motion_amplitude.setValue(1.5)
+    handle = window._handles[window._project.bodies[0].body_id]
+    rest = np.array(handle.transform, copy=True)
+    view.animate_button.click()
+    assert window._rao_motion is not None and window._waves.handle is not None
+    assert window._waves.amplitude.value() == 1.5 and window._waves.heading.value() == 90.0
+    assert window._waves.omega.value() == pytest.approx(2 * math.pi / 8.0, abs=1e-3)
+    window._waves.advance()                                  # one wave tick, then the vessel follows it
+    window._rao_motion_tick()
+    t = window._waves.time
+    assert t > 0
+    rao = motion_rao(data, source=1, heading=90.0, period=8.0)
+    expected = rigid_motion(*pose(rao, amplitude=1.5, omega=2 * math.pi / 8.0, time=t)) @ rest
+    assert np.allclose(handle.transform, expected, atol=1e-12)
+    assert 'unqualified' in window.statusBar().currentMessage()
+    view.stop_button.click()
+    assert window._rao_motion is None and window._waves.handle is None
+    assert np.allclose(handle.transform, rest)
+
+
+def _animate(qapp, window, tmp_path, monkeypatch):
+    path = write(synthetic(), tmp_path / 'ref.json')
+    monkeypatch.setattr(window, '_l01_reference_candidates', lambda: [path])
+    window.load_l01_reference_example()
+    view = window._rao.reference_view
+    view.heading.setCurrentIndex(view.heading.findData(90.0))
+    view.motion_period.setCurrentIndex(view.motion_period.findData(8.0))
+    view.animate_button.click()
+    return view
+
+
+def test_vessel_and_wave_share_the_same_frequency(qapp, window, tmp_path, monkeypatch):
+    _animate(qapp, window, tmp_path, monkeypatch)
+    assert window._rao_motion['omega'] == window._waves.omega.value()
+    assert window._waves.field['request']['omega'] == window._rao_motion['omega']
+
+
+def test_wave_reset_or_mode_change_ends_the_animation(qapp, window, tmp_path, monkeypatch):
+    _animate(qapp, window, tmp_path, monkeypatch)
+    window._waves.mode.setCurrentIndex(0)                    # Off
+    assert window._rao_motion is None
+    window._waves.mode.setCurrentIndex(1)                    # incident waves again: no stale motion resumes
+    window._waves.advance()
+    window._rao_motion_tick()
+    assert window._rao_motion is None
+    _animate(qapp, window, tmp_path, monkeypatch)
+    window._waves.amplitude.setValue(0.5)                    # changed wave inputs reset the panel
+    assert window._rao_motion is None
+
+
+def test_reference_rao_never_moves_another_project(qapp, window, tmp_path, monkeypatch):
+    view = _animate(qapp, window, tmp_path, monkeypatch)
+    assert window._rao_motion is not None
+    window.load_example()                                    # another project; the Reference tab stays
+    assert window._rao_motion is None
+    view.animate_button.click()
+    assert window._rao_motion is None and 'belong to that vessel' in window._rao.status.text()
+
+
+def test_long_legend_labels_are_elided_inside_the_plot(qapp):
+    from PySide6.QtGui import QFont, QFontMetrics
+    from anymarine.qtapp.rao_panel import RaoAxes
+    from anymarine.rao_view import Series
+    metrics = QFontMetrics(QFont('Arial', 8))
+    items = [Series('A very long program label that cannot fit anywhere in a narrow plot', 'line', (1,), (1,)),
+             Series('Short', 'line', (1,), (1,))]
+    rows = RaoAxes._legend_rows(items, metrics, 30, 200)
+    for row in rows:
+        width = sum(metrics.horizontalAdvance(text) + 26 for _, _, text in row)
+        assert width <= 200 - 6
+
+
+def test_replacing_the_reference_stops_motion_and_unbinds_the_vessel(qapp, window, tmp_path, monkeypatch):
+    view = _animate(qapp, window, tmp_path, monkeypatch)
+    assert window._rao_motion is not None
+    other = synthetic()
+    other['title'] = 'Another comparison'
+    from anymarine.reference_comparison import artifact_hash
+    other['artifact_hash'] = artifact_hash(other)
+    assert window._rao.open_reference(write(other, tmp_path / 'other.json'))
+    assert window._rao_motion is None and window._reference_binding is None
+    view.animate_button.click()
+    assert window._rao_motion is None and 'belong to that vessel' in window._rao.status.text()

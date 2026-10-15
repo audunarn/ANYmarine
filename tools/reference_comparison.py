@@ -38,10 +38,11 @@ def read_gdf(path: Path) -> tuple[list, list]:
         raise SystemExit(f'{path}: {npan} panels declared but only {len(numbers) // 12} present')
     corners = np.asarray(numbers[:npan * 12], dtype=float).reshape(npan, 4, 3)
     panels = [corners]
+    # each reflection reverses the vertex order, so mirrored panels keep the orientation of their originals
     if isx:
-        panels += [p * np.array([-1.0, 1.0, 1.0]) for p in list(panels)]
+        panels += [p[:, ::-1] * np.array([-1.0, 1.0, 1.0]) for p in list(panels)]
     if isy:
-        panels += [p * np.array([1.0, -1.0, 1.0]) for p in list(panels)]
+        panels += [p[:, ::-1] * np.array([1.0, -1.0, 1.0]) for p in list(panels)]
     positions, triangles, index = [], [], {}
 
     def vid(point):
@@ -60,9 +61,102 @@ def read_gdf(path: Path) -> tuple[list, list]:
     return positions, triangles
 
 
+def _ear_clip(loop: list, points: np.ndarray) -> list:
+    """Triangles of a simple polygon (plan view, counter-clockwise loop of vertex ids)."""
+    def cross(o, a, b):
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+
+    def inside(p, a, b, c):
+        return cross(a, b, p) >= -1e-12 and cross(b, c, p) >= -1e-12 and cross(c, a, p) >= -1e-12
+
+    n = len(loop)
+
+    def crosses(p1, p2, p3, p4):
+        d1, d2, d3, d4 = cross(p3, p4, p1), cross(p3, p4, p2), cross(p1, p2, p3), cross(p1, p2, p4)
+        return ((d1 > 1e-12 and d2 < -1e-12) or (d1 < -1e-12 and d2 > 1e-12)) and \
+               ((d3 > 1e-12 and d4 < -1e-12) or (d3 < -1e-12 and d4 > 1e-12))
+
+    for i in range(n):                                    # simple polygon: no two non-adjacent edges cross
+        for j in range(i + 2, n):
+            if i == 0 and j == n - 1:
+                continue
+            if crosses(points[loop[i]], points[loop[(i + 1) % n]], points[loop[j]], points[loop[(j + 1) % n]]):
+                raise ValueError('deck outline is not a simple polygon')
+    ring, out = list(loop), []
+    while len(ring) > 3:
+        for i in range(len(ring)):
+            a, b, c = ring[i - 1], ring[i], ring[(i + 1) % len(ring)]
+            pa, pb, pc = points[a], points[b], points[c]
+            if cross(pa, pb, pc) <= 1e-12:
+                continue
+            if any(inside(points[q], pa, pb, pc) for q in ring if q not in (a, b, c)):
+                continue
+            out.append([a, b, c])
+            ring.pop(i)
+            break
+        else:
+            raise ValueError('deck outline is not a simple polygon')
+    if cross(points[ring[0]], points[ring[1]], points[ring[2]]) <= 1e-12:
+        raise ValueError('deck outline leaves a degenerate triangle')
+    out.append(ring)
+    return out
+
+
+def display_mesh(path: Path) -> tuple[list, list]:
+    """Closed, outward-oriented display geometry: the GDF's wet panels (z <= 0), vertical topsides from the
+    waterline to the mesh's highest point and a flat deck. Display only - the hydrodynamics never use it.
+    Falls back to the plain GDF surface when the wet part has no single closed waterline.
+    """
+    positions, triangles = read_gdf(path)
+    v = np.asarray(positions)
+    wet = [tri for tri in triangles if np.all(v[tri, 2] <= 1e-9)]
+    edges = {}
+    for a, b, c in wet:
+        for e in ((a, b), (b, c), (c, a)):
+            edges[e] = edges.get(e, 0) + 1
+    boundary = [e for e in edges if (e[1], e[0]) not in edges]
+    following = {a: b for a, b in boundary}
+    if not boundary or len(following) != len(boundary) or any(abs(v[a, 2]) > 1e-9 for a, _ in boundary):
+        return positions, triangles
+    loop, start = [boundary[0][0]], boundary[0][0]
+    while following[loop[-1]] != start:
+        loop.append(following[loop[-1]])
+        if len(loop) > len(boundary):
+            return positions, triangles
+    if len(loop) != len(boundary):
+        return positions, triangles                       # several waterline loops (e.g. multi-hull)
+    freeboard = float(max(v[:, 2].max(), 0.0)) or 1.0
+    out_positions = [list(p) for p in v]
+    top = {}
+    for a in loop:
+        top[a] = len(out_positions)
+        out_positions.append([v[a, 0], v[a, 1], freeboard])
+    out = [list(tri) for tri in wet]
+    for a in loop:                                        # sides traverse each waterline edge opposite to the hull
+        b = following[a]
+        out += [[b, a, top[a]], [b, top[a], top[b]]]
+    # the deck traverses its edges opposite to the sides (which run top[a] -> top[b]): ring = reversed loop
+    plan = np.asarray(out_positions)[:, :2]
+    ring = [top[a] for a in reversed(loop)]
+    area = sum(plan[ring[i - 1], 0] * plan[ring[i], 1] - plan[ring[i], 0] * plan[ring[i - 1], 1]
+               for i in range(len(ring)))
+    try:
+        if area > 0:
+            out += _ear_clip(ring, plan)
+        else:                                             # clip counter-clockwise, then restore the ring's winding
+            out += [[a, c, b] for a, b, c in _ear_clip(ring[::-1], plan)]
+    except ValueError:
+        return positions, triangles                       # display-only fallback: the plain GDF surface
+    pts = np.asarray(out_positions)
+    volume = sum(np.dot(pts[a], np.cross(pts[b], pts[c])) for a, b, c in out) / 6.0
+    if volume < 0:
+        out = [[a, c, b] for a, b, c in out]
+    return [[float(x) for x in p] for p in out_positions], [[int(i) for i in tri] for tri in out]
+
+
 def orcawave_parts(directory: Path, body_name: str | None = None) -> tuple[dict, dict, list, list]:
     ref = json.loads((directory / 'orcawave_reference.json').read_text(encoding='utf-8'))
-    positions, triangles = read_gdf(directory / ref['body']['mesh_exported'])
+    positions, triangles = display_mesh(directory / ref['body']['mesh_exported'])
     body = dict(name=body_name or ref['body']['name'],
                 mass_kg=ref['body']['mass_kg'], centre_of_mass_m=ref['body']['centre_of_mass_m'],
                 display_mesh=dict(positions=positions, triangles=triangles))
@@ -75,7 +169,7 @@ def orcawave_parts(directory: Path, body_name: str | None = None) -> tuple[dict,
                   details=dict(file_sha256=ref['source']['sha256'][:16],
                                interior_surface_panels=ref['body']['interior_surface_panels'],
                                convention='conjugated to x = Re{X exp(-i w t)}'), raos=conj)
-    return body, source, ref['periods_s'], ref['headings_deg']
+    return body, source, ref['periods_s'], ref['headings_deg'], ref.get('environment', {}).get('water_depth_m')
 
 
 def npz_source(path: Path, periods: list, headings: list) -> dict:
@@ -102,10 +196,10 @@ def main(argv=None) -> None:
     parser.add_argument('--note', action='append', default=[])
     parser.add_argument('--out', required=True, type=Path)
     args = parser.parse_args(argv)
-    body, reference, periods, headings = orcawave_parts(args.orcawave, args.body_name)
+    body, reference, periods, headings, depth = orcawave_parts(args.orcawave, args.body_name)
     sources = [reference] + [npz_source(path, periods, headings) for path in args.source]
     data = build(title=args.title, notes=args.note, body=body, periods_s=periods, headings_deg=headings,
-                 sources=sources)
+                 sources=sources, environment=dict(water_depth_m=depth))
     write(data, args.out)
     print(f'wrote {args.out}: {len(sources)} sources, {len(periods)} periods, {len(headings)} headings, '
           f'hash {data["artifact_hash"][:12]}')

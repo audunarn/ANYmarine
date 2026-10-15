@@ -8,6 +8,7 @@ host=QtViewerHostAdapter())``; meshes are added once and replayed through
 from __future__ import annotations
 
 import json
+import math
 import os
 import sys
 from pathlib import Path
@@ -210,6 +211,15 @@ class MainWindow(QMainWindow):
         self._waves = WavesPanel(self)
         from .rao_panel import RaoPanel
         self._rao = RaoPanel(self)
+        # RAO motion animation of a reference comparison; it follows the Waves panel's own wave clock and is
+        # connected after the panel's advance(), so the vessel pose is set after the panel restores poses.
+        self._rao_motion = None
+        # (project, artifact hash) built for the loaded reference comparison: its RAOs may move only that vessel
+        self._reference_binding = None
+        self._rao.reference_animate.connect(self._start_rao_motion)
+        self._rao.reference_changed.connect(self._on_reference_changed)
+        self._rao.reference_stop.connect(self._stop_rao_motion)
+        self._waves.timer.timeout.connect(self._rao_motion_tick)
         self._build_context_panel()
         self._build_menus()
         self._build_toolbar()
@@ -975,11 +985,84 @@ class MainWindow(QMainWindow):
         self._set_project(project)
         self._dirty = False
         self._rao.show_reference(data)
+        self._reference_binding = (self._project, data['artifact_hash'])
         self._set_mode('rao')
         self.setWindowTitle(f"ANYmarine — {data['title']} (reference comparison, unqualified)")
         self.statusBar().showMessage('External reference comparison in RAO mode: one line per program; development, unqualified')
         self._diagnostics.appendPlainText(f'Loaded reference comparison {path} (hash {data["artifact_hash"][:12]}). '
                                           'External programs; not an ANYmarine RAO case; unqualified.')
+
+    def _start_rao_motion(self, request: dict) -> None:
+        """Animate the vessel with one source's RAOs in the matching incident regular wave."""
+        from ..reference_comparison import motion_rao, water_depth
+        data = getattr(self._rao.reference_view, 'data', None)
+        project = self._project
+        # Only the vessel built for this reference comparison may move with its RAOs.
+        binding = self._reference_binding
+        if (data is None or project is None or binding is None or project is not binding[0]
+                or data['artifact_hash'] != binding[1] or len(project.bodies) != 1):
+            self._rao.status.setText('Motion needs the reference comparison example loaded (File > Examples); '
+                                     'its RAOs belong to that vessel only')
+            return
+        self._stop_rao_motion()
+        waves = self._waves
+        omega = 2.0 * math.pi / request['period']
+        if not waves.omega.minimum() <= omega <= waves.omega.maximum():
+            self._rao.status.setText(f"Motion not started: {request['period']:g} s is outside the wave preview range "
+                                     f"{waves.omega.minimum():g}-{waves.omega.maximum():g} rad/s")
+            return
+        rao = motion_rao(data, source=request['source'], heading=request['heading'], period=request['period'])
+        depth = water_depth(data)
+        target_depth = waves.depth.maximum() if depth is None else depth
+        for control, value in ((waves.amplitude, request['amplitude']), (waves.omega, omega),
+                               (waves.heading, request['heading']), (waves.depth, target_depth)):
+            control.setValue(value)
+        waves.mode.setCurrentIndex(1)                 # incident waves, no body disturbance
+        body = project.bodies[0]
+        handle = self._handles.get(body.body_id)
+        if waves.handle is None or handle is None:
+            self._rao.status.setText(f'Motion not started: {waves.status.text()}')
+            return
+        # Vessel and wave share the wave panel's exact (displayed) frequency, so they never drift apart.
+        wave_omega = waves.omega.value()
+        drawn_depth = waves.depth.value()
+        waves.time = 0.0
+        self._rao_motion = dict(project=project, body_id=body.body_id, rao=rao, omega=wave_omega,
+                                amplitude=request['amplitude'], field=waves.field,
+                                rest=np.array(handle.transform, copy=True))
+        label = data['sources'][request['source']]['label']
+        declared = 'deep water' if depth is None else f'{depth:g} m'
+        depth_note = '' if depth == drawn_depth else f' (declared {declared}; wave drawn at {drawn_depth:g} m)'
+        self.statusBar().showMessage(
+            f"RAO motion: {label}, RAO at T = {request['period']:g} s, wave {wave_omega:.3f} rad/s, heading "
+            f"{request['heading']:g} deg, A = {request['amplitude']:g} m{depth_note} - linear, unqualified")
+        self._rao_motion_tick()
+
+    def _on_reference_changed(self, artifact_hash: str) -> None:
+        """Another reference comparison is shown: stop motion; its RAOs never move a vessel built for another."""
+        self._stop_rao_motion()
+        if self._reference_binding is not None and self._reference_binding[1] != artifact_hash:
+            self._reference_binding = None
+
+    def _stop_rao_motion(self) -> None:
+        if self._rao_motion is not None:
+            self._rao_motion = None
+            self._waves.reset()                       # hides the wave and restores the captured body pose
+
+    def _rao_motion_tick(self) -> None:
+        motion = self._rao_motion
+        if motion is None:
+            return
+        handle = self._handles.get(motion['body_id'])
+        waves = self._waves
+        if (self._project is not motion['project'] or handle is None or waves.handle is None
+                or waves.field is not motion['field'] or waves.mode.currentIndex() != 1):
+            self._rao_motion = None                   # project, wave mode or wave field changed: the animation ends
+            return
+        from ..reference_comparison import pose, rigid_motion
+        translation, rotation = pose(motion['rao'], amplitude=motion['amplitude'], omega=motion['omega'],
+                                     time=self._waves.time)
+        handle.set_transform(rigid_motion(translation, rotation) @ motion['rest'])
 
     def load_native_example(self) -> None:
         if not self._confirm_discard():
@@ -1074,6 +1157,9 @@ class MainWindow(QMainWindow):
         waves = getattr(self, '_waves', None)
         if marine is not None and waves is not None:
             marine.set_suppressed(waves.handle is not None)
+        # The RAO animation lives only as long as its wave layer (reset, mode change, renderer change, replay).
+        if waves is not None and waves.handle is None and getattr(self, '_rao_motion', None) is not None:
+            self._rao_motion = None
 
     def _toggle_water(self, kind: str, visible: bool) -> None:
         if kind == 'water':
