@@ -159,6 +159,22 @@ def rotation_from_vector(theta) -> np.ndarray:
     return np.eye(3) + (np.sin(angle) / angle) * K + ((1.0 - np.cos(angle)) / angle ** 2) * (K @ K)
 
 
+def _rotations_from_vectors(theta: np.ndarray) -> np.ndarray:
+    """Batched Exp(theta) for an (F, 3) array; the same Rodrigues/series formula as rotation_from_vector."""
+
+    theta = np.asarray(theta, dtype=float)
+    angle = np.sqrt(np.einsum("fi,fi->f", theta, theta))
+    K = np.zeros((theta.shape[0], 3, 3))
+    K[:, 0, 1], K[:, 0, 2], K[:, 1, 2] = -theta[:, 2], theta[:, 1], -theta[:, 0]
+    K[:, 1, 0], K[:, 2, 0], K[:, 2, 1] = theta[:, 2], -theta[:, 1], theta[:, 0]
+    KK = K @ K
+    small = angle < 1.0e-8
+    safe = np.where(small, 1.0, angle)
+    a = np.where(small, 1.0, np.sin(safe) / safe)
+    b = np.where(small, 0.5, (1.0 - np.cos(safe)) / safe ** 2)
+    return np.eye(3)[None] + a[:, None, None] * K + b[:, None, None] * KK
+
+
 def body_length_scale(body) -> float:
     """Declared envelope length L: the mesh's largest horizontal extent in body axes (m)."""
 
@@ -194,13 +210,11 @@ def rigid_kinematics(snapshot, q: np.ndarray) -> tuple[dict, dict, dict]:
                 raise ValueError(f"unknown DOF {dof!r} in the linear snapshot labels")
         r0 = np.asarray(item["reference_position"], dtype=float)
         R0 = np.asarray(item.get("reference_orientation", ((1., 0., 0.), (0., 1., 0.), (0., 0., 1.))), dtype=float)
-        positions[body_id] = tuple(tuple(float(v) for v in r0 + u[f]) for f in range(frames))
-        matrices[body_id] = tuple(
-            tuple(tuple(float(v) for v in row) for row in rotation_from_vector(theta[f]) @ R0) for f in range(frames))
+        positions[body_id] = tuple(map(tuple, (r0 + u).tolist()))
+        matrices[body_id] = tuple(tuple(map(tuple, R)) for R in (_rotations_from_vectors(theta) @ R0).tolist())
         limit_u = envelope["max_translation_fraction"] * envelope["length_scale_m"][body_id]
-        flags[body_id] = tuple(
-            1.0 if (np.linalg.norm(theta[f]) > envelope["max_rotation_rad"] or np.linalg.norm(u[f]) > limit_u)
-            else 0.0 for f in range(frames))
+        outside = (np.linalg.norm(theta, axis=1) > envelope["max_rotation_rad"]) | (np.linalg.norm(u, axis=1) > limit_u)
+        flags[body_id] = tuple(np.where(outside, 1.0, 0.0).tolist())
     return positions, matrices, flags
 
 
@@ -809,10 +823,14 @@ def _trapezoidal_memory(kernel: np.ndarray, v: np.ndarray, dt: float) -> tuple[n
     def convolve(K, x):
         product = np.einsum("fik,fk->fi", np.fft.rfft(K, size, axis=0), np.fft.rfft(x, size, axis=0))
         return np.fft.irfft(product, size, axis=0)[:steps]
-    full = convolve(kernel, v)
-    memory = dt * (full - 0.5 * np.einsum("nik,k->ni", kernel[:steps], v[0]) - 0.5 * v @ kernel[0].T)
+    with np.errstate(over="ignore", invalid="ignore"):
+        full = convolve(kernel, v)
+        memory = dt * (full - 0.5 * np.einsum("nik,k->ni", kernel[:steps], v[0]) - 0.5 * v @ kernel[0].T)
+        operand = dt * convolve(np.abs(kernel), np.abs(v))
     memory[0] = 0.0
-    operand = dt * convolve(np.abs(kernel), np.abs(v))
+    if not (np.all(np.isfinite(memory)) and np.all(np.isfinite(operand))):
+        raise LinearResultIncomplete("the memory force cannot be recomputed in finite precision; the result is "
+                                     "refused (fail closed)")
     return memory, np.abs(operand)
 
 
@@ -834,6 +852,13 @@ def _verify_rigid_dynamics(result: ResultRecord, inputs: LinearDevelopmentInputs
     q/v/a (memory by the solver's trapezoidal convolution), requires the per-step balance and the Newmark
     update identities q_{n+1} = q_n + dt v_n + dt^2/4 (a_n + a_{n+1}), v_{n+1} = v_n + dt/2 (a_n + a_{n+1}).
     Together they determine the history uniquely for the admitted (non-singular) effective system.
+
+    Scope (owner decision 2026-10-15, after review round 3): the decoder proves that a stored history is the
+    run of these inputs within round-off allowances scaled by each product's operand magnitude. It is not a
+    tamper seal against deliberately forged channel edits inside those allowances (e.g. equal-and-opposite edits
+    in components whose matrix rows are zero): persisted results are protected by their content-addressed
+    sidecar hashes (persistence) and in-process results are produced by run_linear itself. Any non-finite
+    recomputation refuses the result.
     """
 
     labels = inputs.labels
@@ -857,6 +882,8 @@ def _verify_rigid_dynamics(result: ResultRecord, inputs: LinearDevelopmentInputs
                 "force_memory:": (memory, memory_operand)}
     stored = {prefix: stack(prefix) for prefix in expected}
     for prefix, (values, operand) in expected.items():
+        if not (np.all(np.isfinite(values)) and np.all(np.isfinite(operand))):
+            raise LinearResultIncomplete(f"{prefix[:-1]} cannot be recomputed in finite precision; refused")
         # round-off allowance from the operands (a product near a component's nullspace cancels), plus the
         # relative decoder tolerance on the output itself
         tolerance = (_ROUNDOFF_RELATIVE * float(np.max(operand))
@@ -970,6 +997,17 @@ def run_linear(
         if _time.monotonic() > deadline:
             raise LinearWallTimeExceeded(
                 f"the linear run exceeded max_wall_seconds {limits.max_wall_seconds:g}; no result is produced")
+    def _stop_if_requested(stage: str) -> None:
+        """ADR-015 section 9: cancellation/deadline are observed between every post-processing stage."""
+        if deadline is not None:
+            import time as _time
+            if _time.monotonic() > deadline:
+                raise LinearWallTimeExceeded(
+                    f"the linear run exceeded max_wall_seconds {limits.max_wall_seconds:g} ({stage}); "
+                    "no result is produced")
+        if _cancel_flag(cancel):
+            raise LinearCancelledError(f"the linear run was cancelled ({stage}); no result is produced")
+
     if solved.cancelled or not solved.complete:
         raise LinearCancelledError(
             "the linear run was cancelled or did not complete; incomplete output "
@@ -988,6 +1026,7 @@ def run_linear(
     ):
         _require_finite(name, getattr(solved, name))
 
+    _stop_if_requested("after the solve")
     times = tuple(float(value) for value in solved.times)
     q = solved.displacements
     labels = solved.labels
@@ -1014,8 +1053,10 @@ def run_linear(
     positions = {}
     orientations = {}
     matrices = None
+    _stop_if_requested("after the channels")
     if rigid:
         positions, matrices, flags = rigid_kinematics(snapshot, q)
+        _stop_if_requested("after the kinematics")
         for body_id, values in flags.items():
             channels[f"envelope_exceeded:{body_id}"] = values
     for body_index, binding in enumerate(() if rigid else inputs.bindings):
@@ -1066,16 +1107,9 @@ def run_linear(
         **({"result_layout": LINEAR_LAYOUT_RIGID, "linear_snapshot": snapshot, "rotation_matrices": matrices}
            if rigid else {}),
     )
+    _stop_if_requested("after building the record")
     # Self-check: the record must completely represent this run before it is
     # handed to any caller (worker, CLI, GUI).
     verify_linear_result(record, inputs)
-    # Limits and cancellation also bound the post-processing: nothing is returned after either fired.
-    if deadline is not None:
-        import time as _time
-        if _time.monotonic() > deadline:
-            raise LinearWallTimeExceeded(
-                f"the linear run exceeded max_wall_seconds {limits.max_wall_seconds:g} while building the result; "
-                "no result is produced")
-    if _cancel_flag(cancel):
-        raise LinearCancelledError("the linear run was cancelled while building the result; no result is produced")
+    _stop_if_requested("after verification")
     return record

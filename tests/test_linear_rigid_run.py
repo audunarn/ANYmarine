@@ -435,3 +435,37 @@ def test_decoder_is_fast_enough_for_the_cancellation_bound():
     start = time.perf_counter()
     verify_linear_result(result, inputs)
     assert time.perf_counter() - start < 1.0
+
+
+# ---------------------------------------------------------------- review round 3 regressions
+
+class _StampingToken:
+    def __init__(self):
+        self.stamps = []
+
+    def is_cancelled(self):
+        self.stamps.append(time.perf_counter())
+        return False
+
+
+def _post_solve_gaps(n_steps):
+    project, inputs = _large_inputs(LinearExecutionLimits(max_frames=n_steps))
+    token = _StampingToken()
+    run_linear(inputs, cancel=token, producing_bodies=project.bodies)
+    end = time.perf_counter()
+    post = token.stamps[inputs.n_steps - 1:] + [end]          # the solver polls n_steps times; the rest is post-processing
+    return max(b - a for a, b in zip(post, post[1:])), len(post)
+
+
+def test_post_processing_observes_cancellation_between_stages():
+    gap, polls = _post_solve_gaps(8801)
+    assert polls >= 5 and gap < 1.0
+
+
+def test_non_finite_recomputation_refuses_instead_of_failing_open():
+    """Codex round 3: a finite 1e308 kernel overflows the FFT check; the decoder must refuse, not accept."""
+    from anymarine.linear import _trapezoidal_memory
+    kernel = np.full((8, 1, 1), 1e308)
+    v = np.ones((8, 1))
+    with pytest.raises(LinearResultIncomplete, match="finite precision"):
+        _trapezoidal_memory(kernel, v, 0.1)
