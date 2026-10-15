@@ -1147,7 +1147,7 @@ class ApplicationService:
         # run; a stale or evidence-free hydro intent fails closed here.
         self.verify_hydro_provenance(project)
         try:
-            return run_linear(inputs, cancel=cancel)
+            return run_linear(inputs, cancel=cancel, producing_bodies=project.bodies)
         except LinearError as error:
             raise ServiceError(str(error)) from error
 

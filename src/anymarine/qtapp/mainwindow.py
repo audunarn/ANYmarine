@@ -2440,7 +2440,7 @@ class MainWindow(QMainWindow):
             if handle is None:
                 continue
             position = self._current_result.positions[body_id][index]
-            if self._current_result.kind in ('mechanical_development','equilibrium_development'):
+            if self._current_result.rotation_matrices is not None:     # native or rigid linear: matrices are authoritative
                 rotation = self._current_result.rotation_matrices[body_id][index]
                 transform = matrix_frame_transform(position, rotation)
             else:

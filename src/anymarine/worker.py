@@ -353,7 +353,7 @@ def _run_linear(snapshot: dict, output_path: Path, cancel_path: Path | None) -> 
         return cancel_path is not None and cancel_path.exists()
 
     try:
-        result = run_linear(inputs, cancel=cancel_and_progress)
+        result = run_linear(inputs, cancel=cancel_and_progress, producing_bodies=project.bodies)
         atomic_write_json(output_path, result.to_dict())
     except LinearCancelledError:
         _emit("CANCELLED")

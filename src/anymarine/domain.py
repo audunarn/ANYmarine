@@ -390,6 +390,11 @@ class ResultRecord:
     line_nodes: Optional[tuple] = None
     equilibrium_evidence: Optional[Mapping] = None
     surface_snapshot: Optional[Mapping] = None
+    # ADR-015 section 6: rigid_subset_v1 linear results carry their layout, the
+    # producing snapshot and authoritative BODY-to-WORLD rotation matrices
+    # (Euler orientations empty). Absent for every other result (legacy bytes).
+    result_layout: Optional[str] = None
+    linear_snapshot: Optional[Mapping] = None
 
     def __post_init__(self) -> None:
         if self.kind not in RESULT_KINDS:
@@ -446,8 +451,17 @@ class ResultRecord:
             times = tuple(_number(t, "native time") for t in self.times)
             object.__setattr__(self, 'native_snapshot', _freeze_json_value(self.native_snapshot, 'native_snapshot'))
         else:
-            if self.rotation_matrices is not None or self.native_snapshot is not None:
+            rigid = self.result_layout is not None
+            if self.native_snapshot is not None or (self.rotation_matrices is not None and not rigid):
                 raise ValueError("legacy result kinds cannot carry native matrix/snapshot intent")
+            if rigid:
+                from . import RESULT_KIND_LINEAR
+                if self.kind != RESULT_KIND_LINEAR or self.result_layout != LINEAR_LAYOUT_RIGID:
+                    raise ValueError("result_layout is only admitted as rigid_subset_v1 on linear results")
+                object.__setattr__(self, "linear_snapshot", _validated_linear_snapshot(
+                    self.linear_snapshot, self.input_hash, body_ids))
+            elif self.linear_snapshot is not None:
+                raise ValueError("a linear snapshot requires result_layout rigid_subset_v1")
             times = tuple(float(t) for t in self.times)
         if not times:
             raise ValueError("result must contain at least one time sample")
@@ -505,10 +519,11 @@ class ResultRecord:
             if not current > previous:
                 raise ValueError("result times must be strictly increasing")
         positions = self._freeze_samples(self.positions, "positions", len(times))
-        if native:
+        if native or self.result_layout is not None:
             from .result_rotations import freeze_rotation_samples
             if not isinstance(self.orientations, Mapping) or self.orientations:
-                raise ValueError("native results require empty Euler orientations; matrices are authoritative")
+                raise ValueError("native and rigid linear results require empty Euler orientations; matrices are "
+                                 "authoritative")
             orientations = {}
             rotations = freeze_rotation_samples(self.rotation_matrices, body_ids, len(times))
             object.__setattr__(self, 'rotation_matrices', rotations)
@@ -586,6 +601,10 @@ class ResultRecord:
                 "native_snapshot": _jsonable_value(self.native_snapshot)}
                 if self.kind in (RESULT_KIND_MECHANICAL,RESULT_KIND_EQUILIBRIUM,'line_equilibrium_development') else {}),
             **({"equilibrium_evidence":_jsonable_value(self.equilibrium_evidence)} if self.kind in (RESULT_KIND_EQUILIBRIUM,'line_equilibrium_development') else {}),
+            **({"result_layout": self.result_layout, "linear_snapshot": _jsonable_value(self.linear_snapshot),
+                "rotation_matrices": {bid: [[list(row) for row in matrix] for matrix in samples]
+                                      for bid, samples in self.rotation_matrices.items()}}
+               if self.result_layout is not None else {}),
             "result_id": self.result_id,
             "kind": self.kind,
             "input_hash": self.input_hash,
@@ -614,6 +633,14 @@ class ResultRecord:
             if set(data) != fields:
                 raise ValueError("native result fields must exactly match the matrix schema")
             return cls(**data)
+        if "result_layout" in data or "linear_snapshot" in data:
+            fields = {"result_id", "kind", "input_hash", "body_ids", "times", "positions", "orientations",
+                      "channels", "note", "created_utc", "rotation_matrices", "result_layout", "linear_snapshot"}
+            if "surface_snapshot" in data:
+                fields.add("surface_snapshot")
+            if set(data) != fields:
+                raise ValueError("rigid linear result fields must exactly match the rigid_subset_v1 schema")
+            return cls(**data)
         if "rotation_matrices" in data or "native_snapshot" in data or 'line_nodes' in data:
             raise ValueError("legacy kind cannot silently discard native result intent")
         if kind not in RESULT_KINDS:
@@ -640,6 +667,51 @@ class ResultRecord:
             note=str(data.get("note", "")),
             created_utc=str(data.get("created_utc", "")),
         )
+
+
+LINEAR_SNAPSHOT_FORMAT = "linear_rigid_snapshot_v1"
+_LINEAR_SNAPSHOT_KEYS = ("format", "layout", "input_hash", "labels", "bodies", "envelope")
+
+
+def _validated_linear_snapshot(snapshot, input_hash: str, body_ids) -> Mapping:
+    """Structural admission of a rigid linear result's producing snapshot (ADR-015 section 6).
+
+    Binds the layout, the producing input hash, the ordered DOF labels, the producing bodies (complete Body
+    records in result body order, so replay never depends on the current project) and the declared
+    small-angle envelope. Numerical consistency with the stored channels is proved by
+    ``linear.verify_linear_result``.
+    """
+    if not isinstance(snapshot, Mapping) or set(snapshot) != set(_LINEAR_SNAPSHOT_KEYS):
+        raise ValueError(f"linear snapshot must contain exactly {list(_LINEAR_SNAPSHOT_KEYS)}")
+    if snapshot["format"] != LINEAR_SNAPSHOT_FORMAT or snapshot["layout"] != LINEAR_LAYOUT_RIGID:
+        raise ValueError("unsupported linear snapshot format/layout")
+    if snapshot["input_hash"] != input_hash:
+        raise ValueError("linear snapshot must belong to this result's input hash")
+    labels = snapshot["labels"]
+    if not isinstance(labels, (list, tuple)) or not labels or any(not isinstance(x, str) or ":" not in x
+                                                                  for x in labels):
+        raise ValueError("linear snapshot labels must be body:dof strings")
+    bodies = snapshot["bodies"]
+    if not isinstance(bodies, (list, tuple)):
+        raise ValueError("linear snapshot bodies must be a list")
+    parsed = tuple(Body.from_dict(_jsonable_value(item)) for item in bodies)
+    if tuple(body.body_id for body in parsed) != tuple(body_ids):
+        raise ValueError("linear snapshot bodies must be the result bodies in order")
+    if {label.split(":", 1)[0] for label in labels} - set(body_ids):
+        raise ValueError("linear snapshot labels must belong to the result bodies")
+    envelope = snapshot["envelope"]
+    if (not isinstance(envelope, Mapping) or set(envelope) != {"max_rotation_rad", "max_translation_fraction",
+                                                                "length_scale_m"}
+            or any(isinstance(envelope[k], bool) or not isinstance(envelope[k], (int, float))
+                   or not math.isfinite(envelope[k]) or envelope[k] <= 0
+                   for k in ("max_rotation_rad", "max_translation_fraction"))
+            or not isinstance(envelope["length_scale_m"], Mapping)
+            or set(envelope["length_scale_m"]) != set(body_ids)
+            or any(isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v) or v <= 0
+                   for v in envelope["length_scale_m"].values())):
+        raise ValueError("linear snapshot envelope must declare positive max_rotation_rad, "
+                         "max_translation_fraction and a length scale per body")
+    return _freeze_json_value(snapshot, "linear snapshot")
 
 
 @dataclass(frozen=True)
@@ -1771,15 +1843,16 @@ class ProjectModel:
                     or any(body.hydro_sidecar is not None for body in self.bodies)):
                 raise ValueError("native dry intent cannot coexist with configured hydrodynamics")
         if self.linear_inputs is not None and self.linear_inputs.layout != LINEAR_LAYOUT_LEGACY:
-            # ADR-015 slice L6-2 owns the rigid result mapping: until then no linear result may be bound to
-            # rigid_subset_v1 inputs (persistence, add_result and replay all construct this record)
+            # A linear result bound to rigid_subset_v1 inputs must carry the rigid result layout: a record
+            # decoded with the legacy surge/heave mapping is refused (persistence, add_result and replay all
+            # construct this record). Full numerical consistency: linear.verify_linear_result.
             from . import RESULT_KIND_LINEAR
             from .linear import linear_input_hash
             producing_hash = linear_input_hash(self.linear_inputs)
             if any(result.kind == RESULT_KIND_LINEAR and result.input_hash == producing_hash
-                   for result in self.results):
-                raise ValueError("linear results of rigid_subset_v1 inputs are not supported yet "
-                                 "(ADR-015 slice L6-2); refusing the result")
+                   and result.result_layout != self.linear_inputs.layout for result in self.results):
+                raise ValueError("a linear result of rigid_subset_v1 inputs must carry the rigid result layout; "
+                                 "refusing the result")
         if self.linear_inputs is not None and self.linear_inputs.surface_geometry is not None:
             from . import RESULT_KIND_LINEAR
             from .linear import linear_input_hash

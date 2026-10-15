@@ -29,8 +29,11 @@ import numpy as np
 
 from . import RESULT_KIND_LINEAR
 from .domain import (
+    Body,
     HYDRO_ROUTE_DERIVED,
     LINEAR_LAYOUT_LEGACY,
+    LINEAR_LAYOUT_RIGID,
+    LINEAR_SNAPSHOT_FORMAT,
     LINEAR_SOURCE_ANALYTIC_DEMO,
     RIGID_DOFS,
     LINEAR_SOURCE_HYDRO,
@@ -119,6 +122,10 @@ class LinearResultIncomplete(LinearError):
     """A result record does not completely represent its own linear run."""
 
 
+class LinearWallTimeExceeded(LinearCancelledError):
+    """The run exceeded the declared max_wall_seconds execution limit (ADR-015 section 9)."""
+
+
 class LinearLayoutUnsupported(LinearError):
     """The entry point does not support this linear layout yet (ADR-015 section 7)."""
 
@@ -132,6 +139,72 @@ def require_legacy_layout(inputs, what: str) -> None:
             f"{what} is not available for the {layout} layout yet; only the legacy two-body "
             "surge/heave layout is supported here (ADR-015 section 7)"
         )
+
+
+# ADR-015 section 6: declared small-angle envelope (labels frames outside it; never refuses).
+RIGID_ENVELOPE_MAX_ROTATION_RAD = 0.2
+RIGID_ENVELOPE_MAX_TRANSLATION_FRACTION = 0.2
+_TRANSLATIONS = ("surge", "sway", "heave")
+_ROTATIONS = ("roll", "pitch", "yaw")
+
+
+def rotation_from_vector(theta) -> np.ndarray:
+    """Exp(theta): exact Rodrigues rotation for a rotation vector (radians, world axes)."""
+
+    theta = np.asarray(theta, dtype=float)
+    angle = float(np.sqrt(theta @ theta))
+    K = np.array([[0.0, -theta[2], theta[1]], [theta[2], 0.0, -theta[0]], [-theta[1], theta[0], 0.0]])
+    if angle < 1.0e-8:                     # series, exact to round-off for small angles
+        return np.eye(3) + K + 0.5 * (K @ K)
+    return np.eye(3) + (np.sin(angle) / angle) * K + ((1.0 - np.cos(angle)) / angle ** 2) * (K @ K)
+
+
+def body_length_scale(body) -> float:
+    """Declared envelope length L: the mesh's largest horizontal extent in body axes (m)."""
+
+    points = np.asarray(body.mesh.positions, dtype=float)
+    extent = points[:, :2].max(axis=0) - points[:, :2].min(axis=0)
+    return float(max(extent.max(), 1.0e-9))
+
+
+def _rigid_kinematics(inputs, q: np.ndarray, snapshot) -> tuple[dict, dict, dict]:
+    """positions r0 + u, matrices Exp(theta) R0 and envelope flags per body from the DOF history q."""
+
+    labels = list(inputs.labels)
+    envelope = snapshot["envelope"]
+    positions, matrices, flags = {}, {}, {}
+    for binding in inputs.bindings:
+        frames = q.shape[0]
+        u = np.zeros((frames, 3))
+        theta = np.zeros((frames, 3))
+        for dof in binding.dofs:
+            column = q[:, labels.index(f"{binding.body_id}:{dof}")]
+            if dof in _TRANSLATIONS:
+                u[:, _TRANSLATIONS.index(dof)] = column
+            else:
+                theta[:, _ROTATIONS.index(dof)] = column
+        r0 = np.asarray(binding.reference_position, dtype=float)
+        R0 = np.asarray(binding.reference_orientation, dtype=float)
+        positions[binding.body_id] = tuple(tuple(float(v) for v in r0 + u[f]) for f in range(frames))
+        matrices[binding.body_id] = tuple(
+            tuple(tuple(float(v) for v in row) for row in rotation_from_vector(theta[f]) @ R0) for f in range(frames))
+        limit_u = envelope["max_translation_fraction"] * envelope["length_scale_m"][binding.body_id]
+        flags[binding.body_id] = tuple(
+            1.0 if (np.linalg.norm(theta[f]) > envelope["max_rotation_rad"] or np.linalg.norm(u[f]) > limit_u)
+            else 0.0 for f in range(frames))
+    return positions, matrices, flags
+
+
+def _rigid_snapshot(inputs, producing_bodies) -> dict:
+    bodies = tuple(producing_bodies)
+    verify_body_binding(bodies, inputs)
+    return {
+        "format": LINEAR_SNAPSHOT_FORMAT, "layout": LINEAR_LAYOUT_RIGID, "input_hash": linear_input_hash(inputs),
+        "labels": list(inputs.labels), "bodies": [body.to_dict() for body in bodies],
+        "envelope": {"max_rotation_rad": RIGID_ENVELOPE_MAX_ROTATION_RAD,
+                     "max_translation_fraction": RIGID_ENVELOPE_MAX_TRANSLATION_FRACTION,
+                     "length_scale_m": {body.body_id: body_length_scale(body) for body in bodies}},
+    }
 
 
 def rigid_binding(body, dofs) -> LinearBodyBinding:
@@ -601,11 +674,12 @@ def verify_linear_result(result: ResultRecord, inputs: LinearDevelopmentInputs) 
     right input hash is refused.
     """
 
-    if getattr(inputs, "layout", LINEAR_LAYOUT_LEGACY) != LINEAR_LAYOUT_LEGACY:
-        # never decode a rigid_subset_v1 run with the legacy surge/heave mapping (ADR-015 slice L6-2)
+    rigid = getattr(inputs, "layout", LINEAR_LAYOUT_LEGACY) == LINEAR_LAYOUT_RIGID
+    if rigid != (getattr(result, "result_layout", None) == LINEAR_LAYOUT_RIGID):
+        # never decode a rigid_subset_v1 run with the legacy surge/heave mapping, nor the reverse
         raise LinearResultIncomplete(
-            f"results of the {inputs.layout} layout cannot be verified yet; only the legacy two-body "
-            "surge/heave mapping is implemented (ADR-015 section 7)")
+            f"result layout {getattr(result, 'result_layout', None)!r} does not match the inputs' layout "
+            f"{inputs.layout!r}")
     if result.to_dict().get('surface_snapshot') != surface_result_snapshot(inputs):
         raise LinearResultIncomplete('linear result producing surface geometry is missing or different')
     if result.kind != RESULT_KIND_LINEAR:
@@ -632,6 +706,9 @@ def verify_linear_result(result: ResultRecord, inputs: LinearDevelopmentInputs) 
                 raise LinearResultIncomplete(
                     f"result is missing the required channel {name!r}"
                 )
+    if rigid:
+        _verify_rigid_result(result, inputs)
+        return
     for body_index, binding in enumerate(inputs.bindings):
         surge = result.channels[f"q:{inputs.labels[2 * body_index]}"]
         heave = result.channels[f"q:{inputs.labels[2 * body_index + 1]}"]
@@ -656,6 +733,44 @@ def verify_linear_result(result: ResultRecord, inputs: LinearDevelopmentInputs) 
             )
 
 
+def _verify_rigid_result(result: ResultRecord, inputs: LinearDevelopmentInputs) -> None:
+    """ADR-015 section 6 decoder: the snapshot binds these inputs; positions, matrices and envelope flags are
+    exactly what the stored q channels imply; matrices are proper rotations."""
+
+    snapshot = result.linear_snapshot
+    if snapshot["input_hash"] != linear_input_hash(inputs) or list(snapshot["labels"]) != list(inputs.labels):
+        raise LinearResultIncomplete("the result's producing snapshot does not bind these inputs")
+    try:
+        verify_body_binding(tuple(Body.from_dict(_plain(item)) for item in snapshot["bodies"]), inputs)
+    except LinearBindingError as error:
+        raise LinearResultIncomplete(f"the producing snapshot bodies do not match the bindings: {error}") from error
+    expected_scale = {item["body_id"]: body_length_scale(Body.from_dict(_plain(item))) for item in snapshot["bodies"]}
+    envelope = snapshot["envelope"]
+    if (envelope["max_rotation_rad"] != RIGID_ENVELOPE_MAX_ROTATION_RAD
+            or envelope["max_translation_fraction"] != RIGID_ENVELOPE_MAX_TRANSLATION_FRACTION
+            or dict(envelope["length_scale_m"]) != expected_scale):
+        raise LinearResultIncomplete("the result's small-angle envelope is not the declared one")
+    q = np.column_stack([np.asarray(result.channels[f"q:{label}"], dtype=float) for label in inputs.labels])
+    positions, matrices, flags = _rigid_kinematics(inputs, q, snapshot)
+    for binding in inputs.bindings:
+        body_id = binding.body_id
+        if tuple(result.positions[body_id]) != positions[body_id]:
+            raise LinearResultIncomplete(f"replay positions for body {body_id} disagree with r0 + u from q")
+        stored = np.asarray(result.rotation_matrices[body_id], dtype=float)
+        if stored.shape != (q.shape[0], 3, 3) or np.max(np.abs(stored - np.asarray(matrices[body_id]))) > 1e-12:
+            raise LinearResultIncomplete(f"replay rotation matrices for body {body_id} disagree with Exp(theta) R0")
+        if tuple(result.channels.get(f"envelope_exceeded:{body_id}", ())) != flags[body_id]:
+            raise LinearResultIncomplete(f"envelope flags for body {body_id} disagree with the declared envelope")
+
+
+def _plain(value):
+    if isinstance(value, Mapping):
+        return {str(k): _plain(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_plain(v) for v in value]
+    return value
+
+
 def _require_finite(name: str, array: np.ndarray) -> None:
     if not np.all(np.isfinite(array)):
         raise LinearSolveFailed(
@@ -669,6 +784,7 @@ def run_linear(
     cancel=None,
     result_id: Optional[str] = None,
     created_utc: Optional[str] = None,
+    producing_bodies=None,
 ) -> ResultRecord:
     """Run the linear route through the public solver API and store the result.
 
@@ -679,9 +795,36 @@ def run_linear(
     a and every force decomposition channel are stored as authoritative
     channels, surge maps to x and heave to z at the bound bodies' fixed
     equilibrium reference positions and rotation is zero.
+
+    rigid_subset_v1 (ADR-015 section 6) needs ``producing_bodies`` (the bound project bodies; their complete
+    records become the result's producing snapshot): per body u = (surge, sway, heave) and theta = (roll, pitch,
+    yaw) about the reference point in world axes (absent DOFs zero), positions r0 + u, BODY-to-WORLD matrices
+    Exp(theta) R0, envelope flags per body. ``execution_limits.max_wall_seconds`` is enforced through the cancel
+    poll (``LinearWallTimeExceeded``).
     """
 
-    require_legacy_layout(inputs, "the linear run (ADR-015 slice L6-2)")
+    rigid = inputs.layout == LINEAR_LAYOUT_RIGID
+    snapshot = None
+    if rigid:
+        if producing_bodies is None:
+            raise LinearBindingError("a rigid_subset_v1 run needs the producing bodies for its result snapshot")
+        snapshot = _rigid_snapshot(inputs, producing_bodies)
+    limits = inputs.execution_limits
+    deadline = None
+    if limits is not None and limits.max_wall_seconds is not None:
+        import time as _time
+        deadline = _time.monotonic() + limits.max_wall_seconds
+        user_cancel = cancel
+
+        def cancel():
+            if _time.monotonic() > deadline:
+                return True
+            if user_cancel is None:
+                return False
+            if callable(user_cancel):
+                return bool(user_cancel())
+            flag = getattr(user_cancel, "is_cancelled")
+            return bool(flag() if callable(flag) else flag)
     marine_linear = _import_solver()
     spec = marine_linear.MarineLinearSpec(
         labels=inputs.labels,
@@ -706,6 +849,11 @@ def run_linear(
     except marine_linear.MarineLinearError as error:
         raise LinearSolveFailed(f"unexpected solver failure: {error}") from error
 
+    if solved.cancelled and deadline is not None:
+        import time as _time
+        if _time.monotonic() > deadline:
+            raise LinearWallTimeExceeded(
+                f"the linear run exceeded max_wall_seconds {limits.max_wall_seconds:g}; no result is produced")
     if solved.cancelled or not solved.complete:
         raise LinearCancelledError(
             "the linear run was cancelled or did not complete; incomplete output "
@@ -732,7 +880,7 @@ def run_linear(
         return tuple(float(array[index]) for index in range(array.shape[0]))
 
     channels: dict[str, tuple[float, ...]] = {}
-    for dof in range(4):
+    for dof in range(len(labels)):
         label = labels[dof]
         channels[f"q:{label}"] = channel(q[:, dof])
         channels[f"v:{label}"] = channel(solved.velocities[:, dof])
@@ -749,7 +897,12 @@ def run_linear(
 
     positions = {}
     orientations = {}
-    for body_index, binding in enumerate(inputs.bindings):
+    matrices = None
+    if rigid:
+        positions, matrices, flags = _rigid_kinematics(inputs, q, snapshot)
+        for body_id, values in flags.items():
+            channels[f"envelope_exceeded:{body_id}"] = values
+    for body_index, binding in enumerate(() if rigid else inputs.bindings):
         surge_column = 2 * body_index
         heave_column = 2 * body_index + 1
         reference = binding.reference_position
@@ -794,6 +947,8 @@ def run_linear(
         note=note,
         created_utc=created_utc
         or _datetime.datetime.now(_datetime.timezone.utc).isoformat(),
+        **({"result_layout": LINEAR_LAYOUT_RIGID, "linear_snapshot": snapshot, "rotation_matrices": matrices}
+           if rigid else {}),
     )
     # Self-check: the record must completely represent this run before it is
     # handed to any caller (worker, CLI, GUI).

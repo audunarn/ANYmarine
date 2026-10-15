@@ -227,11 +227,11 @@ def test_mass_record_or_pose_edits_make_rigid_inputs_stale(edit):
 
 # ------------------------------------------------------------------ guards (ADR-015 section 7)
 
-def test_run_and_assessment_refuse_the_rigid_layout_explicitly():
+def test_assessment_refuses_the_rigid_layout_explicitly():
     from anymarine.linear_assessment import AssessmentCaseError, AssessmentRefusalError, assess_result, prepare_case
     from anymarine.paired_refinement import PairedRefinementRefusalError, _member_inputs
     inputs = _inputs(_project(), [("surge", "heave"), ()])
-    with pytest.raises(LinearLayoutUnsupported, match="L6-2"):
+    with pytest.raises(LinearBindingError, match="producing bodies"):     # L6-2: runs need the snapshot bodies
         run_linear(inputs)
     with pytest.raises(AssessmentCaseError, match="six-DOF layouts"):
         prepare_case({}, inputs)
@@ -266,7 +266,7 @@ def test_legacy_projects_keep_their_schema(tmp_path):
 def test_rigid_results_are_never_decoded_with_the_legacy_mapping():
     from anymarine.linear import LinearResultIncomplete, verify_linear_result
     inputs = _inputs(_project(), [("sway", "roll"), ("sway", "yaw")])
-    with pytest.raises(LinearResultIncomplete, match="cannot be verified yet"):
+    with pytest.raises(LinearResultIncomplete, match="does not match the inputs' layout"):
         verify_linear_result(None, inputs)
 
 
@@ -291,7 +291,8 @@ def test_non_finite_dry_mass_assembly_is_refused():
 
 
 def test_linear_results_bound_to_rigid_inputs_are_refused_at_every_boundary(tmp_path):
-    """Review round 2: attachment, project construction (load path) and add_result refuse such results."""
+    """Review round 2 (L6-1): a legacy-mapped record bound to rigid inputs is refused at attachment, project
+    construction (load path) and add_result; L6-2 results carry result_layout instead."""
     from pathlib import Path
     from anymarine.domain import ResultRecord
     from anymarine.services import ApplicationService
@@ -305,7 +306,7 @@ def test_linear_results_bound_to_rigid_inputs_are_refused_at_every_boundary(tmp_
     for key in ("positions", "orientations"):
         frozen[key] = {b.body_id: rows for b, rows in zip(inputs.bindings, frozen[key].values())}
     record = ResultRecord.from_dict(frozen)
-    with pytest.raises(ValueError, match="not supported yet"):
+    with pytest.raises(ValueError, match="must carry the rigid result layout"):
         dataclasses.replace(project, results=(record,))
-    with pytest.raises(Exception, match="not supported yet"):
+    with pytest.raises(Exception, match="must carry the rigid result layout"):
         ApplicationService(tmp_path).add_result(project, record)

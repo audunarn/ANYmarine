@@ -68,8 +68,11 @@ def has_adoption_intent(project):
     return contains(project.to_dict())
 
 def has_rigid_linear_intent(project):
+    """Current rigid_subset_v1 inputs or a retained rigid linear result (ADR-015 section 6)."""
     inputs = project.linear_inputs
-    return inputs is not None and getattr(inputs, "layout", "two_body_surge_heave_v1") != "two_body_surge_heave_v1"
+    if inputs is not None and getattr(inputs, "layout", "two_body_surge_heave_v1") != "two_body_surge_heave_v1":
+        return True
+    return any(getattr(result, "result_layout", None) is not None for result in project.results)
 
 
 def has_lid_policy_intent(project):
