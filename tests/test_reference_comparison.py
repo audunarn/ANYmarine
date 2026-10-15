@@ -11,8 +11,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from anymarine.reference_comparison import (ARTIFACT, DOFS, ReferenceComparisonError, artifact_hash, build, load,
-                                            series, write)
+from anymarine.reference_comparison import (ARTIFACT, DOFS, ReferenceComparisonError, artifact_hash, build,
+                                            drift_series, has_mean_drift, load, series, write)
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -307,3 +307,103 @@ def test_extractor_mean_drift_block_is_si_and_omits_missing_methods():
     class Empty:
         meanDriftHeadingPairs = np.zeros((0, 2))
     assert extractor._mean_drift(Empty()) is None
+
+
+# ---- MD4: mean drift in the reference comparison ----------------------------------------------------------
+
+def _with_drift(data, values=None, **entry):
+    out = {k: v for k, v in data.items() if k != 'artifact_hash'}
+    out['sources'] = [dict(s) for s in out['sources']]
+    n_h, n_p = len(out['headings_deg']), len(out['periods_s'])
+    values = values or [[[1000.0 * (h + 1), -500.0, 2000.0 * p] for p in range(n_p)] for h in range(n_h)]
+    out['sources'][0]['mean_drift'] = [dict(dict(label='far field', method='synthetic', values=values), **entry)]
+    return build(**{k: out[k] for k in ('title', 'notes', 'body', 'periods_s', 'headings_deg', 'sources')})
+
+
+def test_artifacts_without_drift_stay_valid_and_report_none():
+    data = synthetic()
+    assert not has_mean_drift(data)
+    assert drift_series(data, heading=0.0) == {'surge': [], 'sway': [], 'yaw': []}
+
+
+def test_drift_round_trips_and_gives_kilonewton_series(tmp_path):
+    data = _with_drift(synthetic())
+    write(data, tmp_path / 'd.json')
+    back = load(tmp_path / 'd.json')
+    assert has_mean_drift(back)
+    out = drift_series(back, heading=90.0, x_axis='period')
+    assert [s.label for s in out['surge']] == ['Program 0 - far field']
+    assert out['surge'][0].xs == (4.0, 8.0, 12.0) and out['surge'][0].ys == (2.0, 2.0, 2.0)   # kN/m^2
+    assert out['yaw'][0].ys == (0.0, 2.0, 4.0)
+
+
+@pytest.mark.parametrize('values, message', [
+    ([[[1.0, 2.0]] * 3] * 2, 'three finite numbers'),
+    ([[[1.0, 2.0, 3.0]] * 2] * 2, 'one row per period'),
+    ([[[1.0, 2.0, float('nan')]] * 3] * 2, None),
+    ([[[1.0, 2.0, True]] * 3] * 2, 'three finite numbers'),
+])
+def test_malformed_drift_is_refused(values, message):
+    with pytest.raises((ReferenceComparisonError, ValueError), match=message):
+        _with_drift(synthetic(), values=values)
+
+
+def test_drift_entries_need_label_and_method():
+    with pytest.raises(ReferenceComparisonError, match='label, method and values'):
+        _with_drift(synthetic(), extra=1)
+    with pytest.raises(ReferenceComparisonError, match='method must be a string'):
+        _with_drift(synthetic(), method=' ')
+
+
+def test_builder_adds_orcawave_and_npz_drift(tmp_path):
+    periods, headings = [5.0, 10.0], [0.0, 90.0]
+    _write_extract(tmp_path / 'extract', periods, headings)
+    ref_path = tmp_path / 'extract' / 'orcawave_reference.json'
+    ref = json.loads(ref_path.read_text(encoding='utf-8'))
+    pairs = [[0.0, 0.0], [0.0, 90.0], [90.0, 90.0]]
+    # distinct value per pair, period and DOF; nonzero imaginary parts must be dropped (real parts only)
+    mc = [[[[100.0 * (i + 1) + 10.0 * p + k, 0.5 * (k + 1)] for k in range(6)] for p in range(2)] for i in range(3)]
+    ref['mean_drift'] = dict(heading_pairs_deg=pairs, methods=dict(momentum_conservation=mc),
+                             units='N/m^2', layout='[pair][period][dof]')
+    ref_path.write_text(json.dumps(ref), encoding='utf-8')
+    drift = np.arange(12, dtype=float).reshape(2, 2, 3)
+    np.savez(tmp_path / 'ours.npz', periods_s=np.array(periods), headings_deg=np.array(headings),
+             raos=np.zeros((2, 2, 6), complex), meta=json.dumps(dict(label='Ours', program='P', version='1', method='m')),
+             mean_drift=drift, mean_drift_meta=json.dumps(dict(label='far field', method='Maruo/Newman')))
+    out = tmp_path / 'ref.json'
+    subprocess.run([sys.executable, str(ROOT / 'tools' / 'reference_comparison.py'), '--orcawave',
+                    str(tmp_path / 'extract'), '--source', str(tmp_path / 'ours.npz'), '--title', 'T',
+                    '--out', str(out)], check=True, cwd=ROOT)
+    data = load(out)
+    orcawave, ours = data['sources']
+    (entry,) = orcawave['mean_drift']
+    assert entry['label'] == 'momentum conservation'
+    # equal pairs only: heading 0 -> pair 0, heading 90 -> pair 2; DOFs surge, sway, yaw
+    assert entry['values'][0][1] == [110.0, 111.0, 115.0] and entry['values'][1][0] == [300.0, 301.0, 305.0]
+    assert ours['mean_drift'][0]['values'] == drift.tolist()
+
+
+@pytest.mark.parametrize('bad', [np.ones((2, 2, 3), dtype=bool), np.full((2, 2, 3), 1000 + 9000j)])
+def test_builder_refuses_boolean_or_complex_npz_drift(tmp_path, bad):
+    periods, headings = [5.0, 10.0], [0.0, 90.0]
+    _write_extract(tmp_path / 'extract', periods, headings)
+    np.savez(tmp_path / 'ours.npz', periods_s=np.array(periods), headings_deg=np.array(headings),
+             raos=np.zeros((2, 2, 6), complex), meta=json.dumps(dict(label='Ours', program='P', version='1', method='m')),
+             mean_drift=bad, mean_drift_meta=json.dumps(dict(label='far field', method='m')))
+    result = subprocess.run([sys.executable, str(ROOT / 'tools' / 'reference_comparison.py'), '--orcawave',
+                             str(tmp_path / 'extract'), '--source', str(tmp_path / 'ours.npz'), '--title', 'T',
+                             '--out', str(tmp_path / 'ref.json')], capture_output=True, text=True, cwd=ROOT)
+    assert result.returncode != 0 and 'real numbers' in (result.stderr + result.stdout)
+    assert not (tmp_path / 'ref.json').exists()
+
+
+def test_builder_refuses_drift_without_unidirectional_pairs(tmp_path):
+    _write_extract(tmp_path / 'extract', [5.0], [0.0, 90.0])
+    ref_path = tmp_path / 'extract' / 'orcawave_reference.json'
+    ref = json.loads(ref_path.read_text(encoding='utf-8'))
+    ref['mean_drift'] = dict(heading_pairs_deg=[[0.0, 0.0]], methods=dict(momentum_conservation=[[[[1.0, 0.0]] * 6]]))
+    ref_path.write_text(json.dumps(ref), encoding='utf-8')
+    result = subprocess.run([sys.executable, str(ROOT / 'tools' / 'reference_comparison.py'), '--orcawave',
+                             str(tmp_path / 'extract'), '--title', 'T', '--out', str(tmp_path / 'ref.json')],
+                            capture_output=True, text=True, cwd=ROOT)
+    assert result.returncode != 0 and 'unidirectional' in (result.stderr + result.stdout)

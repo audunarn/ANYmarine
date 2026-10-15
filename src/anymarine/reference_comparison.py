@@ -9,6 +9,10 @@ Layout: ``raos[source][heading][period][dof] = [re, im]`` per unit incident wave
 ANYmarine convention ``x(t) = Re{X exp(-i omega t)}`` (a builder converts other conventions before
 writing), translations in m/m and rotations in rad/m, about the body origin. The artifact hash is the
 SHA-256 of the canonical JSON of every other field.
+
+Optional per source: ``mean_drift`` = a list of ``{'label', 'method', 'values'}`` with
+``values[heading][period] = [surge, sway, yaw]`` - the mean (zero-frequency) wave drift for unidirectional waves in
+N/m^2 and N.m/m^2 per unit wave amplitude squared, about the body origin. Artifacts without it stay valid.
 """
 from __future__ import annotations
 
@@ -21,6 +25,7 @@ from .rao_view import GRID, Series, _value, _x
 
 ARTIFACT = 'anymarine_reference_comparison_v1'
 DOFS = ('surge', 'sway', 'heave', 'roll', 'pitch', 'yaw')
+DRIFT_DOFS = ('surge', 'sway', 'yaw')
 _KEYS = ('artifact', 'title', 'notes', 'body', 'periods_s', 'headings_deg', 'dofs', 'sources', 'artifact_hash')
 _SOURCE_KEYS = ('label', 'program', 'version', 'method', 'details', 'raos')
 _MAX_BYTES = 64 * 1024 * 1024
@@ -151,6 +156,31 @@ def validate(data) -> None:
                 _require(isinstance(row, list) and len(row) == len(DOFS) and all(
                     isinstance(z, list) and len(z) == 2 and all(_finite(v) for v in z) for z in row),
                     'each RAO row needs six finite [re, im] pairs')
+        if 'mean_drift' in source:
+            _validate_drift(source['mean_drift'], len(headings), len(periods))
+
+
+def _validate_drift(drift, n_headings: int, n_periods: int) -> None:
+    _require(isinstance(drift, list) and drift, 'mean_drift must be a non-empty list')
+    labels = set()
+    for entry in drift:
+        _require(isinstance(entry, dict) and set(entry) == {'label', 'method', 'values'},
+                 'each mean_drift entry holds label, method and values')
+        for key in ('label', 'method'):
+            _require(isinstance(entry[key], str) and entry[key].strip() != '', f'mean_drift {key} must be a string')
+        _require(entry['label'] not in labels, 'mean_drift labels must be distinct within a source')
+        labels.add(entry['label'])
+        values = entry['values']
+        _require(isinstance(values, list) and len(values) == n_headings
+                 and all(isinstance(block, list) and len(block) == n_periods for block in values),
+                 'mean_drift values need one block per heading and one row per period')
+        _require(all(isinstance(row, list) and len(row) == len(DRIFT_DOFS) and all(_finite(v) for v in row)
+                     for block in values for row in block),
+                 'each mean_drift row needs three finite numbers (surge, sway, yaw)')
+
+
+def has_mean_drift(data: dict) -> bool:
+    return any('mean_drift' in source for source in data['sources'])
 
 
 def water_depth(data: dict):
@@ -200,4 +230,19 @@ def series(data: dict, *, heading: float, display: str = 'amplitude', x_axis: st
                                tuple(_value(complex(*source['raos'][h][p][k]), dof, 'displacement', display)
                                      for p in order))
                         for source in data['sources']]
+    return out
+
+
+def drift_series(data: dict, *, heading: float, x_axis: str = 'period') -> dict:
+    """``{dof: [Series]}`` for surge, sway (kN/m^2) and yaw (kN.m/m^2): one line per source drift entry."""
+    h = data['headings_deg'].index(heading)
+    omegas = [2.0 * math.pi / t for t in data['periods_s']]
+    order = sorted(range(len(omegas)), key=lambda p: _x(omegas[p], x_axis))
+    out = {dof: [] for dof in DRIFT_DOFS}
+    for source in data['sources']:
+        for entry in source.get('mean_drift', ()):
+            label = f"{source['label']} - {entry['label']}"
+            for k, dof in enumerate(DRIFT_DOFS):
+                out[dof].append(Series(label, 'line', tuple(_x(omegas[p], x_axis) for p in order),
+                                       tuple(entry['values'][h][p][k] / 1000.0 for p in order)))
     return out

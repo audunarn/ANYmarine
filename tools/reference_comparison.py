@@ -10,6 +10,11 @@ B2). Each ``--source`` is an .npz with ``periods_s`` (P), ``headings_deg`` (H), 
 ANYmarine convention, rad/m for rotations) and ``meta`` (a JSON string with label, program, version, method and
 an optional details object); periods and headings must equal the OrcaWave ones.
 
+Mean drift (optional): the OrcaWave extract's ``mean_drift`` block adds one drift entry per calculated method
+(momentum conservation, control surface) for the unidirectional (equal) heading pairs; a ``--source`` .npz may
+carry ``mean_drift`` (H x P x 3 real: surge, sway, yaw in N/m^2 and N.m/m^2 per unit amplitude squared about the
+body origin) with ``mean_drift_meta`` (a JSON string with label and method).
+
 The output may contain licensed third-party results: write it outside any repository.
 """
 from __future__ import annotations
@@ -169,7 +174,33 @@ def orcawave_parts(directory: Path, body_name: str | None = None) -> tuple[dict,
                   details=dict(file_sha256=ref['source']['sha256'][:16],
                                interior_surface_panels=ref['body']['interior_surface_panels'],
                                convention='conjugated to x = Re{X exp(-i w t)}'), raos=conj)
+    drift = orcawave_drift(ref)
+    if drift:
+        source['mean_drift'] = drift
     return body, source, ref['periods_s'], ref['headings_deg'], ref.get('environment', {}).get('water_depth_m')
+
+
+DRIFT_LABELS = {'momentum_conservation': 'momentum conservation', 'control_surface': 'control surface',
+                'pressure_integration': 'pressure integration'}
+
+
+def orcawave_drift(ref: dict) -> list:
+    """OrcaWave mean drift for the equal heading pairs: surge, sway, yaw (real parts; drift is real)."""
+    block = ref.get('mean_drift')
+    if not block:
+        return []
+    pairs = [tuple(float(v) for v in pair) for pair in block['heading_pairs_deg']]
+    index = {pair: i for i, pair in enumerate(pairs)}
+    missing = [h for h in ref['headings_deg'] if (float(h), float(h)) not in index]
+    if missing:
+        raise SystemExit(f'OrcaWave mean drift lacks the unidirectional pairs for headings {missing}')
+    out = []
+    for method, values in block['methods'].items():
+        arr = np.asarray(values, dtype=float)                      # [pair][period][6][re, im]
+        rows = arr[[index[(float(h), float(h))] for h in ref['headings_deg']]][:, :, [0, 1, 5], 0]
+        out.append(dict(label=DRIFT_LABELS.get(method, method), method=f'OrcaWave mean drift, {method}',
+                        values=rows.tolist()))
+    return out
 
 
 def npz_source(path: Path, periods: list, headings: list) -> dict:
@@ -183,8 +214,18 @@ def npz_source(path: Path, periods: list, headings: list) -> dict:
     if raos.shape != (len(headings), len(periods), 6):
         raise SystemExit(f'{path}: raos must be {len(headings)} x {len(periods)} x 6, got {raos.shape}')
     pairs = [[[[float(z.real), float(z.imag)] for z in row] for row in block] for block in raos]
-    return dict(label=meta['label'], program=meta['program'], version=meta['version'], method=meta['method'],
-                details=meta.get('details', {}), raos=pairs)
+    source = dict(label=meta['label'], program=meta['program'], version=meta['version'], method=meta['method'],
+                  details=meta.get('details', {}), raos=pairs)
+    if 'mean_drift' in data.files:
+        raw = np.asarray(data['mean_drift'])
+        if raw.dtype.kind not in 'iuf':               # refuse booleans, complex and objects before converting
+            raise SystemExit(f'{path}: mean_drift must be real numbers, got dtype {raw.dtype}')
+        drift = raw.astype(float)
+        if drift.shape != (len(headings), len(periods), 3):
+            raise SystemExit(f'{path}: mean_drift must be {len(headings)} x {len(periods)} x 3, got {drift.shape}')
+        drift_meta = json.loads(str(data['mean_drift_meta']))
+        source['mean_drift'] = [dict(label=drift_meta['label'], method=drift_meta['method'], values=drift.tolist())]
+    return source
 
 
 def main(argv=None) -> None:

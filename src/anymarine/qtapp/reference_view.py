@@ -1,7 +1,8 @@
 """RAO-mode view of an external reference comparison (``anymarine_reference_comparison_v1``).
 
 Display only: one line per source in the 3 x 2 RAO graph grid for the chosen heading. The banner states
-that this is evidence about external programs, not an ANYmarine RAO case, and that it is unqualified.
+that this is evidence about external programs, not an ANYmarine RAO case, and that it is unqualified. When a source
+carries mean drift, a "Mean drift" display shows surge, sway and yaw drift (one line per source and method).
 """
 from __future__ import annotations
 
@@ -10,11 +11,16 @@ from PySide6.QtWidgets import (QButtonGroup, QComboBox, QDoubleSpinBox, QFormLay
                                QPushButton, QRadioButton, QVBoxLayout, QWidget)
 
 from .. import rao_view
-from ..reference_comparison import series
+from ..reference_comparison import drift_series, has_mean_drift, series
 from .rao_panel import RaoGrid
 
 BANNER = ('External reference comparison - not an ANYmarine RAO case and not bound to the project. '
           'Development evidence, unqualified.')
+
+
+DRIFT_GRID = (('surge', 'sway'), ('yaw', None), (None, None))
+DRIFT_NOTE = ('Mean wave drift in regular unidirectional waves per unit wave amplitude squared, about the body origin '
+              '(multiply by A^2). Development evidence, unqualified.')
 
 
 MOTION_NOTE = ('Linear RAO motion x(t) = Re{X A exp(-i w t)} of the chosen source with the incident Airy wave '
@@ -49,7 +55,7 @@ class ReferenceComparisonView(QWidget):
         display = QHBoxLayout()
         self.display_group = QButtonGroup(self)
         self.display_buttons = {}
-        for key, text in (('amplitude', 'Amplitude'), ('phase', 'Phase')):
+        for key, text in (('amplitude', 'Amplitude'), ('phase', 'Phase'), ('drift', 'Mean drift')):
             button = QRadioButton(text)
             self.display_buttons[key] = button
             self.display_group.addButton(button)
@@ -59,6 +65,11 @@ class ReferenceComparisonView(QWidget):
         layout.addLayout(display)
         self.grid = RaoGrid()
         layout.addWidget(self.grid, 1)
+        self.drift_note = QLabel(DRIFT_NOTE)
+        self.drift_note.setWordWrap(True)
+        self.drift_note.setProperty('role', 'hint')
+        self.drift_note.setVisible(False)
+        layout.addWidget(self.drift_note)
         motion_heading = QLabel('MOTION IN A REGULAR WAVE')
         motion_heading.setProperty('role', 'section')
         layout.addWidget(motion_heading)
@@ -116,7 +127,13 @@ class ReferenceComparisonView(QWidget):
             details = ', '.join(f'{k}: {v}' for k, v in source['details'].items())
             lines.append(f"{source['label']}: {source['program']} {source['version']}, {source['method']}"
                          + (f' ({details})' if details else ''))
+            for entry in source.get('mean_drift', ()):
+                lines.append(f"  mean drift {entry['label']}: {entry['method']}")
         self.sources.setText('\n'.join(lines + list(data['notes'])))
+        drift = has_mean_drift(data)
+        self.display_buttons['drift'].setVisible(drift)
+        if not drift and self.display_buttons['drift'].isChecked():
+            self.display_buttons['amplitude'].setChecked(True)
         self.refresh()
 
     def _request_animation(self) -> None:
@@ -135,8 +152,14 @@ class ReferenceComparisonView(QWidget):
             self.grid.show_series(rao_view.GRID, {}, '', lambda dof: '')
             return
         chosen = self.selection()
-        data = series(self.data, **chosen)
         xlabel = 'Period (s)' if chosen['x_axis'] == 'period' else 'Frequency (rad/s)'
+        self.drift_note.setVisible(chosen['display'] == 'drift')
+        if chosen['display'] == 'drift':
+            data = drift_series(self.data, heading=chosen['heading'], x_axis=chosen['x_axis'])
+            self.grid.show_series(DRIFT_GRID, data, xlabel,
+                                  lambda dof: 'Mean drift (kN.m/m²)' if dof == 'yaw' else 'Mean drift (kN/m²)')
+            return
+        data = series(self.data, **chosen)
         kind = 'Amplitude' if chosen['display'] == 'amplitude' else 'Phase'
         self.grid.show_series(rao_view.GRID, data, xlabel,
                               lambda dof: f"{kind} ({rao_view.unit(dof, 'displacement', chosen['display'])})")

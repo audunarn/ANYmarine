@@ -221,3 +221,25 @@ def test_replacing_the_reference_stops_motion_and_unbinds_the_vessel(qapp, windo
     assert window._rao_motion is None and window._reference_binding is None
     view.animate_button.click()
     assert window._rao_motion is None and 'belong to that vessel' in window._rao.status.text()
+
+
+def test_mean_drift_display_appears_only_with_drift(qapp, window, tmp_path):
+    from test_reference_comparison import _with_drift
+    path = write(synthetic(), tmp_path / 'plain.json')
+    assert window._rao.open_reference(path)
+    view = window._rao.reference_view
+    assert view.display_buttons['drift'].isHidden()
+    path = write(_with_drift(synthetic()), tmp_path / 'drift.json')
+    assert window._rao.open_reference(path)
+    view = window._rao.reference_view
+    assert not view.display_buttons['drift'].isHidden() and view.drift_note.isHidden()
+    view.display_buttons['drift'].setChecked(True)
+    assert not view.drift_note.isHidden()
+    surge, yaw = view.grid.cell('surge'), view.grid.cell('yaw')
+    assert [s.label for s in surge.series()] == ['Program 0 - far field']
+    assert surge.series()[0].ys == (1.0, 1.0, 1.0)              # heading 0: 1000 N/m^2 -> 1 kN/m^2
+    assert yaw.series()[0].ys == (0.0, 2.0, 4.0)
+    assert view.grid.cell('heave') is None or view.grid.cell('heave').isHidden()
+    assert 'mean drift far field: synthetic' in view.sources.text()
+    view.display_buttons['amplitude'].setChecked(True)
+    assert view.drift_note.isHidden() and len(view.grid.cell('roll').series()) == 2
