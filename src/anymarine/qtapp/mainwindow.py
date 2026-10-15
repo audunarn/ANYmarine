@@ -15,7 +15,7 @@ from typing import Optional
 
 import numpy as np
 
-from PySide6.QtCore import QEvent, Qt, QTimer
+from PySide6.QtCore import QEvent, QSize, Qt, QTimer
 from PySide6.QtGui import QAction, QActionGroup, QCloseEvent
 from PySide6.QtWidgets import (
     QApplication,
@@ -24,16 +24,22 @@ from PySide6.QtWidgets import (
     QDockWidget,
     QFileDialog,
     QFrame,
+    QHBoxLayout,
     QLabel,
     QMainWindow,
+    QMenu,
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
     QScrollArea,
     QSlider,
     QSizePolicy,
+    QSplitter,
+    QStackedWidget,
     QTableWidget,
     QTableWidgetItem,
+    QToolBar,
+    QToolButton,
     QTreeView,
     QVBoxLayout,
     QWidget,
@@ -79,7 +85,7 @@ from .assessment import (
     ReopenSnapshotDialog,
 )
 from .details import DetailsPanel
-from .jobs import ACTIVE_STATES, JobManager
+from .jobs import ACTIVE_STATES, JOB_STATE_FAILED, JobManager
 from .plot import TimeSeriesPlot
 from .projectmodel import ProjectTreeModel
 from .theme import apply_theme
@@ -88,8 +94,52 @@ CLOSE_CANCEL_WAIT_MS = 8000
 REPLAY_TICK_MS = 100
 
 
+class _ElidedLabel(QLabel):
+    """One-line label that shortens its text but never a protected suffix (the qualification)."""
+
+    def __init__(self, text: str = "", parent: Optional[QWidget] = None):
+        super().__init__(text, parent)
+        self.keep_suffix = ""
+
+    def displayed_text(self, width: Optional[int] = None) -> str:
+        """The text as painted at ``width`` (default: the current width); the suffix is never cut."""
+        text, suffix = self.text(), self.keep_suffix
+        if not suffix or not text.endswith(suffix):
+            suffix = ""
+        metrics = self.fontMetrics()
+        available = self.contentsRect().width() if width is None else width
+        head = text[:len(text) - len(suffix)] if suffix else text
+        room = max(0, available - metrics.horizontalAdvance(suffix))
+        return metrics.elidedText(head, Qt.TextElideMode.ElideRight, room) + suffix
+
+    def minimumSizeHint(self):  # noqa: N802
+        hint = super().minimumSizeHint()
+        floor = self.fontMetrics().horizontalAdvance("…" + self.keep_suffix) + 4
+        return QSize(min(hint.width(), max(60, floor)), hint.height())
+
+    def paintEvent(self, event):  # noqa: N802
+        from PySide6.QtGui import QPainter
+        painter = QPainter(self)
+        painter.setPen(self.palette().color(self.foregroundRole()))
+        painter.drawText(self.contentsRect(), int(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft),
+                         self.displayed_text())
+
+
 class MainWindow(QMainWindow):
     """Application shell: viewer, project tree, details, jobs, replay."""
+
+    @property
+    def _dirty(self) -> bool:
+        return self._unsaved
+
+    @_dirty.setter
+    def _dirty(self, value: bool) -> None:
+        # Unsaved changes show as '*' in the title bar (Qt's [*] placeholder).
+        self._unsaved = bool(value)
+        self.setWindowModified(self._unsaved)
+
+    def setWindowTitle(self, title: str) -> None:  # noqa: N802
+        super().setWindowTitle(title if '[*]' in title else f'{title}[*]')
 
     def __init__(self, parent: Optional[QWidget] = None, *, viewer_backend: str | None = None):
         super().__init__(parent)
@@ -125,9 +175,20 @@ class MainWindow(QMainWindow):
         self._startup_renderer_timer.timeout.connect(self._start_visible_renderer)
         initial_backend='software' if self._startup_renderer_pending else backend
         self.viewer = create_viewer(self, initial_backend, host=QtViewerHostAdapter())
+        from .marine_scene import MarineScene
+        self._marine = MarineScene()
+        self._marine.apply(self.viewer)
         self.viewer.setMinimumSize(480, 300)
         self.viewer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        self.setCentralWidget(self.viewer)
+        # The viewport hosts the viewer above the replay transport bar; a renderer
+        # change swaps only the viewer inside it.
+        self._viewport = QWidget()
+        self._viewport.setObjectName('Viewport')
+        self._viewport_layout = QVBoxLayout(self._viewport)
+        self._viewport_layout.setContentsMargins(0, 0, 0, 0)
+        self._viewport_layout.setSpacing(0)
+        self._viewport_layout.addWidget(self.viewer, 1)
+        self.setCentralWidget(self._viewport)
         from .member_scene import MemberScene
         self._member_scene = MemberScene(self.viewer)
         # Project loads reuse the viewer; only an explicit renderer change replaces it.
@@ -144,32 +205,13 @@ class MainWindow(QMainWindow):
         self._job_manager = JobManager(self._service, self)
         from .waves import WavesPanel
         self._waves = WavesPanel(self)
-        wave_dock = QDockWidget('Waves', self)
-        wave_dock.setObjectName('anymarine-dock-Waves')
-        wave_dock.setMinimumWidth(240)
-        wave_dock.setWidget(self._scroll_dock_content(self._waves))
-        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, wave_dock)
-        assessment_dock = next(d for d in self.findChildren(QDockWidget) if d.windowTitle() == 'Assessment')
-        self.tabifyDockWidget(assessment_dock, wave_dock)
-        wave_dock.raise_()
-        self._wave_dock = wave_dock
         from .rao_panel import RaoPanel
         self._rao = RaoPanel(self)
-        rao_dock = QDockWidget('RAO', self)
-        rao_dock.setObjectName('anymarine-dock-RAO')
-        rao_dock.setMinimumWidth(240)
-        rao_dock.setWidget(self._scroll_dock_content(self._rao))
-        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, rao_dock)
-        self.tabifyDockWidget(assessment_dock, rao_dock)
-        wave_dock.raise_()
-        self._rao_dock = rao_dock
+        self._build_context_panel()
         self._build_menus()
-        self._viewer_backend_label = QLabel()
-        self._viewer_backend_label.setToolTip('Change renderer under View > Renderer')
-        self.statusBar().addPermanentWidget(self._viewer_backend_label)
-        self._development_status_label = QLabel()
-        self._development_status_label.setToolTip('Details under Help > Development status')
-        self.statusBar().addPermanentWidget(self._development_status_label)
+        self._build_toolbar()
+        self._build_mode_bar()
+        self._build_status_bar()
         self._refresh_startup_development_status()
         self._log_viewer_backend()
 
@@ -186,7 +228,7 @@ class MainWindow(QMainWindow):
         self._play_timer.timeout.connect(self._advance_frame)
 
         self.resize(1280, 720)
-        self.statusBar().showMessage("Development preview — results are unqualified")
+        self.statusBar().showMessage("Open a project or an example from the File menu")
 
     def showEvent(self,event):  # noqa: N802
         super().showEvent(event)
@@ -241,21 +283,42 @@ class MainWindow(QMainWindow):
         scroll.setWidget(widget)
         return scroll
 
+    MODES = (
+        ('model', 'Model', 'model', 'Project tree, properties and the 3D model'),
+        ('waves', 'Waves', 'waves', 'Incident and body-disturbed wave fields'),
+        ('rao', 'RAO', 'rao', 'Frequency-domain RAO cases and graphs'),
+        ('assessment', 'Assess', 'assessment', 'Assessment evidence: register, assess, pair, reopen'),
+        ('results', 'Results', 'results', 'Time series of the selected result channel'),
+    )
+    MODE_TITLES = {'model': 'Model', 'waves': 'Waves', 'rao': 'RAO', 'assessment': 'Assessment',
+                   'results': 'Results'}
+
+    @staticmethod
+    def _section(title: str, widget: QWidget, margins: tuple[int, int, int, int]) -> QWidget:
+        """A titled region: small uppercase heading above one widget."""
+        section = QWidget()
+        layout = QVBoxLayout(section)
+        layout.setContentsMargins(*margins)
+        layout.setSpacing(2)
+        heading = QLabel(title.upper())
+        heading.setProperty('role', 'section')
+        layout.addWidget(heading)
+        layout.addWidget(widget, 1)
+        return section
+
+    @staticmethod
+    def _fixed_region(dock: QDockWidget) -> None:
+        """Fixed workspace region: no dock title bar, not movable, floatable or closable."""
+        dock.setFeatures(QDockWidget.DockWidgetFeature.NoDockWidgetFeatures)
+        dock.setTitleBarWidget(QWidget())
+
     def _build_docks(self) -> None:
-        # project tree
-        tree_dock = QDockWidget("Project", self)
-        tree_dock.setFeatures(QDockWidget.DockWidgetFeature.DockWidgetMovable)
+        # navigator: project tree above the properties of the selected item
         tree = QTreeView()
         tree.setModel(self._tree_model)
+        tree.setHeaderHidden(True)
         tree.clicked.connect(self._on_tree_clicked)
-        tree_dock.setWidget(tree)
-        tree_dock.setMinimumWidth(180)
-        self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, tree_dock)
         self._tree = tree
-
-        # details
-        details_dock = QDockWidget("Details", self)
-        details_dock.setFeatures(QDockWidget.DockWidgetFeature.DockWidgetMovable)
         self._details = DetailsPanel(self._service)
         self._details.body_edited.connect(self._apply_body_edit)
         self._details.equilibrium_edited.connect(self._apply_equilibrium_edit)
@@ -265,76 +328,276 @@ class MainWindow(QMainWindow):
         self._details.surface_create_requested.connect(self._apply_surface_create)
         self._details.surface_create_failed.connect(
             lambda message: self._notify_warning("Surface creation refused", message))
-        details_dock.setWidget(self._details)
-        details_dock.setMinimumWidth(240)
-        self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, details_dock)
+        navigator = QSplitter(Qt.Orientation.Vertical)
+        navigator.setObjectName('Navigator')
+        navigator.setChildrenCollapsible(False)
+        tree_section = self._section('Project', tree, (10, 8, 6, 4))
+        tree_section.setMinimumHeight(150)
+        details_section = self._section('Properties', self._details, (10, 8, 6, 4))
+        details_section.setMinimumHeight(160)
+        navigator.addWidget(tree_section)
+        navigator.addWidget(details_section)
+        navigator.setStretchFactor(0, 1)
+        navigator.setStretchFactor(1, 1)
+        navigator.setSizes([360, 300])
+        navigator_dock = QDockWidget("Project", self)
+        navigator_dock.setObjectName('anymarine-dock-Navigator')
+        self._fixed_region(navigator_dock)
+        navigator_dock.setWidget(navigator)
+        navigator_dock.setMinimumWidth(220)
+        self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, navigator_dock)
+        self._navigator_dock = navigator_dock
 
-        # jobs + diagnostics
-        jobs_dock = QDockWidget("Jobs / Diagnostics", self)
-        jobs_dock.setFeatures(QDockWidget.DockWidgetFeature.DockWidgetMovable)
-        jobs_host = QWidget()
-        jobs_layout = QVBoxLayout(jobs_host)
+        # jobs + log drawer, collapsed until asked for (status bar) or a job fails
         self._jobs_table = QTableWidget(0, 3)
         self._jobs_table.setHorizontalHeaderLabels(["Job", "State", "Progress"])
         self._jobs_table.horizontalHeader().setStretchLastSection(True)
+        self._jobs_table.verticalHeader().setVisible(False)
         self._diagnostics = QPlainTextEdit()
         self._diagnostics.setReadOnly(True)
-        self._diagnostics.setMaximumHeight(140)
-        jobs_layout.addWidget(self._jobs_table)
-        jobs_layout.addWidget(QLabel("Diagnostics"))
-        jobs_layout.addWidget(self._diagnostics)
-        jobs_dock.setWidget(self._scroll_dock_content(jobs_host))
+        drawer = QSplitter(Qt.Orientation.Horizontal)
+        drawer.setChildrenCollapsible(False)
+        drawer.addWidget(self._section('Jobs', self._jobs_table, (10, 4, 6, 8)))
+        drawer.addWidget(self._section('Log', self._diagnostics, (6, 4, 10, 8)))
+        drawer.setStretchFactor(0, 2)
+        drawer.setStretchFactor(1, 3)
+        jobs_dock = QDockWidget("Jobs and log", self)
+        jobs_dock.setObjectName('anymarine-dock-Jobs')
+        jobs_dock.setFeatures(QDockWidget.DockWidgetFeature.DockWidgetClosable)
+        jobs_dock.setWidget(drawer)
         jobs_dock.setMinimumHeight(110)
         self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, jobs_dock)
+        jobs_dock.hide()
+        self._jobs_dock = jobs_dock
 
-        # replay
-        replay_dock = QDockWidget("Replay", self)
-        replay_dock.setFeatures(QDockWidget.DockWidgetFeature.DockWidgetMovable)
-        replay_host = QWidget()
-        replay_layout = QVBoxLayout(replay_host)
-        controls = QWidget()
-        controls_layout = QVBoxLayout(controls)
-        controls_layout.setContentsMargins(0, 0, 0, 0)
+        # replay transport bar under the viewer (shown while a result is loaded)
+        from .icons import icon
+        transport = QFrame()
+        transport.setObjectName('Transport')
+        transport_layout = QHBoxLayout(transport)
+        transport_layout.setContentsMargins(10, 6, 12, 6)
+        transport_layout.setSpacing(10)
         self._play_button = QPushButton("Play")
+        self._play_button.setIcon(icon('play'))
+        self._play_button.setToolTip('Play or pause the replay')
         self._play_button.clicked.connect(self._toggle_play)
         self._frame_slider = QSlider(Qt.Orientation.Horizontal)
         self._frame_slider.setRange(0, 0)
         self._frame_slider.valueChanged.connect(self._on_slider_moved)
+        # Full result status (shown in the Results panel); the bar shows a one-line summary
+        # with the full status as its tooltip.
+        self._frame_label = QLabel("no result")
+        self._frame_label.setWordWrap(True)
+        self._frame_label.setProperty('role', 'hint')
+        self._frame_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        self._transport_label = _ElidedLabel("no result")
+        self._transport_label.setProperty('role', 'hint')
+        self._transport_label.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
+        self._frame_slider.setMinimumWidth(120)
+        transport_layout.addWidget(self._play_button)
+        transport_layout.addWidget(self._frame_slider, 1)
+        transport_layout.addWidget(self._transport_label)
+        transport.hide()
+        self._viewport_layout.addWidget(transport)
+        self._transport = transport
+
+        # results: channel time series (a context panel page)
         self._channel_combo = QComboBox()
         self._channel_combo.setMinimumContentsLength(16)
         self._channel_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
         self._channel_combo.currentTextChanged.connect(self._on_channel_changed)
-        self._frame_label = QLabel("no result")
-        self._frame_label.setWordWrap(True)
-        self._frame_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-        controls_layout.addWidget(self._play_button)
-        controls_layout.addWidget(self._frame_slider)
-        controls_layout.addWidget(self._channel_combo)
-        controls_layout.addWidget(self._frame_label)
         self._plot = TimeSeriesPlot()
-        replay_layout.addWidget(controls)
-        replay_layout.addWidget(self._plot)
-        replay_dock.setWidget(self._scroll_dock_content(replay_host))
-        replay_dock.setMinimumHeight(110)
-        self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, replay_dock)
 
         # assessment evidence (child-validated payloads; display only)
-        assessment_dock = QDockWidget("Assessment", self)
-        assessment_dock.setFeatures(QDockWidget.DockWidgetFeature.DockWidgetMovable)
         self._assessment_panel = AssessmentPanel()
         self._assessment_panel.register_case_requested.connect(self._register_case_dialog)
         self._assessment_panel.assess_requested.connect(self._assess_dialog)
         self._assessment_panel.pair_requested.connect(self._pair_dialog)
         self._assessment_panel.reopen_requested.connect(self._reopen_dialog)
         self._assessment_panel.replay_member_changed.connect(self._select_replay_member)
-        assessment_dock.setWidget(self._scroll_dock_content(self._assessment_panel))
-        assessment_dock.setMinimumWidth(240)
-        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, assessment_dock)
-        # Responsive workbench: bottom docks share one strip; side docks keep
-        # readable minimums and the model canvas takes the remaining space.
-        self.resizeDocks([jobs_dock, replay_dock], [200, 200], Qt.Orientation.Vertical)
-        self.resizeDocks([tree_dock, details_dock], [200, 300], Qt.Orientation.Horizontal)
-        self.resizeDocks([assessment_dock], [280], Qt.Orientation.Horizontal)
+
+    def _build_context_panel(self) -> None:
+        """One right-hand panel whose page follows the active mode (Model mode hides it)."""
+        results = QWidget()
+        results_layout = QVBoxLayout(results)
+        results_layout.setContentsMargins(0, 0, 0, 0)
+        status_heading = QLabel('RESULT')
+        status_heading.setProperty('role', 'section')
+        results_layout.addWidget(status_heading)
+        results_layout.addWidget(self._frame_label)
+        channel_heading = QLabel('CHANNEL')
+        channel_heading.setProperty('role', 'section')
+        results_layout.addWidget(channel_heading)
+        results_layout.addWidget(self._channel_combo)
+        results_layout.addWidget(self._plot, 1)
+        hint = QLabel('Play, pause and scrub the replay with the bar under the 3D view.')
+        hint.setProperty('role', 'hint')
+        hint.setWordWrap(True)
+        results_layout.addWidget(hint)
+        self._context_stack = QStackedWidget()
+        self._context_pages = {
+            'waves': self._scroll_dock_content(self._waves),
+            'rao': self._scroll_dock_content(self._rao),
+            'assessment': self._scroll_dock_content(self._assessment_panel),
+            'results': results,
+        }
+        for page in self._context_pages.values():
+            self._context_stack.addWidget(page)
+        panel = QWidget()
+        panel.setObjectName('ContextPanel')
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(14, 10, 10, 8)
+        layout.setSpacing(4)
+        self._context_title = QLabel()
+        self._context_title.setObjectName('PanelTitle')
+        layout.addWidget(self._context_title)
+        layout.addWidget(self._context_stack, 1)
+        dock = QDockWidget("Context", self)
+        dock.setObjectName('anymarine-dock-Context')
+        self._fixed_region(dock)
+        dock.setWidget(panel)
+        dock.setMinimumWidth(340)
+        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
+        self._context_dock = dock
+        self.resizeDocks([self._navigator_dock, dock], [240, 420], Qt.Orientation.Horizontal)
+
+    def _build_mode_bar(self) -> None:
+        from .icons import icon
+        bar = QToolBar('Modes', self)
+        bar.setObjectName('ModeBar')
+        bar.setMovable(False)
+        bar.setOrientation(Qt.Orientation.Vertical)
+        bar.setIconSize(QSize(22, 22))
+        bar.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
+        self.addToolBar(Qt.ToolBarArea.LeftToolBarArea, bar)
+        group = QActionGroup(self)
+        group.setExclusive(True)
+        self._mode_actions = {}
+        for index, (name, label, icon_name, tip) in enumerate(self.MODES, start=1):
+            action = QAction(icon(icon_name), label, self)
+            action.setCheckable(True)
+            action.setShortcut(f'Ctrl+{index}')
+            action.setToolTip(f'{tip} (Ctrl+{index})')
+            action.triggered.connect(lambda _checked=False, mode=name: self._set_mode(mode))
+            group.addAction(action)
+            bar.addAction(action)
+            self._mode_actions[name] = action
+        self._mode_bar = bar
+        self._mode = None
+        self._context_widths = {}
+        self._set_mode('model')
+
+    def _set_mode(self, mode: str) -> None:
+        """Show the context page of one workspace mode (Model shows the model only).
+
+        Each mode keeps its own panel width; RAO starts wider so its graph grid is readable.
+        """
+        previous = self._mode
+        widths = self._context_widths
+        if previous in self._context_pages and self._context_dock.isVisible():
+            widths[previous] = self._context_dock.width()
+        self._mode = mode
+        self._mode_actions[mode].setChecked(True)
+        page = self._context_pages.get(mode)
+        if page is None:
+            self._context_dock.hide()
+            return
+        self._context_stack.setCurrentWidget(page)
+        self._context_title.setText(self.MODE_TITLES[mode])
+        self._context_dock.show()
+        width = widths.get(mode, int(self.width() * 0.42) if mode == 'rao' else 420)
+        room = self.width() - self._mode_bar.width() - self._navigator_dock.width() - 500
+        self.resizeDocks([self._context_dock], [max(340, min(width, room))], Qt.Orientation.Horizontal)
+
+    def _build_status_bar(self) -> None:
+        from .icons import icon
+        bar = self.statusBar()
+        self._viewer_backend_label = QLabel()
+        self._viewer_backend_label.setToolTip('Change renderer under View > Renderer')
+        bar.addPermanentWidget(self._viewer_backend_label)
+        self._jobs_button = QToolButton()
+        self._jobs_button.setObjectName('JobsIndicator')
+        self._jobs_button.setIcon(icon('log'))
+        self._jobs_button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self._jobs_button.setCheckable(True)
+        self._jobs_button.setToolTip('Show or hide the jobs and log drawer')
+        self._jobs_button.toggled.connect(self._set_jobs_drawer)
+        self._jobs_dock.visibilityChanged.connect(self._sync_jobs_button)
+        bar.addPermanentWidget(self._jobs_button)
+        # Compact badge; the snapshot summary is its tooltip and Help > Development status.
+        self._development_status_label = QLabel()
+        self._development_status_label.setObjectName('DevBadge')
+        bar.addPermanentWidget(self._development_status_label)
+        self._refresh_jobs_indicator()
+
+    def _sync_jobs_button(self, _visible: bool = False) -> None:
+        self._jobs_button.blockSignals(True)
+        self._jobs_button.setChecked(not self._jobs_dock.isHidden())
+        self._jobs_button.blockSignals(False)
+
+    def _set_jobs_drawer(self, visible: bool) -> None:
+        was_hidden = self._jobs_dock.isHidden()
+        self._jobs_dock.setVisible(visible)
+        if visible and was_hidden:
+            self.resizeDocks([self._jobs_dock], [180], Qt.Orientation.Vertical)
+        self._sync_jobs_button()
+
+    def _show_jobs_drawer(self) -> None:
+        self._set_jobs_drawer(True)
+
+    def _refresh_jobs_indicator(self) -> None:
+        jobs = self._job_manager.jobs()
+        active = sum(1 for record in jobs.values() if record.state in ACTIVE_STATES)
+        failed = sum(1 for record in jobs.values() if record.state == JOB_STATE_FAILED)
+        if active:
+            text = '1 job running' if active == 1 else f'{active} jobs running'
+        elif failed:
+            text = f'Jobs and log ({failed} failed)'
+        else:
+            text = 'Jobs and log'
+        self._jobs_button.setText(text)
+
+    def _build_toolbar(self) -> None:
+        """Main toolbar: file, the wave/run workflow and standard views (existing actions reused)."""
+        from .icons import icon
+        bar = QToolBar('Main', self)
+        bar.setObjectName('MainToolbar')
+        bar.setMovable(False)
+        bar.setIconSize(QSize(20, 20))
+        bar.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.addToolBar(Qt.ToolBarArea.TopToolBarArea, bar)
+        def add(action, name, tip, text_beside=False):
+            action.setIcon(icon(name))
+            action.setToolTip(tip)
+            bar.addAction(action)
+            button = bar.widgetForAction(action)
+            if button is not None and not text_beside:
+                button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
+            return action
+        add(self._actions['new'], 'new', 'New project')
+        add(self._actions['open'], 'open', 'Open project…')
+        add(self._actions['save'], 'save', 'Save project (Ctrl+S)')
+        bar.addSeparator()
+        calc = QAction('Calculate waves', self)
+        calc.triggered.connect(lambda: self._waves.compute.click())
+        add(calc, 'waves', 'Calculate the body disturbance for the current wave inputs', text_beside=True)
+        add(self._actions['run'], 'run', self._actions['run'].text().replace('&', ''), text_beside=True)
+        add(self._actions['cancel'], 'stop', 'Cancel all jobs')
+        bar.addSeparator()
+        add(self._actions['fit'], 'fit', 'Fit model to view (Ctrl+F)')
+        for label, name, azimuth, elevation in (('Isometric view', 'iso', 45.0, 28.0),
+                                                ('Top view', 'top', 0.0, 89.0),
+                                                ('Side view', 'side', 0.0, 0.0)):
+            view = QAction(label, self)
+            view.triggered.connect(lambda checked=False, a=azimuth, e=elevation: self._standard_view(a, e))
+            add(view, name, label)
+        self._toolbar = bar
+
+    def _standard_view(self, azimuth: float, elevation: float) -> None:
+        set_view = getattr(self.viewer, 'set_view', None)
+        if set_view is not None:
+            set_view(azimuth, elevation)
+        self._fit_model()
 
     def _build_menus(self) -> None:
         self._menu_bar = self.menuBar()
@@ -348,49 +611,56 @@ class MainWindow(QMainWindow):
         save_action.triggered.connect(self._save_project)
         file_menu.addAction(new_action)
         file_menu.addAction(open_action)
+        examples_menu = QMenu("&Examples", self)
+        self._examples_menu = examples_menu
         example_action = QAction("Load &example (two-body replay)", self)
         example_action.triggered.connect(self.load_example)
-        file_menu.addAction(example_action)
+        examples_menu.addAction(example_action)
         regular_wave_action = QAction('Load moored bodies in a regular wave (solved replay)', self)
         regular_wave_action.triggered.connect(self.load_regular_wave_example)
-        file_menu.addAction(regular_wave_action)
+        examples_menu.addAction(regular_wave_action)
         native_example_action = QAction('Load native dry two-body example', self)
         native_example_action.triggered.connect(self.load_native_example)
-        file_menu.addAction(native_example_action)
+        examples_menu.addAction(native_example_action)
         plates_action = QAction('Load attached-plate geometry example', self)
         plates_action.triggered.connect(self.load_plate_example)
-        file_menu.addAction(plates_action)
+        examples_menu.addAction(plates_action)
+        examples_menu.addSeparator()
         mooring_example_action=QAction('Load native mooring example (three lines)',self)
         mooring_example_action.triggered.connect(self.load_native_mooring_example)
-        file_menu.addAction(mooring_example_action)
+        examples_menu.addAction(mooring_example_action)
         fluid_example_action = QAction('Load native coupled fluid example',self)
         fluid_example_action.triggered.connect(self.load_native_fluid_example)
-        file_menu.addAction(fluid_example_action)
+        examples_menu.addAction(fluid_example_action)
         sea_example_action=QAction('Load coupled seeded-wave example',self)
         sea_example_action.triggered.connect(self.load_native_sea_state_example)
-        file_menu.addAction(sea_example_action)
+        examples_menu.addAction(sea_example_action)
         calculated_wave_action=QAction('Load calculated wave preview example',self)
         calculated_wave_action.triggered.connect(self.load_calculated_wave_example)
-        file_menu.addAction(calculated_wave_action)
+        examples_menu.addAction(calculated_wave_action)
+        examples_menu.addSeparator()
         hams_wave_action=QAction('Load stored HAMS wave samples',self)
         hams_wave_action.triggered.connect(lambda:self.load_hams_wave_bundle())
-        file_menu.addAction(hams_wave_action)
+        examples_menu.addAction(hams_wave_action)
         open_hams_wave_action=QAction('Open stored HAMS wave bundle…',self)
         open_hams_wave_action.triggered.connect(self.open_hams_wave_bundle)
         file_menu.addAction(open_hams_wave_action)
         morison_example_action = QAction('Load native wave/current Morison example', self)
         morison_example_action.triggered.connect(self.load_native_morison_example)
-        file_menu.addAction(morison_example_action)
+        examples_menu.addAction(morison_example_action)
         line_hydro_action=QAction('Load native wave/current mooring example',self)
         line_hydro_action.triggered.connect(self.load_native_line_hydro_example)
-        file_menu.addAction(line_hydro_action)
+        examples_menu.addAction(line_hydro_action)
         contact_action=QAction('Load native seabed contact example',self)
         contact_action.triggered.connect(self.load_native_contact_example)
-        file_menu.addAction(contact_action)
+        examples_menu.addAction(contact_action)
+        examples_menu.addSeparator()
         static_example_action=QAction('Load coupled static equilibrium example',self)
         static_example_action.triggered.connect(self.load_equilibrium_example)
-        file_menu.addAction(static_example_action)
+        examples_menu.addAction(static_example_action)
         file_menu.addAction(save_action)
+        file_menu.addSeparator()
+        file_menu.addMenu(examples_menu)
 
         jobs_menu = self._menu_bar.addMenu("&Jobs")
         run_action = QAction("&Run synthetic job", self)
@@ -456,6 +726,9 @@ class MainWindow(QMainWindow):
         fit_action.setShortcut("Ctrl+F")
         fit_action.triggered.connect(self._fit_model)
         view_menu.addAction(fit_action)
+        # Shared with the main toolbar (one action object: one shortcut, one enabled state).
+        self._actions = {"new": new_action, "open": open_action, "save": save_action,
+                         "run": run_linear_action, "cancel": cancel_action, "fit": fit_action}
         self._fit_action = fit_action
         renderer_menu = view_menu.addMenu('Renderer')
         self._renderer_group = QActionGroup(self)
@@ -472,6 +745,19 @@ class MainWindow(QMainWindow):
             action.triggered.connect(lambda checked=False, mode=mode: self._change_renderer(mode))
             self._renderer_actions[mode] = action
         self._renderer_menu = renderer_menu
+        view_menu.addSeparator()
+        self._water_actions = {}
+        for kind, label in (('water', 'Still-water plane'), ('grid', 'Water grid')):
+            action = QAction(label, self)
+            action.setCheckable(True)
+            action.setChecked(True)
+            action.toggled.connect(lambda visible, kind=kind: self._toggle_water(kind, visible))
+            view_menu.addAction(action)
+            self._water_actions[kind] = action
+        jobs_action = QAction('Jobs and log', self)
+        jobs_action.setShortcut('Ctrl+J')
+        jobs_action.triggered.connect(lambda: self._set_jobs_drawer(self._jobs_dock.isHidden()))
+        view_menu.addAction(jobs_action)
 
         help_menu = self._menu_bar.addMenu("&Help")
         about = QAction("&About", self)
@@ -537,7 +823,7 @@ class MainWindow(QMainWindow):
         except (ImportError,ValueError) as error:
             self._waves.reset();self._notify_warning('Stored HAMS waves',str(error));return
         self.setWindowTitle('ANYmarine — stored HAMS wave samples (unsaved, unqualified)')
-        self._wave_dock.raise_()
+        self._set_mode('waves')
         self.statusBar().showMessage('Stored HAMS samples — Waves selects incident, total, scattered or prescribed-motion radiation')
         self._diagnostics.appendPlainText('Loaded saved source-bound HAMS point fields. No calculation. Surface samples have true elevation; submerged dynamic pressure is retained separately. Development, unqualified.')
 
@@ -668,7 +954,7 @@ class MainWindow(QMainWindow):
         self._project_root = None
         self._set_project(project)
         self._set_result(project.results[0])
-        self._wave_dock.raise_()
+        self._set_mode('waves')
         self.setWindowTitle("ANYmarine — moored bodies in a regular wave (unsaved copy)")
         self.statusBar().showMessage("Stored solved replay — press Play: bodies and their forcing wave move together")
         self._diagnostics.appendPlainText(
@@ -707,8 +993,28 @@ class MainWindow(QMainWindow):
                 continue
             self._handles[body.body_id] = self._add_viewer_body(self.viewer, body, source)
         self._member_scene.sync(source, self._handles,line_nodes=line_nodes)
+        self._refresh_water()
         if self._handles or self._member_scene.line_handles:
             self._schedule_fit()
+
+    def _refresh_water(self) -> None:
+        """Size the still-water plane to the bodies and lines now in the viewer."""
+        self._marine.sync((*self._handles.values(), *self._member_scene.line_handles.values()))
+
+    def _on_wave_layer_changed(self) -> None:
+        """A computed wave surface replaces the still-water plane while it is shown."""
+        marine = getattr(self, '_marine', None)
+        waves = getattr(self, '_waves', None)
+        if marine is not None and waves is not None:
+            marine.set_suppressed(waves.handle is not None)
+
+    def _toggle_water(self, kind: str, visible: bool) -> None:
+        if kind == 'water':
+            self._marine.water_visible = visible
+        else:
+            self._marine.grid_visible = visible
+        self._refresh_water()
+        self.viewer.redraw()
 
     @staticmethod
     def _add_viewer_body(viewer, body, source):
@@ -741,11 +1047,6 @@ class MainWindow(QMainWindow):
         old = self.viewer
         candidate = None
         try:
-            layout_state = self.saveState()
-            horizontal_docks = [dock for dock in self.findChildren(QDockWidget)
-                if self.dockWidgetArea(dock) in (Qt.DockWidgetArea.LeftDockWidgetArea,
-                                                Qt.DockWidgetArea.RightDockWidgetArea)]
-            dock_widths = [dock.size().width() for dock in horizontal_docks]
             state = old.export_view_state()
             highlights = old.highlighted_tags()
             candidate = create_viewer(self, backend, host=QtViewerHostAdapter())
@@ -769,6 +1070,8 @@ class MainWindow(QMainWindow):
                 member_scene.update(handles,self._current_result.line_nodes[index],result=self._current_result,index=index)
             candidate.apply_view_state(state)
             candidate.set_highlight(highlights)
+            # Scenery is part of the candidate: a failure here also keeps the current view.
+            water = self._marine.build(candidate, (*handles.values(), *member_scene.line_handles.values()))
         except Exception as error:
             if candidate is not None:
                 candidate.destroy()
@@ -783,7 +1086,8 @@ class MainWindow(QMainWindow):
         old.removeEventFilter(self)
         old.render_error.disconnect(self._on_render_error)
         old.backend_changed.disconnect(self._on_backend_changed)
-        self.takeCentralWidget()
+        self._viewport_layout.replaceWidget(old, candidate)
+        old.hide()
         self.viewer = candidate
         self._handles = handles
         self._member_scene = member_scene
@@ -791,18 +1095,12 @@ class MainWindow(QMainWindow):
         candidate.installEventFilter(self)
         candidate.render_error.connect(self._on_render_error)
         candidate.backend_changed.connect(self._on_backend_changed)
-        self.setCentralWidget(candidate)
-        self.restoreState(layout_state)
-        # Qt redistributes spare central space after replacing the widget.
-        # Reapply the existing side-panel widths after that layout pass.
-        def restore_dock_widths():
-            if self.viewer is candidate:
-                self.resizeDocks(horizontal_docks, dock_widths, Qt.Orientation.Horizontal)
-        restore_dock_widths()
-        QTimer.singleShot(0, restore_dock_widths)
+        candidate.show()
         self._renderer_actions[backend].setChecked(True)
         old.destroy()
+        self._marine.adopt(candidate, water)
         self._waves.renderer_changed()
+        self._on_wave_layer_changed()
         candidate.redraw()
         self._log_viewer_backend()
 
@@ -822,13 +1120,13 @@ class MainWindow(QMainWindow):
         if not viewer.isVisible() or size.width() <= 1 or size.height() <= 1:
             return  # not laid out yet; the Show/Resize filter re-arms the timer
         self._fit_pending = False
-        viewer.fit_to_scene()
+        self._marine.fit(viewer)
 
     def _fit_model(self) -> None:
         """User-triggered immediate fit (View > Fit model)."""
 
         self._fit_pending = False
-        self.viewer.fit_to_scene()
+        self._marine.fit(self.viewer)
 
     def eventFilter(self, watched, event) -> bool:  # noqa: N802
         if (self._startup_renderer_pending and self.isVisible()
@@ -1228,7 +1526,7 @@ class MainWindow(QMainWindow):
         try:self._waves.load_stored_hams(record)
         except ValueError as error:
             self._notify_warning('HAMS replay refused', str(error)); return
-        self._wave_dock.raise_()
+        self._set_mode('waves')
         self._diagnostics.appendPlainText(f'HAMS field job {job_id[:8]} displayed from authoritative saved arrays; development, unqualified.')
 
     def _run_native_job(self) -> None:
@@ -1429,6 +1727,7 @@ class MainWindow(QMainWindow):
 
     def _on_job_state(self, job_id: str, state: str) -> None:
         self._refresh_jobs_table()
+        self._refresh_jobs_indicator()
         record = self._job_manager.job(job_id)
         if record is not None:
             self._diagnostics.appendPlainText(
@@ -1461,6 +1760,8 @@ class MainWindow(QMainWindow):
 
     def _on_job_failed(self, job_id: str, message: str) -> None:
         self._diagnostics.appendPlainText(f"job {job_id[:8]}… FAILED: {message}")
+        self._refresh_jobs_indicator()
+        self._show_jobs_drawer()
 
     def _refresh_jobs_table(self) -> None:
         jobs = self._job_manager.jobs()
@@ -1912,13 +2213,15 @@ class MainWindow(QMainWindow):
             self._sync_viewer_bodies(self._replay_project,line_nodes=result.line_nodes[0] if result.kind=='line_equilibrium_development' else None)
         self._current_result = result
         self._play_timer.stop()
-        self._play_button.setText("Play")
+        self._set_play_button(False)
+        self._transport.setVisible(result is not None)
         if result is None:
             self._frame_slider.setRange(0, 0)
             self._channel_combo.clear()
             self._plot.set_series("", [], [])
             self._result_status = "no result"
             self._frame_label.setText("no result")
+            self._refresh_transport_label(0)
             return
         frames = result.frame_count()
         self._frame_slider.setRange(0, frames - 1)
@@ -1947,15 +2250,20 @@ class MainWindow(QMainWindow):
         self._plot.set_series(name, self._current_result.times, values)
         self._plot.set_cursor(self._current_frame)
 
+    def _set_play_button(self, playing: bool) -> None:
+        from .icons import icon
+        self._play_button.setText("Pause" if playing else "Play")
+        self._play_button.setIcon(icon('pause' if playing else 'play'))
+
     def _toggle_play(self) -> None:
         if self._play_timer.isActive():
             self._play_timer.stop()
-            self._play_button.setText("Play")
+            self._set_play_button(False)
         else:
             if self._current_result is None:
                 return
             self._play_timer.start()
-            self._play_button.setText("Pause")
+            self._set_play_button(True)
 
     def _advance_frame(self) -> None:
         if self._current_result is None:
@@ -2011,6 +2319,29 @@ class MainWindow(QMainWindow):
                       for i in range(len(contact_lumps(self._member_scene.contact_inputs))))
             penetration=self._current_result.channels['mooring/contact/max_penetration'][index]
             self._frame_label.setText(self._frame_label.text()+f' — active contact samples{int(count)}, max penetration{penetration:.5g} m')
+        self._refresh_transport_label(index)
+
+    def _refresh_transport_label(self, index: int) -> None:
+        """One-line replay position for the transport bar; the full status is its tooltip."""
+        result = self._current_result
+        full = self._frame_label.text()
+        if result is None:
+            text = "no result"
+        else:
+            frames = result.frame_count()
+            if result.kind in ('equilibrium_development', 'line_equilibrium_development'):
+                text = f"stage {index + 1}/{frames}"
+            else:
+                text = f"frame {index + 1}/{frames} · t = {result.times[index]:.2f} s"
+            lowered = full.lower()
+            if 'stale' in lowered:
+                text += " · stale"
+            if 'unqualified' in lowered or 'synthetic' in lowered or 'development' in lowered:
+                text += " · unqualified"
+        self._transport_label.keep_suffix = " · unqualified" if text.endswith(" · unqualified") else ""
+        self._transport_label.setText(text)
+        self._transport_label.updateGeometry()
+        self._transport_label.setToolTip(full)
 
     # ------------------------------------------------------------- file menu
 
@@ -2077,12 +2408,13 @@ class MainWindow(QMainWindow):
             status = load_development_status()
         except DevelopmentStatusError as exc:
             self._development_status = None
-            self._development_status_label.setText(
-                'Development status data unavailable (corrupt or missing)')
+            self._development_status_label.setText('Development status unavailable')
             self._development_status_label.setToolTip(str(exc))
             return
         self._development_status = status
-        self._development_status_label.setText(startup_summary(status))
+        self._development_status_label.setText('Development preview · unqualified')
+        self._development_status_label.setToolTip(
+            startup_summary(status) + '. Results are development output and are not qualified.')
 
     def _show_development_status(self) -> None:
         try:

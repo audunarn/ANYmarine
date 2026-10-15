@@ -55,6 +55,8 @@ def test_plate_scene_uses_public_two_sided_options(window,monkeypatch):
         return original(mesh,**kwargs)
     monkeypatch.setattr(window.viewer,'add_mesh_arrays',capture)
     window.load_plate_example()
+    from anymarine.qtapp.marine_scene import TAG
+    calls=[call for call in calls if call[1].get('tags')!=TAG]  # the still-water plane is scenery
     assert len(calls)==2
     assert all(count==14 and kw['two_sided_shell'] and not kw['cull_backface'] for count,kw in calls)
 

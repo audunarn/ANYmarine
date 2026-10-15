@@ -89,7 +89,7 @@ def test_renderer_change_keeps_replay_pose_camera_and_project(app,window):
     window.load_example()
     assert window.viewer is new
 
-@pytest.mark.parametrize('stage',('create','populate','state'))
+@pytest.mark.parametrize('stage',('create','populate','state','water'))
 def test_failed_renderer_selection_retains_current_view(app,window,monkeypatch,stage):
     window.load_example()
     window.show()
@@ -106,12 +106,18 @@ def test_failed_renderer_selection_retains_current_view(app,window,monkeypatch,s
         create=ui.create_viewer
         monkeypatch.setattr(ui,'create_viewer',lambda parent,backend,**kw: create(parent,'software',**kw))
         monkeypatch.setattr(window,'_add_viewer_body',fail)
-    else:
+    elif stage=='state':
         create=ui.create_viewer
         monkeypatch.setattr(ui,'create_viewer',lambda parent,backend,**kw: create(parent,'software',**kw))
         monkeypatch.setattr(type(original),'apply_view_state',fail)
+    else:
+        create=ui.create_viewer
+        monkeypatch.setattr(ui,'create_viewer',lambda parent,backend,**kw: create(parent,'software',**kw))
+        monkeypatch.setattr(window._marine,'build',fail)
+    water=window._marine.handle
     window._renderer_actions['gpu'].trigger()
-    assert window.viewer is original and window.centralWidget() is original
+    assert window._marine.viewer is original and window._marine.handle is water
+    assert window.viewer is original and window._viewport_layout.indexOf(original) >= 0
     assert window._handles==handles and not original._closed
     assert window._project is project and window._current_result is result
     assert window._renderer_actions['software'].isChecked()

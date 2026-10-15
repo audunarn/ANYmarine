@@ -51,10 +51,12 @@ def window(app):
 def test_startup_status_label_shows_compact_snapshot(window):
     label = window._development_status_label
     status = load_development_status()
-    assert label.text() == startup_summary(status)
-    assert "2026-10-10" in label.text()
-    assert "unqualified" in label.text()
-    assert "NO_GO" in label.text()
+    # compact badge in the status bar; the snapshot summary is its tooltip
+    assert label.text() == "Development preview · unqualified"
+    assert label.toolTip().startswith(startup_summary(status))
+    assert "2026-10-10" in label.toolTip()
+    assert "unqualified" in label.toolTip()
+    assert "NO_GO" in label.toolTip()
 
 
 def test_help_menu_has_development_status_action(window):
@@ -69,6 +71,13 @@ def test_existing_menu_paths_preserved(window):
     file_titles = [
         action.text() for action in window._menus[0].actions()
     ]
+    # examples live in File > Examples, not directly under File (owner, 2026-10-15)
+    assert "&Examples" in file_titles
+    assert not any(title.startswith("Load ") for title in file_titles)
+    assert "Open stored HAMS wave bundle…" in file_titles
+    example_titles = [
+        action.text() for action in window._examples_menu.actions()
+    ]
     for expected in (
         "Load &example (two-body replay)",
         "Load native dry two-body example",
@@ -78,13 +87,12 @@ def test_existing_menu_paths_preserved(window):
         "Load coupled seeded-wave example",
         "Load calculated wave preview example",
         "Load stored HAMS wave samples",
-        "Open stored HAMS wave bundle…",
         "Load native wave/current Morison example",
         "Load native wave/current mooring example",
         "Load native seabed contact example",
         "Load coupled static equilibrium example",
     ):
-        assert expected in file_titles
+        assert expected in example_titles
     renderer_titles = [
         action.text() for action in window._renderer_menu.actions()
     ]

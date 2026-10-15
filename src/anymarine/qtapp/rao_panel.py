@@ -15,7 +15,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from PySide6.QtCore import QPointF, QProcess, QProcessEnvironment, Qt, Signal
+from PySide6.QtCore import QPointF, QProcess, QRectF, QProcessEnvironment, Qt, Signal
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen
 from PySide6.QtWidgets import (QButtonGroup, QComboBox, QFileDialog, QGridLayout, QHBoxLayout, QLabel,
                                QPushButton, QRadioButton, QTabWidget, QTableWidget,
@@ -155,7 +155,7 @@ class RaoAxes(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setMinimumSize(220, 170)
+        self.setMinimumSize(150, 150)
         self._title, self._xlabel, self._ylabel, self._series = '', '', '', []
 
     def set_data(self, title, xlabel, ylabel, series):
@@ -190,11 +190,15 @@ class RaoAxes(QWidget):
         painter.setFont(font)
         xs = [x for item in self._series for x in item.xs]
         ys = [y for item in self._series for y in item.ys]
+        if not xs:
+            painter.setPen(QPen(QColor('#d5dce5')))
+            painter.drawRect(int(x0), int(y0), int(x1 - x0), int(y1 - y0))
+            painter.setPen(QColor('#8592a3'))
+            painter.drawText(QRectF(x0, y0, x1 - x0, y1 - y0), int(Qt.AlignmentFlag.AlignCenter),
+                             'no data for this selection')
+            return
         painter.setPen(QPen(QColor('#000000')))
         painter.drawRect(int(x0), int(y0), int(x1 - x0), int(y1 - y0))
-        if not xs:
-            painter.drawText(int(x0) + 8, int(y0) + 16, 'no data for this selection')
-            return
         xlo, xhi = min(xs), max(xs)
         if xhi <= xlo:
             xlo, xhi = xlo - 0.5, xhi + 0.5
@@ -309,12 +313,13 @@ class RaoPanel(QWidget):
         self.run_button = QPushButton('Run TD campaign')
         self.open_button = QPushButton('Open results…')
         self.cancel_button = QPushButton('Cancel')
-        for row in ((self.register_button, self.table_button, self.run_button),
-                    (self.open_button, self.cancel_button)):
-            buttons = QHBoxLayout()
-            for b in row:
-                buttons.addWidget(b)
-            layout.addLayout(buttons)
+        self.register_button.setProperty('primary', True)
+        # Two columns keep the panel readable in a narrow context panel.
+        buttons = QGridLayout()
+        for i, b in enumerate((self.register_button, self.open_button, self.table_button, self.run_button,
+                               self.cancel_button)):
+            buttons.addWidget(b, i // 2, i % 2)
+        layout.addLayout(buttons)
         self.case_label = QLabel('No RAO case. Register one from a JSON specification (see docs/RAO_REPORTING.md).')
         self.case_label.setWordWrap(True)
         layout.addWidget(self.case_label)
@@ -340,8 +345,10 @@ class RaoPanel(QWidget):
         for i, (label, combo) in enumerate((('Body', self.owner), ('Graph type', self.quantity),
                                             ('Contribution', self.contribution), ('Wave heading (deg)', self.heading),
                                             ('Wave amplitude', self.amplitude), ('X axis', self.x_axis))):
-            controls.addWidget(QLabel(label), i // 3 * 2, i % 3)
-            controls.addWidget(combo, i // 3 * 2 + 1, i % 3)
+            controls.addWidget(QLabel(label), i // 2 * 2, i % 2)
+            controls.addWidget(combo, i // 2 * 2 + 1, i % 2)
+            combo.setMinimumContentsLength(8)
+            combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
         graphs_layout.addLayout(controls)
         options = QHBoxLayout()
         self.source_group, self.display_group = QButtonGroup(self), QButtonGroup(self)
@@ -351,16 +358,18 @@ class RaoPanel(QWidget):
             self.source_buttons[key] = button
             self.source_group.addButton(button)
             options.addWidget(button)
-        options.addSpacing(16)
+        options.addStretch(1)
+        graphs_layout.addLayout(options)
+        display = QHBoxLayout()
         self.display_buttons = {}
         for key, text in (('amplitude', 'Amplitude'), ('phase', 'Phase')):
             button = QRadioButton(text)
             self.display_buttons[key] = button
             self.display_group.addButton(button)
-            options.addWidget(button)
-        options.addStretch(1)
+            display.addWidget(button)
+        display.addStretch(1)
         self.display_buttons['amplitude'].setChecked(True)
-        graphs_layout.addLayout(options)
+        graphs_layout.addLayout(display)
         self.grid = RaoGrid()
         graphs_layout.addWidget(self.grid, 1)
         self.tabs.addTab(graphs, 'Graphs')
@@ -383,6 +392,7 @@ class RaoPanel(QWidget):
         self.tabs.addTab(details, 'Details')
         self.note = QLabel('RAO reporting is development evidence only (docs/RAO_REPORTING.md); unqualified.')
         self.note.setWordWrap(True)
+        self.note.setProperty('role', 'hint')
         layout.addWidget(self.note)
         self.register_button.clicked.connect(lambda: self.register_case())
         self.table_button.clicked.connect(lambda: self.start('rao-table'))

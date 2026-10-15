@@ -34,4 +34,4 @@ testpaths = ["tests"]
 addopts = "--basetemp=.pytest-tmp"
 
 [tool.setuptools.package-data]
-anymarine = ["development_status.json", "examples/hams-wave-points/*.json", "examples/hams-wave-points/*.nc", "examples/calculated-wave-preview/*.json", "examples/shared-sea-state-development/*.json", "examples/two-body-replay/*.json", "examples/two-body-replay/bodies/*.json", "examples/two-body-replay/results/*.json", "examples/regular-wave-replay/*.json", "examples/regular-wave-replay/bodies/*.json", "examples/regular-wave-replay/native_inputs/*.json", "examples/regular-wave-replay/results/*.json"]
+anymarine = ["development_status.json", "qtapp/assets/*.svg", "examples/hams-wave-points/*.json", "examples/hams-wave-points/*.nc", "examples/calculated-wave-preview/*.json", "examples/shared-sea-state-development/*.json", "examples/two-body-replay/*.json", "examples/two-body-replay/bodies/*.json", "examples/two-body-replay/results/*.json", "examples/regular-wave-replay/*.json", "examples/regular-wave-replay/bodies/*.json", "examples/regular-wave-replay/native_inputs/*.json", "examples/regular-wave-replay/results/*.json"]

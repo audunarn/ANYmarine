@@ -83,7 +83,12 @@ class DetailsPanel(QWidget):
         layout.addLayout(self._stack)
 
         # empty page
-        self._stack.addWidget(QLabel("Select an item in the project tree."))
+        empty = QLabel("Select a body, settings or a result in the project tree above "
+                       "to see and edit its properties.")
+        empty.setObjectName("EmptyState")
+        empty.setWordWrap(True)
+        empty.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        self._stack.addWidget(empty)
 
         # body page
         body_box = QGroupBox("Body")

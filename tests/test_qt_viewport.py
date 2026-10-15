@@ -127,10 +127,12 @@ def test_unfallbackable_render_failure_is_visible(qapp, window, project_dir, mon
 
 
 def test_light_workbench_theme_applied(qapp, window):
+    from anymarine.qtapp import theme
+
     sheet = window.styleSheet()
-    assert "#f3f5f8" in sheet
-    assert "#253247" in sheet
-    assert window.font().pointSizeF() == pytest.approx(10.0)
+    assert sheet == theme.WORKBENCH_STYLESHEET
+    assert theme.APP_BG in sheet and theme.TEXT in sheet and theme.ACCENT in sheet
+    assert window.font().pointSizeF() == pytest.approx(9.5)
 
 
 def test_reload_preserves_reference_and_replay_transforms(qapp, window):

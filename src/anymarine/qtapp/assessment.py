@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QDialogButtonBox,
     QFileDialog,
     QFormLayout,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -153,22 +154,23 @@ class AssessmentPanel(QWidget):
         self._table.horizontalHeader().setStretchLastSection(True)
         self._table.setMinimumHeight(160)
 
-        buttons = QHBoxLayout()
+        buttons = QGridLayout()
         self._register_button = QPushButton("Register case…")
         self._assess_button = QPushButton("Assess selected result…")
+        self._assess_button.setProperty("primary", True)
         self._pair_button = QPushButton("Assess coarse/fine pair…")
         self._reopen_button = QPushButton("Reopen snapshot…")
         self._register_button.clicked.connect(self.register_case_requested.emit)
         self._assess_button.clicked.connect(self.assess_requested.emit)
         self._pair_button.clicked.connect(self.pair_requested.emit)
         self._reopen_button.clicked.connect(self.reopen_requested.emit)
-        for button in (
+        for index, button in enumerate((
             self._register_button,
             self._assess_button,
             self._pair_button,
             self._reopen_button,
-        ):
-            buttons.addWidget(button)
+        )):
+            buttons.addWidget(button, index // 2, index % 2)
 
         self._member_combo = QComboBox()
         self._member_combo.addItem("coarse")

@@ -1,7 +1,7 @@
 """ANY3dView wave layer and controls, using the application's single job queue."""
 import numpy as np
 from PySide6.QtCore import QTimer
-from PySide6.QtWidgets import (QWidget,QVBoxLayout,QFormLayout,QComboBox,QDoubleSpinBox,
+from PySide6.QtWidgets import (QWidget,QVBoxLayout,QHBoxLayout,QFormLayout,QComboBox,QDoubleSpinBox,
                               QLabel,QPushButton,QFileDialog)
 from any3dview import MeshArrays
 from ..wave_jobs import preview_request
@@ -13,10 +13,21 @@ MATCHED_NOTE=('Saved incident waves that drove the shown result, at the replay t
     'Undisturbed incident field; diffraction and radiation are not drawn. Development preview — unqualified.')
 
 class WavesPanel(QWidget):
+    @property
+    def handle(self):
+        """The wave-surface viewer handle (None while no surface is shown)."""
+        return self._handle
+
+    @handle.setter
+    def handle(self,value):
+        self._handle=value
+        changed=getattr(self.window,'_on_wave_layer_changed',None)
+        if changed is not None:changed()
+
     def __init__(self,window):
         super().__init__(window)
         self.window=window
-        self.field=None;self.handle=None;self.saved_poses=None;self.saved_view=None
+        self.field=None;self._handle=None;self.saved_poses=None;self.saved_view=None
         self.job_id=None;self.time=0.;self.mechanical_environment=None
         layout=QVBoxLayout(self)
         self.mode=QComboBox()
@@ -24,6 +35,8 @@ class WavesPanel(QWidget):
             'Stored HAMS: incident','Stored HAMS: total (incident + disturbance)','Stored HAMS: scattered only','Stored HAMS: prescribed-motion radiation'])
         self.mode.model().item(2).setEnabled(False)
         for i in range(4,8):self.mode.model().item(i).setEnabled(False)
+        self.mode.setMinimumContentsLength(14)
+        self.mode.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
         layout.addWidget(self.mode)
         form=QFormLayout();self.regular_form=form
         self.amplitude=self._spin(.01,2.,.3,.05)
@@ -49,22 +62,25 @@ class WavesPanel(QWidget):
         self.save_stored=QPushButton('Save stored HAMS wave bundle…');self.save_stored.clicked.connect(self.save_stored_bundle);layout.addWidget(self.save_stored)
         self._stored_controls(False)
         self.compute=QPushButton('Calculate body disturbance')
+        self.compute.setProperty('primary',True)
         self.compute.clicked.connect(self.calculate)
         layout.addWidget(self.compute)
         self.play=QPushButton('Pause waves')
         self.play.clicked.connect(self.toggle_play)
-        layout.addWidget(self.play)
         self.cancel_button=QPushButton('Cancel wave calculation')
         self.cancel_button.clicked.connect(self.cancel)
-        layout.addWidget(self.cancel_button)
+        secondary=QHBoxLayout();secondary.addWidget(self.play);secondary.addWidget(self.cancel_button)
+        layout.addLayout(secondary)
         self.status=QLabel('Choose Incident waves, or calculate body disturbance.')
         self.status.setWordWrap(True)
         layout.addWidget(self.status)
-        self.elevation_legend=QLabel('Surface elevation [m]');layout.addWidget(self.elevation_legend)
+        self.elevation_legend=QLabel('Surface elevation [m]');self.elevation_legend.setProperty('role','hint')
+        self.elevation_legend.setWordWrap(True);layout.addWidget(self.elevation_legend)
         self.note=QLabel('Fixed captured body poses; linear Airy waves, no wave stretching. '
                     'Disturbed view adds calculated diffraction. Body-motion radiation is not included. '
                     'Coarse development preview — unqualified.')
         self.note.setWordWrap(True)
+        self.note.setProperty('role','hint')
         layout.addWidget(self.note)
         layout.addStretch()
         self.timer=QTimer(self)
