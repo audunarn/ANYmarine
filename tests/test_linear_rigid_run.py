@@ -393,3 +393,45 @@ def test_worker_runs_and_the_service_decodes_a_rigid_job(tmp_path):
     result = service.load_job_output(output_path, snapshot["input_hash"])
     assert result.result_layout == LINEAR_LAYOUT_RIGID
     verify_linear_result(result, inputs)
+
+
+# ---------------------------------------------------------------- review round 2 regressions
+
+class _Token:
+    def __init__(self):
+        self.calls = 0
+
+    def is_cancelled(self):
+        self.calls += 1
+        return False
+
+
+def test_uncancelled_token_objects_do_not_cancel_legacy_or_rigid_runs():
+    from anymarine.linear import analytic_demo_inputs
+    project, inputs, _ = _mixed_run()
+    token = _Token()
+    run_linear(inputs, cancel=token, producing_bodies=project.bodies)
+    assert token.calls > 0
+    legacy_project = default_two_body_project()
+    run_linear(analytic_demo_inputs(legacy_project), cancel=_Token())
+
+
+def test_decoder_allows_round_off_near_a_component_nullspace():
+    """Codex reproduction: PSD damping 1000 [[1, 1], [1, 1]] with q0 = (0.1, -0.1) gives a nearly zero damping force."""
+    project = _one_body_project()
+    dofs = ("surge", "sway")
+    M = rigid_dry_mass((rigid_binding(project.bodies[0], dofs),))
+    K = np.diag(np.diag(M)) * (2 * math.pi / 8.0) ** 2
+    inputs = _inputs(project, dofs, dt=0.05, n_steps=401, stiffness=K, damping=1000.0 * np.ones((2, 2)),
+                     q0=(0.1, -0.1))
+    result = run_linear(inputs, producing_bodies=project.bodies)
+    verify_linear_result(result, inputs)
+
+
+def test_decoder_is_fast_enough_for_the_cancellation_bound():
+    """Review round 2: the O(S log S) memory recomputation keeps verification well inside 1 s at 8,801 steps."""
+    project, inputs = _large_inputs(LinearExecutionLimits(max_frames=8801))
+    result = run_linear(inputs, producing_bodies=project.bodies)
+    start = time.perf_counter()
+    verify_linear_result(result, inputs)
+    assert time.perf_counter() - start < 1.0

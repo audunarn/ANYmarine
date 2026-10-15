@@ -791,6 +791,40 @@ def _verify_rigid_result(result: ResultRecord, inputs: LinearDevelopmentInputs) 
 # update identities; the equation-of-motion balance uses the solver's own per-step scale.
 _DECODE_RELATIVE = 1.0e-9
 _BALANCE_RELATIVE = 1.0e-8
+# Round-off allowance relative to the operand scale sum |X||y| of a product (different summation orders).
+_ROUNDOFF_RELATIVE = 1.0e-12
+
+
+def _trapezoidal_memory(kernel: np.ndarray, v: np.ndarray, dt: float) -> tuple[np.ndarray, np.ndarray]:
+    """The solver's memory force for every step, by FFT convolution (O(S log S)), and its operand scale.
+
+    memory_0 = 0; memory_n = dt (sum_{j=0..n} K[n-j] v_j - K[n] v_0 / 2 - K[0] v_n / 2) for n >= 1 - the
+    trapezoidal rule of anysolver.marine_linear (past lags plus the current-step half weight).
+    """
+
+    steps = v.shape[0]
+    kernel = kernel[:steps]                     # only lags 0..S-1 enter; avoids circular wrap-around
+    size = 1 << int(2 * steps - 1).bit_length()
+
+    def convolve(K, x):
+        product = np.einsum("fik,fk->fi", np.fft.rfft(K, size, axis=0), np.fft.rfft(x, size, axis=0))
+        return np.fft.irfft(product, size, axis=0)[:steps]
+    full = convolve(kernel, v)
+    memory = dt * (full - 0.5 * np.einsum("nik,k->ni", kernel[:steps], v[0]) - 0.5 * v @ kernel[0].T)
+    memory[0] = 0.0
+    operand = dt * convolve(np.abs(kernel), np.abs(v))
+    return memory, np.abs(operand)
+
+
+def _cancel_flag(cancel) -> bool:
+    """The solver's cancellation normalisation: a callable, or an object whose is_cancelled is a flag or method."""
+
+    if cancel is None:
+        return False
+    if callable(cancel):
+        return bool(cancel())
+    flag = getattr(cancel, "is_cancelled")
+    return bool(flag() if callable(flag) else flag)
 
 
 def _verify_rigid_dynamics(result: ResultRecord, inputs: LinearDevelopmentInputs) -> None:
@@ -815,31 +849,33 @@ def _verify_rigid_dynamics(result: ResultRecord, inputs: LinearDevelopmentInputs
     C, K = np.asarray(inputs.damping), np.asarray(inputs.stiffness)
     kernel = np.asarray(inputs.radiation_kernel, dtype=float)
     dt = inputs.dt
-    memory = np.zeros_like(q)
-    for n in range(1, q.shape[0]):
-        past = 0.5 * (kernel[n] @ v[0])
-        if n > 1:
-            past = past + np.einsum("lij,lj->i", kernel[1:n], v[n - 1:0:-1])
-        memory[n] = dt * past + 0.5 * dt * (kernel[0] @ v[n])
-    expected = {"force_dry_inertia:": a @ M.T, "force_added_inertia:": a @ A.T, "force_damping:": v @ C.T,
-                "force_stiffness:": q @ K.T, "force_memory:": memory}
+    memory, memory_operand = _trapezoidal_memory(kernel, v, dt)
+    expected = {"force_dry_inertia:": (a @ M.T, np.abs(a) @ np.abs(M).T),
+                "force_added_inertia:": (a @ A.T, np.abs(a) @ np.abs(A).T),
+                "force_damping:": (v @ C.T, np.abs(v) @ np.abs(C).T),
+                "force_stiffness:": (q @ K.T, np.abs(q) @ np.abs(K).T),
+                "force_memory:": (memory, memory_operand)}
     stored = {prefix: stack(prefix) for prefix in expected}
-    for prefix, values in expected.items():
-        scale = max(float(np.max(np.abs(values))), float(np.max(np.abs(stored[prefix]))), 1e-300)
-        if np.max(np.abs(stored[prefix] - values)) > _DECODE_RELATIVE * scale:
+    for prefix, (values, operand) in expected.items():
+        # round-off allowance from the operands (a product near a component's nullspace cancels), plus the
+        # relative decoder tolerance on the output itself
+        tolerance = (_ROUNDOFF_RELATIVE * float(np.max(operand))
+                     + _DECODE_RELATIVE * max(float(np.max(np.abs(values))), float(np.max(np.abs(stored[prefix])))))
+        if np.max(np.abs(stored[prefix] - values)) > max(tolerance, 1e-300):
             raise LinearResultIncomplete(f"stored {prefix[:-1]} channels are not reproduced from q/v/a and the inputs")
     residual = stack("force_residual:")
     total = sum(stored.values())
-    if np.max(np.abs(residual - (external - total))) > _DECODE_RELATIVE * max(float(np.max(np.abs(external))),
-                                                                              float(np.max(np.abs(total))), 1e-300):
+    operand_total = np.abs(external) + sum(np.abs(values) for values in stored.values())
+    if np.max(np.abs(residual - (external - total))) > max(_ROUNDOFF_RELATIVE * float(np.max(operand_total)), 1e-300):
         raise LinearResultIncomplete("stored residual forces are not external minus the force components")
-    for n in range(q.shape[0]):
-        scale = max(1.0, float(np.linalg.norm(external[n])),
-                    float(np.linalg.norm(stored["force_dry_inertia:"][n] + stored["force_added_inertia:"][n])),
-                    float(np.linalg.norm(stored["force_damping:"][n])), float(np.linalg.norm(stored["force_stiffness:"][n])),
-                    float(np.linalg.norm(stored["force_memory:"][n])))
-        if np.linalg.norm(residual[n]) > _BALANCE_RELATIVE * scale:
-            raise LinearResultIncomplete(f"the equation of motion is not satisfied at step {n}")
+    norm = lambda x: np.linalg.norm(x, axis=1)
+    step_scale = np.maximum.reduce([np.ones(q.shape[0]), norm(external),
+                                    norm(stored["force_dry_inertia:"] + stored["force_added_inertia:"]),
+                                    norm(stored["force_damping:"]), norm(stored["force_stiffness:"]),
+                                    norm(stored["force_memory:"])])
+    failing = np.flatnonzero(norm(residual) > _BALANCE_RELATIVE * step_scale)
+    if failing.size:
+        raise LinearResultIncomplete(f"the equation of motion is not satisfied at step {int(failing[0])}")
     dq = q[1:] - q[:-1] - dt * v[:-1] - 0.25 * dt * dt * (a[:-1] + a[1:])
     dv = v[1:] - v[:-1] - 0.5 * dt * (a[:-1] + a[1:])
     q_scale = max(float(np.max(np.abs(q))), dt * float(np.max(np.abs(v))), dt * dt * float(np.max(np.abs(a))), 1e-300)
@@ -904,12 +940,7 @@ def run_linear(
         def cancel():
             if _time.monotonic() > deadline:
                 return True
-            if user_cancel is None:
-                return False
-            if callable(user_cancel):
-                return bool(user_cancel())
-            flag = getattr(user_cancel, "is_cancelled")
-            return bool(flag() if callable(flag) else flag)
+            return _cancel_flag(user_cancel)
     marine_linear = _import_solver()
     spec = marine_linear.MarineLinearSpec(
         labels=inputs.labels,
@@ -1045,6 +1076,6 @@ def run_linear(
             raise LinearWallTimeExceeded(
                 f"the linear run exceeded max_wall_seconds {limits.max_wall_seconds:g} while building the result; "
                 "no result is produced")
-    if cancel is not None and (cancel() if callable(cancel) else bool(getattr(cancel, "is_cancelled", False))):
+    if _cancel_flag(cancel):
         raise LinearCancelledError("the linear run was cancelled while building the result; no result is produced")
     return record
