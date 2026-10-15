@@ -275,6 +275,9 @@ def matrix_pencil(samples, dt, order, rank_tolerance: float = 1e-10):
     V = Vh[:order].conj().T
     V1, V2 = V[:-1], V[1:]
     z = np.linalg.eigvals(np.linalg.pinv(V1) @ V2)
+    if np.any(np.abs(z) <= 1e-300) or not np.all(np.isfinite(z)):
+        raise LinearFdError("matrix pencil produced a zero or non-finite discrete eigenvalue (e.g. an impulse-only "
+                            "kernel channel); no finite continuous exponent exists")
     return np.log(z.astype(complex)) / dt
 
 

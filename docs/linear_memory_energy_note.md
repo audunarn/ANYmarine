@@ -29,7 +29,8 @@ and hence E_N = E_0 + W_ext - W_C - W_mem. Here W_C = sum dt vbar^T C vbar >= 0 
 ## Claim
 
 If v_0 = 0 (every judged run starts from rest or from a displacement) and the stored kernel is passive in the sense
-of ADR-015 section 8 (iv), then W_mem(N) >= 0 for every N. Consequently E_N <= E_0 + W_ext.
+of ADR-015 section 8 (iv) with exactly positive semi-definite samples, then W_mem(N) >= 0 for every N.
+Consequently E_N <= E_0 + W_ext. The admitted round-off tolerance is treated in the section after the proof.
 
 ## Proof
 
@@ -87,41 +88,60 @@ of ADR-015 section 8 (iv), then W_mem(N) >= 0 for every N. Consequently E_N <= E
 ## Admission tolerance: a round-off-level perturbation bound
 
 The theorem above assumes exactly positive semi-definite damping samples. Structural admission (ADR-015 section 8
-(iii)-(iv)) admits eigenvalues down to -64 eps ||B|| (and -64 eps ||C||). Such a sample is not exactly positive
-semi-definite, and a tiny negative W_mem is then possible (Codex review L6-A round 1 gives an example of size
--eps/(8 pi)). The claim is therefore stated for the admitted class with the following bound.
+(iii)-(iv)) checks the normalised operators X_hat = S^T X S, where q = S q_hat and S = diag(1 for translations,
+1/L for rotations). It admits normalised eigenvalues down to -64 eps ||B_hat|| (and -64 eps ||C_hat||). Such an
+operator is not exactly positive semi-definite, and a small negative W_mem is then possible (Codex review L6-A
+round 1). The claim for the admitted class is therefore stated, entirely in normalised coordinates, with the
+following bound.
+
+**Coordinates.** With v = S v_hat and s = S s_hat:
+
+    s_n^T g_l s_j = s_hat_n^T g_hat_l s_hat_j,    g_hat_l = S^T g_l S.
+
+So the proof above applies verbatim to the normalised kernel, and W_mem is coordinate-free.
 
 **Notation.**
-- Let delta = max over all samples i of max(0, -lambda_min(B_i)), so delta <= 64 eps max_i ||B_i||.
+- Let delta_hat = max over all samples i of max(0, -lambda_min(B_hat_i)), so delta_hat <= 64 eps max_i ||B_hat_i||.
 - Let omega_max be the top of the stored band.
 
 **Steps.**
-1. The piecewise-linear interpolant of the samples, with a linear-to-zero or zero low tail and a truncated high
-   tail, satisfies B(w) >= -delta I on [0, omega_max] and B(w) = 0 above it. This holds because the negative part of
-   a convex combination is bounded by the same delta.
-2. The Bartlett-tapered spectrum is the convolution of B with the normalised non-negative Fejer kernel. That kernel
-   integrates to w(0) = 1, so Btilde(w) >= -delta (F * 1_band)(w) I, where 1_band is the indicator of the band.
+1. The piecewise-linear interpolant of the normalised samples, with a linear-to-zero or zero low tail and a
+   truncated high tail, satisfies B_hat(w) >= -delta_hat I on [0, omega_max] and B_hat(w) = 0 above it. This holds
+   because the negative part of a convex combination is bounded by the same delta_hat.
+2. The Bartlett-tapered spectrum is the convolution of B_hat with the normalised non-negative Fejer kernel. That
+   kernel integrates to w(0) = 1, so Btilde_hat(w) >= -delta_hat (F * 1_band)(w) I, where 1_band is the indicator of
+   the band.
 3. Sum the aliases. The sum of F * 1_band over the shifted copies (w + 2 pi m / dt) is at most
-   c = ceil(omega_max dt / pi) + 1, the number of copies that overlap. Hence dt G(theta) >= -2 c delta I.
+   c = ceil(omega_max dt / pi) + 1, the number of copies that overlap. Hence dt G_hat(theta) >= -2 c delta_hat I.
    If the band lies below Nyquist (omega_max dt <= pi), then c <= 2.
-4. By Parseval, (1 / 2 pi) int |S|^2 d theta = sum_n |s_n|^2, so
+4. By Parseval, (1 / 2 pi) int |S_hat|^2 d theta = sum_n |s_hat_n|^2, so
 
-       W_mem(N) >= -(dt / 4) c delta sum_n |s_n|^2,    with delta <= 64 eps max_i ||B_i||.
+       W_mem(N) >= -(dt / 4) c delta_hat sum_n |s_hat_n|^2,    with delta_hat <= 64 eps max_i ||B_hat_i||.
+
+**External damping.** In the same coordinates, W_C >= -64 eps ||C_hat|| sum_n dt |vbar_hat_n|^2.
 
 **Interpretation.**
-- Relative to the radiation-dissipation scale (dt / 4) max ||B|| sum |s_n|^2, the deficit is at most 64 c eps,
-  that is about 3e-14 for c <= 2.
-- The external damping obeys the same kind of bound: W_C >= -64 eps ||C|| sum dt |vbar_n|^2.
-- ADR-015 section 8 (v) "bounded total energy" is accepted in this form: exact for exactly positive semi-definite
-  inputs, and up to this round-off-level deficit for inputs admitted with the -64 eps tolerance. This is an owner
-  acceptance item.
+- Relative to the normalised radiation-dissipation scale (dt / 4) max ||B_hat|| sum |s_hat_n|^2, the deficit is at
+  most 64 c eps, that is about 3e-14 for c <= 2.
+- The energy balance of an admitted run is therefore E_N <= E_0 + W_ext + D_N, where
+
+      D_N = (dt / 4) c delta_hat sum_{n<N} |s_hat_n|^2 + 64 eps ||C_hat|| sum_{n<N} dt |vbar_hat_n|^2.
+
+  D_N is a finite-history bound. It grows with the accumulated squared velocity.
+- **This is not a uniform-in-time stability theorem for inputs at the edge of the tolerance.** For example,
+  admitted damping C = diag(1, -1e-14) with zero memory has an energy-growing mode (poles about 5e-15 +/- 1i).
+- For the finite judged runs of ADR-015 (at most 20,001 steps) D_N is a round-off-level quantity.
+- ADR-015 section 8 (v) is accepted in this form: exact for exactly positive semi-definite inputs, and up to D_N for
+  inputs admitted with the -64 eps tolerance. Stability claims cite it as such. This is an owner acceptance item.
 
 ## Scope and limits
 
 - **v_0 = 0 is used.** With a nonzero initial velocity, the starting-endpoint term 1/2 dt K_n v_0 does not cancel in
   step 2 and the claim is not proven. ADR-015 requires judged runs to start from rest or from a displacement.
 - **The claim bounds the total energy, not the mechanical energy.** E_n may rise temporarily while the memory
-  returns energy it has stored. Only E_N <= E_0 + W_ext holds.
+  returns energy it has stored.
+  - For exactly positive semi-definite inputs, E_N <= E_0 + W_ext.
+  - For inputs admitted within the -64 eps tolerance, E_N <= E_0 + W_ext + D_N (previous section).
 - **A rectangular cut is not covered.** The time-window zeroing of the stored kernel is not admitted for judged
   cases: its Dirichlet transform has negative lobes, and G(theta) can lose positive semi-definiteness.
   `test_weights_oracle_nonzero_last_retained_sample` uses such a cut deliberately, with damping that dominates it.

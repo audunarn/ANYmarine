@@ -284,6 +284,8 @@ def test_matrix_pencil_refuses_unidentifiable_orders():
         fd.matrix_pencil(np.exp(-0.3 * t), dt, 4)
     with pytest.raises(fd.LinearFdError, match="numerical rank"):
         fd.matrix_pencil(np.zeros(t.size), dt, 1)
+    with pytest.raises(fd.LinearFdError, match="no finite continuous exponent"):
+        fd.matrix_pencil([1.0, 0, 0, 0, 0, 0, 0, 0, 0], 0.1, 1)
 
 
 def test_bartlett_taper_needs_the_whole_support():
