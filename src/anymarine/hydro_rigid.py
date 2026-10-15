@@ -63,6 +63,28 @@ def _positive(value, name):
     return out
 
 
+def _finite(value, name):
+    try:
+        out = float(value)
+    except (TypeError, ValueError) as error:
+        raise HydroOptionsError(f"{name} must be a number") from error
+    if isinstance(value, bool) or not math.isfinite(out):
+        raise HydroOptionsError(f"{name} must be a finite number")
+    return out
+
+
+def _source_gravity_declarations(dataset, contract) -> dict:
+    """Every explicit gravity the source declares: the hydrostatic contract provenance (required), and the wave
+    environment and scalar ``g`` of a schema 1.3 dataset when present. All must equal the run's one declared g."""
+    found = {"hydrostatic contract provenance": contract.provenance.get("gravity")}
+    environment = _json_attr(dataset, "wave_environment")
+    if environment is not None:
+        found["wave_environment attribute"] = environment.get("g") if isinstance(environment, dict) else None
+    if "g" in dataset.data_vars:
+        found["dataset scalar g"] = dataset["g"].values.item() if dataset["g"].size == 1 else None
+    return found
+
+
 def _parse(project: ProjectModel, options) -> dict:
     if not isinstance(options, Mapping):
         raise HydroOptionsError("rigid import options must be a JSON object")
@@ -148,6 +170,8 @@ def _require_kernel_contract(anyhydro, kernel, dataset, keys, n_steps):
         raise HydroAdmissionError("the kernel is not bound to this dataset (source content hash mismatch)")
     if [str(k) for k in kernel.dof_keys] != keys:
         raise HydroAdmissionError("the kernel DOF identities/order differ from the dataset's")
+    if [str(b) for b in kernel.body_ids] != [str(b) for b in dataset["body"].values]:
+        raise HydroAdmissionError("the kernel body identities/order differ from the dataset's")
     a_inf_source = np.asarray(dataset["added_mass_infinite"].values, dtype=np.float64)
     if settings.a_inf_policy == A_INF_BAND_CONSISTENT:
         verify_band_consistent_added_mass_infinite(kernel, a_inf_source, np.asarray(dataset["omega"].values),
@@ -226,7 +250,11 @@ def import_rigid_hydro_inputs(project: ProjectModel, dataset_path, kernel_path, 
         criteria = anyhydro.FullBlockReconstructionCriteria(dof_scales=scales_full, **opt["criteria"])
     except anyhydro.HydroError as error:
         raise HydroOptionsError(f"invalid criteria: {error}") from error
-    report = anyhydro.compare_reconstruction(kernel, dataset, criteria)
+    try:
+        report = anyhydro.compare_reconstruction(kernel, dataset, criteria)
+    except anyhydro.HydroError as error:
+        raise HydroAdmissionError(f"the normalised full-block reconstruction gate could not be evaluated: "
+                                  f"{error}") from error
     summary = report.summary()
     if not summary["overall_pass"]:
         raise HydroAdmissionError(f"the normalised full-block reconstruction gate failed: "
@@ -238,10 +266,10 @@ def import_rigid_hydro_inputs(project: ProjectModel, dataset_path, kernel_path, 
     if contract.role != "BUOYANCY_ONLY":
         raise HydroAdmissionError("the rigid import composes BUOYANCY_ONLY sources with separately owned gravity only")
     g = opt["gravity"]
-    source_g = contract.provenance.get("gravity")
-    if source_g is None or float(source_g) != g:
-        raise HydroAdmissionError(f"one declared g: the run's gravity {g!r} must equal the source's gravity "
-                                  f"{source_g!r} (hydrostatic contract provenance)")
+    for where, source_g in _source_gravity_declarations(dataset, contract).items():
+        if isinstance(source_g, bool) or not isinstance(source_g, (int, float)) or float(source_g) != g:
+            raise HydroAdmissionError(f"one declared g: the run's gravity {g!r} must equal the source's gravity "
+                                      f"{source_g!r} ({where})")
     K_source_full = np.asarray(dataset["hydrostatic_stiffness"].values, dtype=np.float64)
     n_full = len(keys)
     K_buoy = np.zeros((n_full, n_full))
@@ -339,15 +367,17 @@ def import_rigid_hydro_inputs(project: ProjectModel, dataset_path, kernel_path, 
         omegas = np.asarray(dataset["omega"].values, dtype=np.float64)
         headings = np.asarray(dataset["wave_direction"].values, dtype=np.float64)
         o = np.flatnonzero(omegas == omega)
-        h = np.flatnonzero(headings == float(wave["heading"]))
+        heading = _finite(wave["heading"], "wave heading")
+        amplitude = _finite(wave["amplitude"], "wave amplitude")
+        h = np.flatnonzero(headings == heading)
         if o.size != 1 or h.size != 1:
             raise HydroOptionsError("the wave omega and heading must be exact dataset grid values (no interpolation)")
         F = np.asarray(dataset["excitation_force"].values[o[0], h[0], :], dtype=np.complex128)[index]
         times = dt * np.arange(n_steps)
-        phase = float(wave.get("phase", 0.0))
+        phase = _finite(wave.get("phase", 0.0), "wave phase")
         phasor = np.exp(-1j * omega * times + 1j * phase)
-        forces = float(wave["amplitude"]) * (F[None, :] * phasor[:, None]).real
-        wave_selection = dict(omega=omega, heading=float(wave["heading"]), amplitude=float(wave["amplitude"]),
+        forces = amplitude * (F[None, :] * phasor[:, None]).real
+        wave_selection = dict(omega=omega, heading=heading, amplitude=amplitude,
                               phase=phase)
 
     details = {

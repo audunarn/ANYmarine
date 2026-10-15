@@ -351,3 +351,43 @@ def test_gate_coverage_options_geometry_and_window_shape(tmp_path):
     anyhydro.save_radiation_kernel(anyhydro.radiation_kernel_from_dataset(ds, settings), rect)
     with pytest.raises(HydroAdmissionError, match="Bartlett"):
         import_rigid_hydro_inputs(project, ds_path, rect, _options(project))
+
+
+# ---------------------------------------------------------------------------------------------- review round 2
+
+def test_every_explicit_source_gravity_must_equal_the_run_g(tmp_path):
+    """A schema 1.3 dataset also declares g in its wave environment and as a scalar: all declarations count."""
+    from anyhydro.hydrostatic_contract import read_hydrostatic_contract
+    from anymarine.hydro_rigid import _source_gravity_declarations
+    project = _project()
+    _, _, ds, _ = _source(tmp_path, project)
+    contract = read_hydrostatic_contract(ds)
+    assert _source_gravity_declarations(ds, contract) == {"hydrostatic contract provenance": G}
+    kochin = ds.assign(g=((), 4.905))
+    kochin.attrs["wave_environment"] = json.dumps(dict(water_depth="inf", rho=RHO, g=4.905))
+    found = _source_gravity_declarations(kochin, contract)
+    assert found == {"hydrostatic contract provenance": G, "wave_environment attribute": 4.905,
+                     "dataset scalar g": 4.905}
+
+
+def test_kernel_body_identity_is_bound(tmp_path):
+    project = _project()
+    ds_path, _, _, kernel = _source(tmp_path, project)
+    path = tmp_path / "foreign.nc"
+    anyhydro.save_radiation_kernel(dataclasses.replace(kernel, body_ids=("foreign-body",)), path)
+    with pytest.raises(HydroAdmissionError, match="body identities|source dataset"):
+        import_rigid_hydro_inputs(project, ds_path, path, _options(project))
+
+
+def test_gate_and_wave_option_failures_are_typed(tmp_path):
+    project = _project()
+    ds_path, k_path, _, _ = _source(tmp_path, project)
+    empty = _options(project, criteria=dict(omega_min=4.0, omega_max=5.0, block_rel_tol=0.1, modal_rel_tol=0.1,
+                                            energetic_fraction=1e-3, cluster_fraction=0.01))
+    with pytest.raises((HydroAdmissionError, HydroOptionsError)):
+        import_rigid_hydro_inputs(project, ds_path, k_path, empty)
+    for key, bad in (("heading", "east"), ("amplitude", math.nan), ("phase", "x")):
+        wave = dict(omega=float(OMEGAS[40]), heading=0.0, amplitude=1.0, phase=0.0)
+        wave[key] = bad
+        with pytest.raises(HydroOptionsError, match=key):
+            import_rigid_hydro_inputs(project, ds_path, k_path, _options(project, wave=wave))
