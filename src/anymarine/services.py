@@ -18,6 +18,7 @@ from .domain import (
     AnalysisSettings,
     HydroBridgeProvenance,
     LinearDevelopmentInputs,
+    LINEAR_LAYOUT_RIGID,
     LINEAR_SOURCE_HYDRO,
     HYDRO_ROUTE_DERIVED,
     ProjectModel,
@@ -843,6 +844,113 @@ class ApplicationService:
         self.verify_hydro_provenance(new_project)
         return new_project
 
+    def import_rigid_hydro_inputs(
+        self,
+        project: ProjectModel,
+        dataset_path: os.PathLike | str,
+        kernel_path: os.PathLike | str,
+        options: dict,
+    ) -> ProjectModel:
+        """Admit an ANYhydro dataset/kernel pair as stored rigid_subset_v1 inputs (ADR-015 L6-3).
+
+        Everything is validated by ``anymarine.hydro_rigid.import_rigid_hydro_inputs`` before the project changes.
+        The authoritative raw dataset/kernel files are copied into the project as content-addressed sidecars and the
+        structured hydro provenance (with its rigid bundle: route, layout, format and the plain caller options) is
+        attached; verification re-runs the import from those sidecars. Legacy two-body inputs are never silently
+        replaced (ADR-015 section 7): clear them first. Returns the new project; the caller adopts it explicitly.
+        """
+
+        from .hydro_rigid import import_rigid_hydro_inputs as _rigid_import
+
+        inputs = project.linear_inputs
+        if inputs is not None and inputs.layout != LINEAR_LAYOUT_RIGID:
+            raise ServiceError(
+                "the six-DOF hydrodynamic import would replace the project's legacy two-body inputs; clear the "
+                "linear inputs first (ADR-015 section 7)")
+        self._require_linear_route(project)
+        if self.root is None:
+            raise ServiceError(
+                "the hydrodynamic import requires a project root: open or save the project first, because the "
+                "authoritative dataset/kernel files are copied into the project")
+        try:
+            inputs, provenance_data = _rigid_import(project, dataset_path, kernel_path, options)
+        except HydroImportError as error:
+            raise ServiceError(str(error)) from error
+        store = ProjectStore(self.root)
+        for source, expected_reference, expected_digest in (
+            (dataset_path, provenance_data["dataset_sidecar"], provenance_data["dataset_raw_sha256"]),
+            (kernel_path, provenance_data["kernel_sidecar"], provenance_data["kernel_raw_sha256"]),
+        ):
+            try:
+                payload = Path(source).read_bytes()
+            except OSError as error:
+                raise ServiceError(f"cannot read the hydrodynamic source file {source}: {error}") from error
+            reference, digest = store.store_hydro_artifact(payload)
+            if reference != expected_reference or digest != expected_digest:
+                raise ServiceError(
+                    f"the hydrodynamic source file {source} changed while the import was running; refusing "
+                    "inconsistent provenance")
+        try:
+            provenance = HydroBridgeProvenance.from_dict(provenance_data)
+            new_project = project.with_edits(linear_inputs=inputs, hydro_provenance=provenance)
+        except ValueError as error:
+            raise ServiceError(f"the rigid hydro import produced an inadmissible record: {error}") from error
+        self._verify_linear_binding(new_project, inputs)
+        self.verify_hydro_provenance(new_project)
+        return new_project
+
+    def _verify_rigid_reimport(self, project: ProjectModel, provenance: HydroBridgeProvenance) -> None:
+        """Re-run the rigid import from the stored sidecars under the record's options; it must reproduce the
+        stored inputs (full input hash) and every source-derived provenance field."""
+
+        from .hydro_rigid import import_rigid_hydro_inputs as _rigid_import
+        import tempfile
+
+        inputs = project.linear_inputs
+        if inputs.layout != LINEAR_LAYOUT_RIGID:
+            raise ServiceError("a rigid hydro provenance may only accompany rigid_subset_v1 inputs")
+        if linear_input_hash(inputs) != provenance.linear_input_hash:
+            raise ServiceError(
+                "the stored linear inputs do not reproduce the hydro provenance's declared input hash; the hydro "
+                "intent is stale")
+        if self.root is None:
+            raise ServiceError(
+                "a rigid hydro provenance can only be verified against the project root holding the authoritative "
+                "dataset/kernel sidecars; no project root is configured")
+        payloads = {}
+        for role, reference, expected in self._hydro_artifact_roles(provenance):
+            try:
+                payload = resolve_sidecar(self.root, reference).read_bytes()
+            except (OSError, UnsafePathError) as error:
+                raise ServiceError(f"cannot read the authoritative {role} sidecar {reference!r}: {error}") from error
+            if sha256_bytes(payload) != expected:
+                raise ServiceError(
+                    f"the {role} sidecar {reference!r} does not match the hydro provenance raw sha256; the "
+                    "authoritative source evidence is inconsistent and the project is refused")
+            payloads[role] = payload
+        with tempfile.TemporaryDirectory(prefix="anymarine-rigid-verify-") as temp_dir:
+            dataset_copy, kernel_copy = Path(temp_dir) / "dataset.nc", Path(temp_dir) / "kernel.nc"
+            dataset_copy.write_bytes(payloads["dataset"])
+            kernel_copy.write_bytes(payloads["kernel"])
+            try:
+                recompiled, data = _rigid_import(project, dataset_copy, kernel_copy,
+                                                 _jsonable_value(provenance.rigid_bundle["options"]))
+            except HydroImportError as error:
+                raise ServiceError(f"the authoritative rigid sources do not re-verify: {error}") from error
+        if linear_input_hash(recompiled) != provenance.linear_input_hash:
+            raise ServiceError(
+                "the stored linear inputs do not reproduce the inputs re-imported from the authoritative "
+                "dataset/kernel sidecars; effective-operator tampering is not cured by re-hashing the provenance "
+                "bookkeeping and the project is refused")
+        stored = provenance.to_dict()
+        for key, value in HydroBridgeProvenance.from_dict(data).to_dict().items():
+            if key in ("dataset_source_path", "kernel_source_path", "created_utc"):
+                continue
+            if stored.get(key) != value:
+                raise ServiceError(
+                    f"the hydro provenance field {key!r} does not match the re-import from the authoritative "
+                    "sidecars; the project is refused")
+
     def import_derived_hydro_inputs(
         self,
         project: ProjectModel,
@@ -934,6 +1042,14 @@ class ApplicationService:
                 "hydro provenance may only accompany linear inputs imported from "
                 "an ANYhydro dataset"
             )
+        if (inputs.layout == LINEAR_LAYOUT_RIGID) != (provenance.rigid_bundle is not None):
+            raise ServiceError(
+                "hydro provenance must carry a rigid bundle exactly when the linear inputs use the "
+                f"{LINEAR_LAYOUT_RIGID} layout; stripped or misplaced rigid intent is refused")
+        if provenance.rigid_bundle is not None:
+            # Authoritative source ownership for the six-DOF route: the import is re-run from the stored sidecars.
+            self._verify_rigid_reimport(project, provenance)
+            return
         wave = provenance.to_dict()["wave"]
         if provenance.derived_bundle is None and wave is not None and wave.get("prehistory") is not None:
             # The import refuses a prehistory on the raw route; a stored raw project

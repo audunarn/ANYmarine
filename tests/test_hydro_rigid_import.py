@@ -23,7 +23,7 @@ anyhydro = pytest.importorskip("anyhydro")
 pytest.importorskip("anyhydro.hydrostatics_exact")
 
 from anymarine.domain import (Body, EquilibriumMetadata, LINEAR_LAYOUT_RIGID, ProjectModel,  # noqa: E402
-                              default_box_mesh)
+                              _jsonable_value, default_box_mesh)
 from anymarine.hydro import HydroAdmissionError, HydroGeometryError, HydroOptionsError  # noqa: E402
 from anymarine.hydro_rigid import import_rigid_hydro_inputs  # noqa: E402
 from anymarine.linear import run_linear, verify_linear_result  # noqa: E402
@@ -187,7 +187,8 @@ def _options(project, **overrides):
 def test_six_dof_import_on_the_reference_axis(tmp_path):
     project = _project()
     ds_path, k_path, _, _ = _source(tmp_path, project)
-    inputs, details = import_rigid_hydro_inputs(project, ds_path, k_path, _options(project))
+    inputs, provenance = import_rigid_hydro_inputs(project, ds_path, k_path, _options(project))
+    details = _jsonable_value(inputs.provenance.details)
     assert inputs.layout == LINEAR_LAYOUT_RIGID and inputs.ndof == 6
     K = np.asarray(inputs.stiffness)
     # restoring = buoyancy (chart = source, zero baseline moment) + gravity (0.5 W on roll/pitch) + mooring
@@ -207,7 +208,8 @@ def test_offset_buoyancy_centre_exercises_the_chart_conversion(tmp_path):
     xb, yb = 1.0, -0.5
     project = _project((_body("vessel", cb_offset=(xb, yb)),))
     ds_path, k_path, _, _ = _source(tmp_path, project)
-    inputs, details = import_rigid_hydro_inputs(project, ds_path, k_path, _options(project))
+    inputs, provenance = import_rigid_hydro_inputs(project, ds_path, k_path, _options(project))
+    details = _jsonable_value(inputs.provenance.details)
     K = np.asarray(inputs.stiffness)
     assert np.allclose(K, K.T, rtol=0, atol=1e-9 * W)
     assert details["skew_ratios"]["K_buoyancy_chart"] <= 1e-12          # the converted block is symmetric
@@ -386,7 +388,10 @@ def test_gate_and_wave_option_failures_are_typed(tmp_path):
                                             energetic_fraction=1e-3, cluster_fraction=0.01))
     with pytest.raises((HydroAdmissionError, HydroOptionsError)):
         import_rigid_hydro_inputs(project, ds_path, k_path, empty)
-    for key, bad in (("heading", "east"), ("amplitude", math.nan), ("phase", "x")):
+    with pytest.raises(HydroOptionsError, match="finite JSON"):
+        import_rigid_hydro_inputs(project, ds_path, k_path, _options(project, wave=dict(
+            omega=float(OMEGAS[40]), heading=0.0, amplitude=math.nan)))
+    for key, bad in (("heading", "east"), ("amplitude", "x"), ("phase", "x")):
         wave = dict(omega=float(OMEGAS[40]), heading=0.0, amplitude=1.0, phase=0.0)
         wave[key] = bad
         with pytest.raises(HydroOptionsError, match=key):

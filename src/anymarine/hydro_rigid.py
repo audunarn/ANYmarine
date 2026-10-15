@@ -24,23 +24,27 @@ Nothing is silently defaulted; every refusal is a typed ``HydroImportError``. De
 """
 from __future__ import annotations
 
+import datetime as _datetime
 import hashlib
 import json
 import math
+import tempfile
 from pathlib import Path
 from typing import Mapping
 
 import numpy as np
 
 from . import linear_fd as fd
-from .domain import (LINEAR_LAYOUT_RIGID, LINEAR_SOURCE_HYDRO, RIGID_DOFS, ExternalMatrixRecord,
+from .domain import (HYDRO_ROUTE_RIGID, LINEAR_LAYOUT_RIGID, LINEAR_SOURCE_HYDRO, RIGID_DOFS, ExternalMatrixRecord,
                      LinearDevelopmentInputs, LinearExecutionLimits, LinearProvenance, ProjectModel)
 from .hashing import equilibrium_hash
 from .hydro import (HydroAdmissionError, HydroGeometryError, HydroImportError, HydroOptionsError, _import_anyhydro,
-                    _read_raw_source, _require_global_source_axes)
-from .linear import rigid_binding, rigid_dry_mass
+                    _read_raw_source, _require_global_source_axes, _sha256_file)
+from .linear import linear_input_hash, rigid_binding, rigid_dry_mass
 
 RIGID_IMPORT_FORMAT = "anymarine-rigid-hydro-import-v1"
+#: route of the hydro provenance rigid bundle: raw dataset + kernel, re-run from the stored sidecars on verification
+RIGID_PROVENANCE_ROUTE = HYDRO_ROUTE_RIGID
 EQUILIBRIUM_RELATIVE = 1.0e-3
 _TRANSLATIONS = ("surge", "sway", "heave")
 _OPTION_KEYS = {"dofs", "length_scale", "criteria", "n_steps", "gravity", "wave", "external_matrices",
@@ -210,18 +214,47 @@ def _symmetrise(name, matrix, scale):
         raise HydroAdmissionError(f"declared symmetrisation refused (ADR-015 section 8): {error}") from error
 
 
+def _plain_options(options) -> dict:
+    """The caller options as plain JSON (stored in the provenance rigid bundle and re-run on verification)."""
+    try:
+        plain = json.loads(json.dumps(options, allow_nan=False))
+    except (TypeError, ValueError) as error:
+        raise HydroOptionsError(f"rigid import options must be plain finite JSON: {error}") from error
+    if not isinstance(plain, dict):
+        raise HydroOptionsError("rigid import options must be a JSON object")
+    return plain
+
+
 def import_rigid_hydro_inputs(project: ProjectModel, dataset_path, kernel_path, options):
-    """Admit an ANYhydro dataset + kernel as rigid_subset_v1 inputs. Returns (inputs, details)."""
+    """Admit an ANYhydro dataset + kernel as rigid_subset_v1 inputs.
+
+    Returns ``(inputs, provenance_data)``: the immutable inputs and the full ``HydroBridgeProvenance`` field set with
+    the rigid bundle (route and the plain caller options), for the caller to freeze after copying the authoritative
+    raw files into the project. The dataset and kernel are decoded from private copies of the captured raw bytes and
+    the original files are re-checked against that snapshot before returning (as the legacy import).
+    """
     anyhydro = _import_anyhydro()
     from anyhydro.hydrostatic_contract import chart_stiffness, read_hydrostatic_contract, \
         require_hydrostatic_composition
-    opt = _parse(project, options)
+    plain_options = _plain_options(options)
+    opt = _parse(project, plain_options)
     if float(project.equilibrium.waterline_z) != 0.0:
         raise HydroGeometryError("the rigid import requires project waterline_z == 0")
-    dataset_payload = _read_raw_source(Path(dataset_path), "dataset")
-    kernel_payload = _read_raw_source(Path(kernel_path), "kernel")
-    dataset = anyhydro.load_hydro_dataset(dataset_path)
-    kernel = anyhydro.load_radiation_kernel(kernel_path)
+    dataset_file, kernel_file = Path(dataset_path), Path(kernel_path)
+    dataset_payload = _read_raw_source(dataset_file, "dataset")
+    kernel_payload = _read_raw_source(kernel_file, "kernel")
+    with tempfile.TemporaryDirectory(prefix="anymarine-rigid-import-") as temp_dir:
+        dataset_copy, kernel_copy = Path(temp_dir) / "dataset.nc", Path(temp_dir) / "kernel.nc"
+        dataset_copy.write_bytes(dataset_payload)
+        kernel_copy.write_bytes(kernel_payload)
+        try:
+            dataset = anyhydro.load_hydro_dataset(dataset_copy)
+        except Exception as error:
+            raise HydroImportError(f"cannot load ANYhydro dataset {dataset_file}: {error}") from error
+        try:
+            kernel = anyhydro.load_radiation_kernel(kernel_copy)
+        except Exception as error:
+            raise HydroImportError(f"cannot load ANYhydro radiation kernel {kernel_file}: {error}") from error
     _prove_geometry(anyhydro, project, dataset)
 
     bodies = tuple(project.bodies)
@@ -408,4 +441,52 @@ def import_rigid_hydro_inputs(project: ProjectModel, dataset_path, kernel_path, 
             layout=LINEAR_LAYOUT_RIGID)
     except (ValueError, TypeError) as error:
         raise HydroAdmissionError(f"the assembled inputs are not admissible: {error}") from error
-    return inputs, details
+
+    dataset_raw_sha256 = details["dataset_raw_sha256"]
+    kernel_raw_sha256 = details["kernel_raw_sha256"]
+    for source_file, captured, label in ((dataset_file, dataset_raw_sha256, "dataset"),
+                                         (kernel_file, kernel_raw_sha256, "kernel")):
+        try:
+            current = _sha256_file(source_file)
+        except OSError as error:
+            raise HydroImportError(f"cannot re-read the ANYhydro {label} source file {source_file} for the raw "
+                                   f"identity check: {error}") from error
+        if current != captured:
+            raise HydroImportError(f"the ANYhydro {label} source file {source_file} changed while the import was "
+                                   "running; inconsistent provenance is refused")
+    provenance_data = {
+        "source": LINEAR_SOURCE_HYDRO,
+        "dataset_content_hash": details["dataset_content_hash"],
+        "kernel_content_hash": details["kernel_content_hash"],
+        "dataset_raw_sha256": dataset_raw_sha256,
+        "kernel_raw_sha256": kernel_raw_sha256,
+        "dataset_sidecar": f"hydro/{dataset_raw_sha256}.nc",
+        "kernel_sidecar": f"hydro/{kernel_raw_sha256}.nc",
+        "dataset_source_path": str(dataset_file.resolve()),
+        "kernel_source_path": str(kernel_file.resolve()),
+        "request_hash": str(dataset.attrs["request_hash"]),
+        "body_ids": [body.body_id for body in bodies],
+        "dof_keys": [f"{b.body_id}::{d}" for b in bindings for d in b.dofs],
+        "mesh_hashes": [_world_mesh(anyhydro, body).mesh_hash for body in bodies],
+        "a_inf_source": str(dataset["added_mass_infinite"].attrs["source"]),
+        "phasor_convention": str(dataset.attrs["phasor_convention"]),
+        "source_qualification_status": str(dataset.attrs["qualification_status"]),
+        "source_schema_version": str(dataset.attrs["schema_version"]),
+        "source_backend": str(dataset.attrs["backend"]),
+        "reference_transformations": None,
+        "criteria": criteria.to_dict(),
+        "reconstruction_report": summary,
+        "kernel_settings": kernel.settings.to_dict(),
+        "diagnostics": kernel.diagnostics.scalars(),
+        "assumptions": [str(item) for item in kernel.assumptions],
+        "wave": wave_selection,
+        "surge_link_stiffness": 0.0,
+        "dt": dt,
+        "t0": float(inputs.t0),
+        "n_steps": n_steps,
+        "linear_input_hash": linear_input_hash(inputs),
+        "created_utc": _datetime.datetime.now(_datetime.timezone.utc).isoformat(),
+        "rigid_bundle": {"route": RIGID_PROVENANCE_ROUTE, "layout": LINEAR_LAYOUT_RIGID, "format": RIGID_IMPORT_FORMAT,
+                         "options": plain_options},
+    }
+    return inputs, provenance_data

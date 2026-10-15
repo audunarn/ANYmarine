@@ -1005,6 +1005,10 @@ DERIVED_BUNDLE_KEYS = (
     "v0",
     "execution_limits",
 )
+# Rigid_subset_v1 route (ADR-015 L6-3 M-c): raw dataset + kernel re-run from the
+# stored sidecars under the bundle's plain caller options.
+HYDRO_ROUTE_RIGID = "rigid_raw_v1"
+RIGID_BUNDLE_KEYS = ("route", "layout", "format", "options")
 
 
 def _freeze_json_value(value, name: str):
@@ -1094,10 +1098,18 @@ class HydroBridgeProvenance:
     # when present, every key below is required.
     derived_bundle: Optional[Mapping] = None
     auxiliary_lid_policy: Optional[str] = None
+    # Optional rigid_subset_v1 bundle (ADR-015 L6-3 M-c): the route, layout,
+    # import format and the plain caller options, re-run from the stored
+    # sidecars on verification. Additive optional field: omitted entirely
+    # (None) for legacy records, which keep their exact serialized
+    # identities. When present the record describes N bodies with canonical
+    # rigid DOF keys and no surge link, lid or derived route.
+    rigid_bundle: Optional[Mapping] = None
 
     def __post_init__(self) -> None:
         if self.auxiliary_lid_policy is not None and self.auxiliary_lid_policy != "submerged_0p1m_v1":
             raise ValueError("unsupported provenance auxiliary_lid_policy")
+        rigid = self.rigid_bundle is not None
         for name in (
             "dataset_content_hash",
             "kernel_content_hash",
@@ -1124,19 +1136,26 @@ class HydroBridgeProvenance:
             if not isinstance(value, str) or not value.strip():
                 raise ValueError(f"hydro {name} must be a non-empty string")
         body_ids = tuple(str(item) for item in self.body_ids)
-        if len(body_ids) != 2 or len(set(body_ids)) != 2 or not all(body_ids):
+        if rigid:
+            if not body_ids or len(set(body_ids)) != len(body_ids) or not all(body_ids):
+                raise ValueError("rigid hydro provenance body_ids must be distinct non-empty ids")
+        elif len(body_ids) != 2 or len(set(body_ids)) != 2 or not all(body_ids):
             raise ValueError("hydro provenance body_ids must be exactly 2 distinct ids")
         object.__setattr__(self, "body_ids", body_ids)
         dof_keys = tuple(str(item) for item in self.dof_keys)
-        if len(dof_keys) != LINEAR_DOF_COUNT or not all(dof_keys):
+        if rigid:
+            allowed = {f"{body}::{dof}" for body in body_ids for dof in RIGID_DOFS}
+            if not dof_keys or len(set(dof_keys)) != len(dof_keys) or not set(dof_keys) <= allowed:
+                raise ValueError("rigid hydro provenance dof_keys must be distinct 'body::dof' keys of its bodies")
+        elif len(dof_keys) != LINEAR_DOF_COUNT or not all(dof_keys):
             raise ValueError(
                 f"hydro provenance dof_keys must contain exactly {LINEAR_DOF_COUNT} "
                 "ordered DOF keys"
             )
         object.__setattr__(self, "dof_keys", dof_keys)
         mesh_hashes = tuple(_hash_digest(item, "hydro mesh hash") for item in self.mesh_hashes)
-        if len(mesh_hashes) != 2:
-            raise ValueError("hydro provenance mesh_hashes must contain exactly 2 entries")
+        if len(mesh_hashes) != len(body_ids):
+            raise ValueError(f"hydro provenance mesh_hashes must contain exactly {len(body_ids)} entries")
         object.__setattr__(self, "mesh_hashes", mesh_hashes)
         object.__setattr__(self, "assumptions", tuple(str(item) for item in self.assumptions))
         for name in ("reference_transformations", "criteria", "reconstruction_report",
@@ -1226,6 +1245,19 @@ class HydroBridgeProvenance:
                     "object or null"
                 )
             object.__setattr__(self, "derived_bundle", bundle)
+        if rigid:
+            bundle = _freeze_json_value(self.rigid_bundle, "hydro rigid bundle")
+            if not isinstance(bundle, Mapping) or set(bundle) != set(RIGID_BUNDLE_KEYS):
+                raise ValueError(f"hydro rigid bundle must contain exactly {list(RIGID_BUNDLE_KEYS)}")
+            if bundle["route"] != HYDRO_ROUTE_RIGID or bundle["layout"] != LINEAR_LAYOUT_RIGID:
+                raise ValueError(f"hydro rigid bundle must declare route {HYDRO_ROUTE_RIGID!r} and layout "
+                                 f"{LINEAR_LAYOUT_RIGID!r}")
+            if not isinstance(bundle["format"], str) or not isinstance(bundle["options"], Mapping):
+                raise ValueError("hydro rigid bundle format must be a string and options a JSON object")
+            if (self.surge_link_stiffness != 0.0 or self.lid_mesh_hashes is not None
+                    or self.derived_bundle is not None or self.auxiliary_lid_policy is not None):
+                raise ValueError("a rigid hydro provenance carries no surge link, lid, auxiliary lid or derived route")
+            object.__setattr__(self, "rigid_bundle", bundle)
 
     def to_dict(self) -> dict:
         data = {
@@ -1273,6 +1305,9 @@ class HydroBridgeProvenance:
             # Omitted when None: raw-route provenance records keep their
             # exact legacy serialized identities.
             data["derived_bundle"] = _jsonable_value(self.derived_bundle)
+        if self.rigid_bundle is not None:
+            # Omitted when None: legacy records keep their exact identities.
+            data["rigid_bundle"] = _jsonable_value(self.rigid_bundle)
         return data
 
     @classmethod
@@ -1282,7 +1317,7 @@ class HydroBridgeProvenance:
         # Additive optional fields: records saved before lid/derived support
         # carry neither key and keep loading unchanged; nothing unknown is
         # ever silently ignored.
-        optional = {"lid_mesh_hashes", "derived_bundle", "auxiliary_lid_policy"}
+        optional = {"lid_mesh_hashes", "derived_bundle", "auxiliary_lid_policy", "rigid_bundle"}
         unknown = sorted(received - expected - optional)
         if unknown:
             raise ValueError(
@@ -1303,6 +1338,7 @@ class HydroBridgeProvenance:
         return cls(
             dataset_content_hash=str(data["dataset_content_hash"]),
             auxiliary_lid_policy=data.get("auxiliary_lid_policy"),
+            rigid_bundle=data.get("rigid_bundle"),
             kernel_content_hash=str(data["kernel_content_hash"]),
             dataset_raw_sha256=str(data["dataset_raw_sha256"]),
             kernel_raw_sha256=str(data["kernel_raw_sha256"]),
@@ -1871,8 +1907,10 @@ class ProjectModel:
                     "a project with hydro provenance must also store the linear "
                     "inputs that provenance describes"
                 )
-            if self.linear_inputs.layout != LINEAR_LAYOUT_LEGACY:
-                raise ValueError("hydro provenance for rigid_subset_v1 inputs is not supported yet (ADR-015 L6-3)")
+            rigid_inputs = self.linear_inputs.layout == LINEAR_LAYOUT_RIGID
+            if rigid_inputs != (self.hydro_provenance.rigid_bundle is not None):
+                raise ValueError("hydro provenance must carry a rigid bundle exactly when the linear inputs use the "
+                                 f"{LINEAR_LAYOUT_RIGID} layout (ADR-015 L6-3)")
             if self.linear_inputs.provenance.source != LINEAR_SOURCE_HYDRO:
                 raise ValueError(
                     "hydro provenance may only accompany linear inputs whose "
