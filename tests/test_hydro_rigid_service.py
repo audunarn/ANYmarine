@@ -156,3 +156,31 @@ def test_route_guards(tmp_path):
         ApplicationService(None).import_rigid_hydro_inputs(project, *sources, _options(project))
     with pytest.raises(ServiceError, match="explicit load path|verified hydro import"):
         service.load_explicit_linear_inputs(project, json.loads(json.dumps(project.linear_inputs.to_dict())))
+
+
+def test_dependency_and_io_failures_are_typed(tmp_path, monkeypatch):
+    """Review round 2: ANYhydro refusals and private-copy I/O failures cross the service boundary typed."""
+    import anyhydro.hydrostatic_contract as contract_module
+    import tempfile
+    service, root, project, sources = _imported(tmp_path)
+
+    def unresolved(_dataset):
+        raise contract_module.HydrostaticContractError("unresolved hydrostatic contract (test)")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(contract_module, "require_hydrostatic_composition", unresolved)
+        with pytest.raises(ServiceError, match="unresolved hydrostatic contract"):
+            service.import_rigid_hydro_inputs(project, *sources, _options(project, n_steps=401))
+        with pytest.raises(ServiceError, match="unresolved hydrostatic contract"):
+            service.verify_hydro_provenance(project)
+
+    def no_temp(*args, **kwargs):
+        raise PermissionError("no temporary directory (test)")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(tempfile, "mkdtemp", no_temp)
+        patch.setattr(tempfile, "TemporaryDirectory", no_temp)
+        with pytest.raises(ServiceError, match="no temporary directory"):
+            service.verify_hydro_provenance(project)
+        with pytest.raises(ServiceError, match="no temporary directory"):
+            service.import_rigid_hydro_inputs(project, *sources, _options(project, n_steps=401))

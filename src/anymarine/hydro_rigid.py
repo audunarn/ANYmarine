@@ -231,9 +231,22 @@ def import_rigid_hydro_inputs(project: ProjectModel, dataset_path, kernel_path, 
     Returns ``(inputs, provenance_data)``: the immutable inputs and the full ``HydroBridgeProvenance`` field set with
     the rigid bundle (route and the plain caller options), for the caller to freeze after copying the authoritative
     raw files into the project. The dataset and kernel are decoded from private copies of the captured raw bytes and
-    the original files are re-checked against that snapshot before returning (as the legacy import).
+    the original files are re-checked against that snapshot before returning (as the legacy import). Every refusal,
+    including ANYhydro's own (e.g. an unresolved hydrostatic contract) and I/O failures of the private copies, is a
+    typed ``HydroImportError`` with the cause preserved.
     """
     anyhydro = _import_anyhydro()
+    try:
+        return _import_rigid(anyhydro, project, dataset_path, kernel_path, options)
+    except HydroImportError:
+        raise
+    except anyhydro.HydroError as error:
+        raise HydroAdmissionError(f"the ANYhydro source was refused: {error}") from error
+    except OSError as error:
+        raise HydroImportError(f"I/O failure during the rigid import: {error}") from error
+
+
+def _import_rigid(anyhydro, project: ProjectModel, dataset_path, kernel_path, options):
     from anyhydro.hydrostatic_contract import chart_stiffness, read_hydrostatic_contract, \
         require_hydrostatic_composition
     plain_options = _plain_options(options)

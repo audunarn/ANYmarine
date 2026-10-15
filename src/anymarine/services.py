@@ -904,6 +904,7 @@ class ApplicationService:
         stored inputs (full input hash) and every source-derived provenance field."""
 
         from .hydro_rigid import import_rigid_hydro_inputs as _rigid_import
+        import shutil
         import tempfile
 
         inputs = project.linear_inputs
@@ -928,10 +929,17 @@ class ApplicationService:
                     f"the {role} sidecar {reference!r} does not match the hydro provenance raw sha256; the "
                     "authoritative source evidence is inconsistent and the project is refused")
             payloads[role] = payload
-        with tempfile.TemporaryDirectory(prefix="anymarine-rigid-verify-") as temp_dir:
+        try:
+            temp_dir = tempfile.mkdtemp(prefix="anymarine-rigid-verify-")
+        except OSError as error:
+            raise ServiceError(f"cannot create the private copies for the rigid source proof: {error}") from error
+        try:
             dataset_copy, kernel_copy = Path(temp_dir) / "dataset.nc", Path(temp_dir) / "kernel.nc"
-            dataset_copy.write_bytes(payloads["dataset"])
-            kernel_copy.write_bytes(payloads["kernel"])
+            try:
+                dataset_copy.write_bytes(payloads["dataset"])
+                kernel_copy.write_bytes(payloads["kernel"])
+            except OSError as error:
+                raise ServiceError(f"cannot write the private copies for the rigid source proof: {error}") from error
             # JSON objects are unordered (the manifest is written with sorted keys): the per-body DOF mapping is
             # replayed in the project body order, which the record's body_ids must equal.
             options = _jsonable_value(provenance.rigid_bundle["options"])
@@ -945,6 +953,8 @@ class ApplicationService:
                 recompiled, data = _rigid_import(project, dataset_copy, kernel_copy, options)
             except HydroImportError as error:
                 raise ServiceError(f"the authoritative rigid sources do not re-verify: {error}") from error
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
         if linear_input_hash(recompiled) != provenance.linear_input_hash:
             raise ServiceError(
                 "the stored linear inputs do not reproduce the inputs re-imported from the authoritative "
