@@ -1,7 +1,8 @@
 # Radiation memory work of the linear route is non-negative (ADR-015 section 8 (v), slice L6-A)
 
-Status: proof note for owner and reviewer acceptance. Until it is accepted, ADR-015 section 8 (v) remains a stated
-hypothesis. The numerical verification is in `tests/test_linear_fd.py` (`test_memory_work_*`).
+Status: ACCEPTED by the owner 2026-10-15 as the proof of ADR-015 section 8 (v) in its qualified form (Codex review
+L6-A rounds 1-3, session 01a14068-2b0d-7440-ad99-75b0661dedc4). The numerical verification is in
+`tests/test_linear_fd.py` (`test_memory_work_*`).
 
 ## Setting
 
