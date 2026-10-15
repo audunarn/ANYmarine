@@ -770,6 +770,16 @@ class ApplicationService:
 
     # ------------------------------------------------------ hydro import
 
+    @staticmethod
+    def _require_legacy_linear_layout(project: ProjectModel, what: str) -> None:
+        """Never silently replace rigid_subset_v1 inputs with a legacy import (ADR-015 section 7)."""
+        inputs = project.linear_inputs
+        if inputs is not None and inputs.layout != "two_body_surge_heave_v1":
+            raise ServiceError(
+                f"{what} builds legacy two-body surge/heave inputs and would replace the project's "
+                f"{inputs.layout} inputs; it is not available for six-DOF layouts yet (ADR-015 section 7) - "
+                "clear the linear inputs first")
+
     def import_hydro_inputs(
         self,
         project: ProjectModel,
@@ -789,6 +799,7 @@ class ApplicationService:
         adopts (and saves) it explicitly.
         """
 
+        self._require_legacy_linear_layout(project, "the hydrodynamic import")
         self._require_linear_route(project)
         if self.root is None:
             raise ServiceError(
@@ -854,6 +865,7 @@ class ApplicationService:
         saves) it explicitly.
         """
 
+        self._require_legacy_linear_layout(project, "the derived hydrodynamic import")
         self._require_linear_route(project)
         if self.root is None:
             raise ServiceError(

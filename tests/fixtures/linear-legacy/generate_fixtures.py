@@ -4,7 +4,8 @@
 
 Captured from ANYmarine main 85b22fb (2026-10-15): the analytic demo inputs, their input hash and a demo run
 result; the regular-wave assessment rehearsal of tests/test_linear_assessment.py (project saved on disk with
-inputs and result, case, report). tests/test_linear_legacy_fixtures.py proves that later code reproduces them.
+inputs and result, case, report); with the argument `hydro` (run in a main worktree, after review round 1) the
+raw and derived hydro-imported projects of tests/test_hydro_bridge.py / tests/test_derived_import.py. tests/test_linear_legacy_fixtures.py proves that later code reproduces them.
 Never regenerate on a branch that changes the linear route.
 """
 import json
@@ -55,5 +56,51 @@ def main():
     print('frozen', sorted(p.name for p in HERE.iterdir()))
 
 
+def hydro(tmp):
+    """Raw and derived hydro-imported projects (test_hydro_bridge / test_derived_import fixtures)."""
+    import anyhydro
+    import test_derived_import as td
+    import test_hydro_bridge as tb
+
+    out = {}
+    for label, module in (('raw', tb), ('derived', td)):
+        project = module._fixture_project()
+        art = tmp / label
+        art.mkdir(parents=True)
+        if label == 'raw':
+            dataset = module._fixture_dataset(project)
+            kernel = module._fixture_kernel(dataset)
+            anyhydro.save_hydro_dataset(dataset, art / 'dataset.nc')
+            anyhydro.save_radiation_kernel(kernel, art / 'kernel.nc')
+        else:
+            dataset = module._fixture_dataset(project)
+            artifact = anyhydro.derived_operators_from_dataset(dataset, module._derived_settings())
+            kernel = module._derived_kernel(artifact, dataset)
+            anyhydro.save_hydro_dataset(dataset, art / 'dataset.nc')
+            anyhydro.save_derived_operators(artifact, art / 'operators.npz')
+            anyhydro.save_radiation_kernel(kernel, art / 'kernel.nc')
+        root = tmp / f'{label}_project'
+        service = ApplicationService(root)
+        service.save(project, root=root)
+        options = module._base_options()
+        if label == 'raw':
+            new = service.import_hydro_inputs(project, art / 'dataset.nc', art / 'kernel.nc', options)
+        else:
+            new = service.import_derived_hydro_inputs(project, art / 'dataset.nc', art / 'operators.npz',
+                                                      art / 'kernel.nc', options)
+        service.save(new, root=root)
+        target = HERE / f'{label}_hydro_project'
+        shutil.rmtree(target, ignore_errors=True)
+        shutil.copytree(root, target)
+        out[label] = dict(input_hash=linear_input_hash(new.linear_inputs),
+                          provenance=new.hydro_provenance.to_dict())
+    dump('hydro_projects.json', out)
+
+
 if __name__ == '__main__':
-    main()
+    if sys.argv[1:] == ['hydro']:
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            hydro(Path(tmp))
+    else:
+        main()

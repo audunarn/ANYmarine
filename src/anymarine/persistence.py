@@ -55,6 +55,9 @@ SCHEMA_VERSION_LINE_EQUILIBRIUM = 6
 SCHEMA_VERSION_SURFACES = 7
 SCHEMA_VERSION_LID_POLICY = 8
 SCHEMA_VERSION_EQUILIBRIUM_ADOPTION = 9
+# ADR-015: projects whose linear inputs use the rigid_subset_v1 layout. Older readers refuse it
+# (they would read the channels as surge/heave); it is otherwise a superset of version 9.
+SCHEMA_VERSION_RIGID_LINEAR = 10
 
 def has_adoption_intent(project):
     def contains(value):
@@ -63,6 +66,11 @@ def has_adoption_intent(project):
         if isinstance(value,(list,tuple)):return any(contains(v) for v in value)
         return False
     return contains(project.to_dict())
+
+def has_rigid_linear_intent(project):
+    inputs = project.linear_inputs
+    return inputs is not None and getattr(inputs, "layout", "two_body_surge_heave_v1") != "two_body_surge_heave_v1"
+
 
 def has_lid_policy_intent(project):
     def contains(value):
@@ -81,6 +89,7 @@ SUPPORTED_SCHEMA_VERSIONS = (
     SCHEMA_VERSION_SURFACES,
     SCHEMA_VERSION_LID_POLICY,
     SCHEMA_VERSION_EQUILIBRIUM_ADOPTION,
+    SCHEMA_VERSION_RIGID_LINEAR,
 )
 MANIFEST_NAME = "project.json"
 HYDRO_ARTIFACT_ROLES = ("dataset", "kernel")
@@ -283,6 +292,7 @@ class ProjectStore:
             hydro_intent = project.hydro_provenance is not None
             manifest = {
                 "schema_version": (
+                    SCHEMA_VERSION_RIGID_LINEAR if has_rigid_linear_intent(project) else
                     SCHEMA_VERSION_EQUILIBRIUM_ADOPTION if has_adoption_intent(project) else
                     SCHEMA_VERSION_LID_POLICY if has_lid_policy_intent(project) else
                     SCHEMA_VERSION_SURFACES if has_surface_intent(project) else
@@ -446,6 +456,10 @@ class ProjectStore:
                 "must refuse an unknown manifest version rather than silently "
                 "dropping intent it does not understand."
             )
+        # schema 10 = schema 9 semantics plus rigid_subset_v1 linear inputs (checked after loading)
+        rigid_manifest = version == SCHEMA_VERSION_RIGID_LINEAR
+        if rigid_manifest:
+            version = SCHEMA_VERSION_EQUILIBRIUM_ADOPTION
         if version not in (SCHEMA_VERSION_NATIVE,SCHEMA_VERSION_LINE_EQUILIBRIUM,SCHEMA_VERSION_SURFACES,SCHEMA_VERSION_LID_POLICY,SCHEMA_VERSION_EQUILIBRIUM_ADOPTION) and "native_inputs" in manifest:
             raise ProjectLoadError("native intent requires schema_version 5; downgrade is refused")
         if version in (SCHEMA_VERSION_NATIVE,SCHEMA_VERSION_LINE_EQUILIBRIUM):
@@ -719,8 +733,11 @@ class ProjectStore:
         adoption_intent=has_adoption_intent(project)
         if adoption_intent and version != SCHEMA_VERSION_EQUILIBRIUM_ADOPTION:
             raise ProjectLoadError("reference orientation/adoption in current or retained intent requires schema_version 9; downgrade refused")
-        if version == SCHEMA_VERSION_EQUILIBRIUM_ADOPTION and not adoption_intent:
+        if version == SCHEMA_VERSION_EQUILIBRIUM_ADOPTION and not adoption_intent and not rigid_manifest:
             raise ProjectLoadError("schema_version 9 requires current or retained adoption/orientation intent")
+        if has_rigid_linear_intent(project) != rigid_manifest:
+            raise ProjectLoadError("rigid_subset_v1 linear inputs require schema_version 10 and schema_version 10 "
+                                   "requires them; downgrade or reinterpretation is refused")
         return project
 
     def _load_sidecar_json(self, entry: dict, label: str) -> dict:

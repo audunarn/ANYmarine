@@ -109,3 +109,25 @@ def test_regular_wave_assessment_reproduces(tmp_path):
     report = service.assess_linear_result(project, result, case)
     assert report.verdict == "pass"
     assert _stable(report.to_dict()) == _stable(frozen["report"])
+
+
+@pytest.mark.parametrize("label", ["raw", "derived"])
+def test_hydro_imported_projects_load_verify_and_resave_byte_identically(tmp_path, label):
+    pytest.importorskip("anyhydro")
+    from anymarine.services import ApplicationService
+
+    frozen = _load("hydro_projects.json")[label]
+    source = tmp_path / "frozen"
+    shutil.copytree(FIXTURES / f"{label}_hydro_project", source)
+    service = ApplicationService(source)
+    project = service.load(source)
+    assert linear_input_hash(project.linear_inputs) == frozen["input_hash"]
+    assert _canonical(project.hydro_provenance.to_dict()) == frozen["provenance"]
+    service.verify_hydro_provenance(project)          # re-proves the stored sources (derived: recompiles)
+    target = tmp_path / "resaved"
+    shutil.copytree(FIXTURES / f"{label}_hydro_project", target)   # hydro sidecars must exist before a save
+    ProjectStore(target).save(project)
+    frozen_files = sorted(p.relative_to(source) for p in source.rglob("*") if p.is_file())
+    assert sorted(p.relative_to(target) for p in target.rglob("*") if p.is_file()) == frozen_files
+    for relative in frozen_files:
+        assert (target / relative).read_bytes() == (source / relative).read_bytes(), relative

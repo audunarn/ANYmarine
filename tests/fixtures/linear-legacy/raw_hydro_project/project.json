@@ -1,0 +1,50 @@
+{
+  "bodies": {
+    "hydro-alpha": {
+      "sha256": "ec6bab3a586a44a202d8b340481554e5f0511abc7c3a5bf6bd4d82781ef36455",
+      "sidecar": "bodies/ec6bab3a586a44a202d8b340481554e5f0511abc7c3a5bf6bd4d82781ef36455.json"
+    },
+    "hydro-beta": {
+      "sha256": "774e6b4ed6cd3d45e4a8846706336fd6f632a741858acd4bbbdc09a115d9a0ec",
+      "sidecar": "bodies/774e6b4ed6cd3d45e4a8846706336fd6f632a741858acd4bbbdc09a115d9a0ec.json"
+    }
+  },
+  "body_order": [
+    "hydro-alpha",
+    "hydro-beta"
+  ],
+  "equilibrium": {
+    "description": "Analytic test equilibrium (development fixture).",
+    "source": "synthetic",
+    "waterline_z": 0.0
+  },
+  "hydro_artifacts": [
+    {
+      "role": "dataset",
+      "sha256": "b8efac9075329b091d24f0e333cb1a057fafa0766e0724a0cd7e45579f25b488",
+      "sidecar": "hydro/b8efac9075329b091d24f0e333cb1a057fafa0766e0724a0cd7e45579f25b488.nc"
+    },
+    {
+      "role": "kernel",
+      "sha256": "bd490ce3984f04536a5a3e5987ae18b11e610a0b6a6d12544caec9c6d22e56ec",
+      "sidecar": "hydro/bd490ce3984f04536a5a3e5987ae18b11e610a0b6a6d12544caec9c6d22e56ec.nc"
+    }
+  ],
+  "hydro_provenance": {
+    "sha256": "ba5a838b164093fda4b966e09de94f130b14f244dc65123d78c852e91fcf9f1c",
+    "sidecar": "hydro/ba5a838b164093fda4b966e09de94f130b14f244dc65123d78c852e91fcf9f1c.json"
+  },
+  "linear_inputs": {
+    "sha256": "67390d98792f547e9f5f65c779b1e5fed9802944c8f55c4754552b03cee2c140",
+    "sidecar": "linear_inputs/67390d98792f547e9f5f65c779b1e5fed9802944c8f55c4754552b03cee2c140.json"
+  },
+  "name": "Hydro bridge fixture",
+  "results": [],
+  "schema_version": 4,
+  "settings": {
+    "dt": 0.25,
+    "duration": 20.0,
+    "wave_amplitude": 0.8,
+    "wave_period": 6.0
+  }
+}

@@ -239,3 +239,52 @@ def test_run_and_assessment_refuse_the_rigid_layout_explicitly():
         assess_result(None, None, inputs)
     with pytest.raises(PairedRefinementRefusalError, match="six-DOF layouts"):
         _member_inputs(SimpleNamespace(inputs=inputs))
+
+
+# ------------------------------------------------------------------ review round 1 regressions
+
+def test_rigid_projects_use_schema_10_and_legacy_manifests_cannot_carry_them(tmp_path):
+    project = _project()
+    inputs = _inputs(project, [("sway", "roll"), ("sway", "yaw")])
+    ProjectStore(tmp_path).save(dataclasses.replace(project, linear_inputs=inputs))
+    manifest = json.loads((tmp_path / "project.json").read_text(encoding="utf-8"))
+    assert manifest["schema_version"] == 10
+    manifest["schema_version"] = 3                     # what an older application would have accepted
+    (tmp_path / "project.json").write_text(json.dumps(manifest), encoding="utf-8")
+    from anymarine.persistence import ProjectLoadError
+    with pytest.raises(ProjectLoadError, match="schema_version 10"):
+        ProjectStore(tmp_path).load()
+
+
+def test_legacy_projects_keep_their_schema(tmp_path):
+    from anymarine.linear import analytic_demo_inputs
+    project = default_two_body_project()
+    ProjectStore(tmp_path).save(dataclasses.replace(project, linear_inputs=analytic_demo_inputs(project)))
+    assert json.loads((tmp_path / "project.json").read_text(encoding="utf-8"))["schema_version"] == 3
+
+
+def test_rigid_results_are_never_decoded_with_the_legacy_mapping():
+    from anymarine.linear import LinearResultIncomplete, verify_linear_result
+    inputs = _inputs(_project(), [("sway", "roll"), ("sway", "yaw")])
+    with pytest.raises(LinearResultIncomplete, match="cannot be verified yet"):
+        verify_linear_result(None, inputs)
+
+
+def test_imports_refuse_to_replace_rigid_inputs(tmp_path):
+    from anymarine.hydro import HydroImportError, _assemble_derived_inputs
+    from anymarine.services import ApplicationService, ServiceError
+    project = _project()
+    project = dataclasses.replace(project, linear_inputs=_inputs(project, [("sway", "roll"), ("sway", "yaw")]))
+    service = ApplicationService(tmp_path)
+    with pytest.raises(ServiceError, match="six-DOF layouts"):
+        service.import_derived_hydro_inputs(project, "d.nc", "o.npz", "k.nc", {})
+    with pytest.raises(ServiceError, match="six-DOF layouts"):
+        service.import_hydro_inputs(project, "d.nc", "k.nc", {})
+    with pytest.raises(HydroImportError, match="rigid_subset_v1"):
+        _assemble_derived_inputs(None, project, None, None, None, {}, "0" * 64)
+
+
+def test_non_finite_dry_mass_assembly_is_refused():
+    project = _project(cg=(0.0, 0.0, 1e155))
+    with pytest.raises(ValueError):
+        _inputs(project, [("surge", "pitch"), ("surge",)], mass_dry=np.eye(3))

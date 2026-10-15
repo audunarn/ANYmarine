@@ -601,6 +601,11 @@ def verify_linear_result(result: ResultRecord, inputs: LinearDevelopmentInputs) 
     right input hash is refused.
     """
 
+    if getattr(inputs, "layout", LINEAR_LAYOUT_LEGACY) != LINEAR_LAYOUT_LEGACY:
+        # never decode a rigid_subset_v1 run with the legacy surge/heave mapping (ADR-015 slice L6-2)
+        raise LinearResultIncomplete(
+            f"results of the {inputs.layout} layout cannot be verified yet; only the legacy two-body "
+            "surge/heave mapping is implemented (ADR-015 section 7)")
     if result.to_dict().get('surface_snapshot') != surface_result_snapshot(inputs):
         raise LinearResultIncomplete('linear result producing surface geometry is missing or different')
     if result.kind != RESULT_KIND_LINEAR:

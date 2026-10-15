@@ -1,0 +1,215 @@
+{
+  "a_inf_source": "analytic-exponential-oracle-fixture",
+  "assumptions": [
+    "low_tail_policy=explicit_zero_sample: caller-supplied explicit zero-frequency damping sample B(0); no substitution from finite frequencies",
+    "high_tail_truncated_at_omega_max=8: B is explicitly truncated at the last grid frequency; no extrapolation, fitting or symmetrization",
+    "time_window=none",
+    "kernel_artifact_unqualified: development artifact; cannot inherit qualified status from the source dataset",
+    "derived_operators_source: retained-coordinate kernel built from the admitted derived operator artifact (bound to its content hash and the raw source dataset hash); the raw full-6N source is not consumed here"
+  ],
+  "body_ids": [
+    "hydro-alpha",
+    "hydro-beta"
+  ],
+  "created_utc": "2026-10-15T14:18:02.776097+00:00",
+  "criteria": {
+    "added_mass_abs_tol": 50.0,
+    "added_mass_rel_tol": 0.05,
+    "damping_abs_tol": 50.0,
+    "damping_rel_tol": 0.05,
+    "omega_max": 4.0,
+    "omega_min": 0.5
+  },
+  "dataset_content_hash": "1b44d45fc7fa23ef22fa2661ef92e43ed215211e6fa05af69f382a2a27d1f71e",
+  "dataset_raw_sha256": "089277a2ddbf238c19434b8010689dc8ba8773e209308ee2064a6ccea9a8e37d",
+  "dataset_sidecar": "hydro/089277a2ddbf238c19434b8010689dc8ba8773e209308ee2064a6ccea9a8e37d.nc",
+  "dataset_source_path": "C:\\Users\\AudunArnesenNyhus\\AppData\\Local\\Temp\\tmp152c5k9b\\derived\\dataset.nc",
+  "derived_bundle": {
+    "derived_admitted": true,
+    "derived_content_hash": "72d5c9efa52e9354a232fba692fd6ed55d0d5ff37404b8f24f0fb3af445e2e38",
+    "derived_report": {
+      "admitted": true,
+      "correction_pass": true,
+      "damping_psd_pass": true,
+      "derived_symmetry_pass": true,
+      "max_correction_defect": {
+        "added_mass": 0.0,
+        "added_mass_infinite": 0.0,
+        "damping": 6.000000212225132e-07
+      },
+      "max_reciprocity_defect": {
+        "added_mass": 0.0,
+        "added_mass_infinite": 0.0,
+        "damping": 1.200000014023317e-06
+      },
+      "max_symmetry_defect": {
+        "added_mass": 0.0,
+        "added_mass_infinite": 0.0,
+        "damping": 0.0
+      },
+      "min_damping_eigenvalue": -5.975220518613724e-07,
+      "n_damping_negative_modes": 0,
+      "n_frequencies": 80,
+      "n_raw_full_unscaled_negative_modes": 0,
+      "normalization_name": "test-si-metres",
+      "raw_full_coordinate_label": "unscaled_mixed_si_informational",
+      "raw_full_unscaled_max_added_mass_asymmetry": 0.0,
+      "raw_full_unscaled_max_damping_asymmetry": 1.200000014023317e-06,
+      "raw_full_unscaled_min_damping_eigenvalue": -5.994160328496342e-07,
+      "raw_full_unscaled_negative_mode_retained_alignment": [],
+      "raw_reciprocity_pass": true,
+      "retained_dofs": [
+        "hydro-alpha::surge",
+        "hydro-alpha::heave",
+        "hydro-beta::surge",
+        "hydro-beta::heave"
+      ]
+    },
+    "derived_settings": {
+      "correction_policy": "reciprocal_average",
+      "criteria": {
+        "correction_abs_tol": 1e-05,
+        "correction_floor": 1e-06,
+        "correction_rel_tol": 0.0,
+        "damping_psd_tol": 1e-05,
+        "derived_symmetry_tol": 1e-09,
+        "reciprocity_abs_tol": 1e-05,
+        "reciprocity_floor": 1e-06,
+        "reciprocity_rel_tol": 0.0
+      },
+      "normalization": {
+        "name": "test-si-metres",
+        "scales": [
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "unit_convention": "SI base units (m, kg, s)"
+      },
+      "retained_dofs": [
+        "hydro-alpha::surge",
+        "hydro-alpha::heave",
+        "hydro-beta::surge",
+        "hydro-beta::heave"
+      ]
+    },
+    "execution_limits": null,
+    "operators_raw_sha256": "2c46ac62adac992c6be2e1410cd378a2c4fb640af5ed87ef347410f824c63a8c",
+    "operators_sidecar": "hydro/2c46ac62adac992c6be2e1410cd378a2c4fb640af5ed87ef347410f824c63a8c.npz",
+    "operators_source_path": "C:\\Users\\AudunArnesenNyhus\\AppData\\Local\\Temp\\tmp152c5k9b\\derived\\operators.npz",
+    "q0": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "route": "derived_operators",
+    "v0": [
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ]
+  },
+  "diagnostics": {
+    "added_mass_symmetry_violations": 0,
+    "damping_symmetry_violations": 0,
+    "duration_over_spacing_period": 0.31830988618379236,
+    "kernel_duration": 20.0,
+    "max_abs_damping_at_omega_max": 39.59457352253235,
+    "max_added_mass_asymmetry": 0.0,
+    "max_damping_asymmetry": 0.0,
+    "max_frequency_spacing": 0.10000000000000053,
+    "min_damping_eigenvalue": -5.975219682243922e-07,
+    "omega_max": 8.0,
+    "omega_max_times_dt": 0.4,
+    "passivity_violations": 0
+  },
+  "dof_keys": [
+    "hydro-alpha::surge",
+    "hydro-alpha::heave",
+    "hydro-beta::surge",
+    "hydro-beta::heave"
+  ],
+  "dt": 0.05,
+  "kernel_content_hash": "d810cedfebe993234bf051325bf044c2742df28dffec7fe2876ea10279fd2b42",
+  "kernel_raw_sha256": "21ee0ffc2641865032233d67ffd7e6bc97fdc1a3a2cc0c287071af5238727179",
+  "kernel_settings": {
+    "dt": 0.05,
+    "extension_name": null,
+    "low_tail_policy": "explicit_zero_sample",
+    "n_time": 401,
+    "passivity_tol": 1e-06,
+    "symmetry_tol": 1e-06,
+    "time_window": null,
+    "zero_frequency_damping": [
+      [
+        266.6666666666667,
+        339.3939393939394,
+        484.8484848484848,
+        557.5757575757576
+      ],
+      [
+        339.3939393939394,
+        431.95592286501375,
+        617.0798898071624,
+        709.6418732782369
+      ],
+      [
+        484.8484848484848,
+        617.0798898071624,
+        881.5426997245178,
+        1013.7741046831956
+      ],
+      [
+        557.5757575757576,
+        709.6418732782369,
+        1013.7741046831956,
+        1165.8402203856747
+      ]
+    ]
+  },
+  "kernel_sidecar": "hydro/21ee0ffc2641865032233d67ffd7e6bc97fdc1a3a2cc0c287071af5238727179.nc",
+  "kernel_source_path": "C:\\Users\\AudunArnesenNyhus\\AppData\\Local\\Temp\\tmp152c5k9b\\derived\\kernel.nc",
+  "linear_input_hash": "e76437cbc8ba9e54975a1a359e572806bd6e21a660e86a28c740af1905bd7ced",
+  "mesh_hashes": [
+    "9250e959251ae82c25c4668f4bf349fb6392fb3bfb4fd38319d345d0caf5cc7f",
+    "e42dcca79104f9f250180a36f98fd9619cfdbbb29a90fbc2e8cefd66b6d8fe18"
+  ],
+  "n_steps": 201,
+  "phasor_convention": "x(t) = Re{X * exp(-i*omega*t)}",
+  "reconstruction_report": {
+    "added_mass_pass": true,
+    "added_mass_worst_error_to_threshold_ratio": 0.0019358160939580698,
+    "criteria": {
+      "added_mass_abs_tol": 50.0,
+      "added_mass_rel_tol": 0.05,
+      "damping_abs_tol": 50.0,
+      "damping_rel_tol": 0.05,
+      "omega_max": 4.0,
+      "omega_min": 0.5
+    },
+    "damping_pass": true,
+    "damping_worst_error_to_threshold_ratio": 0.001182064949959048,
+    "failing_added_mass_coefficients": [],
+    "failing_damping_coefficients": [],
+    "max_added_mass_error": 0.9386752077134588,
+    "max_damping_error": 0.12111769627762214,
+    "n_window_frequencies": 36,
+    "overall_pass": true,
+    "window_omega_range": [
+      0.5,
+      4.0
+    ]
+  },
+  "reference_transformations": null,
+  "request_hash": "db8822172df891db34b34f2e4829268622bd7048b48df4a2dd9a857ccf87d179",
+  "source": "hydro_dataset",
+  "source_backend": "analytic-test-fixture",
+  "source_qualification_status": "development_fixture",
+  "source_schema_version": "1.1.0",
+  "surge_link_stiffness": 0.0,
+  "t0": 0.0,
+  "wave": null
+}

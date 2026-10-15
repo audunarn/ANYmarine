@@ -1,0 +1,55 @@
+{
+  "bodies": {
+    "hydro-alpha": {
+      "sha256": "ec6bab3a586a44a202d8b340481554e5f0511abc7c3a5bf6bd4d82781ef36455",
+      "sidecar": "bodies/ec6bab3a586a44a202d8b340481554e5f0511abc7c3a5bf6bd4d82781ef36455.json"
+    },
+    "hydro-beta": {
+      "sha256": "774e6b4ed6cd3d45e4a8846706336fd6f632a741858acd4bbbdc09a115d9a0ec",
+      "sidecar": "bodies/774e6b4ed6cd3d45e4a8846706336fd6f632a741858acd4bbbdc09a115d9a0ec.json"
+    }
+  },
+  "body_order": [
+    "hydro-alpha",
+    "hydro-beta"
+  ],
+  "equilibrium": {
+    "description": "Analytic test equilibrium (development fixture).",
+    "source": "synthetic",
+    "waterline_z": 0.0
+  },
+  "hydro_artifacts": [
+    {
+      "role": "dataset",
+      "sha256": "089277a2ddbf238c19434b8010689dc8ba8773e209308ee2064a6ccea9a8e37d",
+      "sidecar": "hydro/089277a2ddbf238c19434b8010689dc8ba8773e209308ee2064a6ccea9a8e37d.nc"
+    },
+    {
+      "role": "kernel",
+      "sha256": "21ee0ffc2641865032233d67ffd7e6bc97fdc1a3a2cc0c287071af5238727179",
+      "sidecar": "hydro/21ee0ffc2641865032233d67ffd7e6bc97fdc1a3a2cc0c287071af5238727179.nc"
+    },
+    {
+      "role": "operators",
+      "sha256": "2c46ac62adac992c6be2e1410cd378a2c4fb640af5ed87ef347410f824c63a8c",
+      "sidecar": "hydro/2c46ac62adac992c6be2e1410cd378a2c4fb640af5ed87ef347410f824c63a8c.npz"
+    }
+  ],
+  "hydro_provenance": {
+    "sha256": "b8a9798f7d4b59be66d989f9c00554e1cfadd983064fe505e94906fc5be9002a",
+    "sidecar": "hydro/b8a9798f7d4b59be66d989f9c00554e1cfadd983064fe505e94906fc5be9002a.json"
+  },
+  "linear_inputs": {
+    "sha256": "803178ae4ecc32cc1ecab9db8424db763b3ca4bed9067a59bd77eb248dd5d7d7",
+    "sidecar": "linear_inputs/803178ae4ecc32cc1ecab9db8424db763b3ca4bed9067a59bd77eb248dd5d7d7.json"
+  },
+  "name": "Derived import fixture",
+  "results": [],
+  "schema_version": 4,
+  "settings": {
+    "dt": 0.25,
+    "duration": 20.0,
+    "wave_amplitude": 0.8,
+    "wave_period": 6.0
+  }
+}

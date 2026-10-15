@@ -1605,6 +1605,8 @@ class LinearDevelopmentInputs:
             expected = rigid_dry_mass(self.bindings)
         except Exception as error:   # solver unavailable or inadmissible mass record: fail closed
             raise ValueError(f"rigid_subset_v1 dry mass cannot be assembled: {error}") from error
+        if not all(math.isfinite(v) for row in expected for v in row):
+            raise ValueError("rigid_subset_v1 dry mass assembly is not finite (CG/inertia/mass out of range)")
         scale = max(abs(v) for row in expected for v in row) or 1.0
         worst = max(abs(a - b) for row_a, row_b in zip(self.mass_dry, expected) for a, b in zip(row_a, row_b))
         if worst > LINEAR_DRY_MASS_RELATIVE_TOLERANCE * scale:

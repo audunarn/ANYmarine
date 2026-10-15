@@ -670,6 +670,10 @@ def import_hydro_inputs(
     anyhydro = _import_anyhydro()
     opt = _parse_options(options)
 
+    if project.linear_inputs is not None and project.linear_inputs.layout != "two_body_surge_heave_v1":
+        raise HydroImportError(
+            "the hydrodynamic import/recompilation builds legacy surge/heave inputs and is not available for "
+            f"projects holding {project.linear_inputs.layout} inputs (ADR-015 section 7)")
     bodies = tuple(project.bodies)
     if len(bodies) != 2:
         raise HydroGeometryError(
@@ -1134,6 +1138,10 @@ def _assemble_derived_inputs(
     of tampering rather than a second numerical truth.
     """
 
+    if project.linear_inputs is not None and project.linear_inputs.layout != "two_body_surge_heave_v1":
+        raise HydroImportError(
+            "the hydrodynamic import/recompilation builds legacy surge/heave inputs and is not available for "
+            f"projects holding {project.linear_inputs.layout} inputs (ADR-015 section 7)")
     bodies = tuple(project.bodies)
     if len(bodies) != 2:
         raise HydroGeometryError(
