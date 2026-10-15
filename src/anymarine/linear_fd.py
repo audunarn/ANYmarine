@@ -92,9 +92,10 @@ def continuous_reference(mass_dry, added_mass, damping_radiation, damping, stiff
 
 
 def memory_symbol_min_eigenvalue(kernel, dt: float, n_theta: int = 4096) -> float:
-    """min over theta of the smallest eigenvalue of dt (K_0 + 2 sum_{l>=1} K_l cos(l theta)) - diagnostic.
+    """min over a theta grid of the smallest eigenvalue of dt (K_0 + 2 sum_{l>=1} K_l cos(l theta)) - diagnostic only.
 
-    This is 2 Re G_d on the discrete frequency circle; it is >= 0 for a passive stored kernel (see the energy note).
+    This is twice the Hermitian part of G_d on the discrete frequency circle; it is >= 0 for a passive stored kernel
+    (energy note). A finite grid can miss narrow negative intervals; it is never an admission proof.
     """
     K = np.asarray(kernel, dtype=float)
     theta = np.linspace(0.0, math.pi, n_theta)
@@ -181,20 +182,20 @@ def _window_fit(times, q, omega):
 
 
 def fit_phasors(times, q, omega, t_fit, scales, floors, periods_per_window: int = 5) -> PhasorFit:
-    """ADR-015 section 8 fitting: consecutive windows of 5 whole wave periods after t_fit; the last two complete
-    windows must agree within max(0.002 s_k, 0.1 f_k) and the last residual must be <= max(0.01 |X_k|, 0.1 f_k)."""
+    """ADR-015 section 8 fitting: the last two consecutive windows of exactly 5 wave periods (physical time, ending at
+    the record end) must both lie after t_fit; they must agree within max(0.002 s_k, 0.1 f_k) and the last residual
+    must be <= max(0.01 |X_k|, 0.1 f_k). Windows are closed intervals in time; samples are those inside them."""
     t = np.asarray(times, dtype=float)
     Q = np.asarray(q, dtype=float).reshape(t.size, -1)
     s, f = np.asarray(scales, dtype=float), np.asarray(floors, dtype=float)
-    dt = t[1] - t[0]
-    samples = int(round(periods_per_window * 2.0 * math.pi / omega / dt))
-    start = int(np.searchsorted(t, t_fit - 1e-12 * max(1.0, abs(t_fit))))
-    count = (t.size - start) // samples
-    if count < 2:
-        return PhasorFit(np.full(Q.shape[1], np.nan + 0j), np.full(Q.shape[1], np.nan + 0j),
-                         np.full(Q.shape[1], np.nan), False, "fewer than two complete windows after t_fit")
-    last = slice(t.size - samples, t.size)
-    prev = slice(t.size - 2 * samples, t.size - samples)
+    width = periods_per_window * 2.0 * math.pi / omega
+    end = float(t[-1])
+    tol = 1e-9 * max(1.0, abs(end))
+    nan = np.full(Q.shape[1], np.nan)
+    if end - 2.0 * width < t_fit - tol or end - 2.0 * width < float(t[0]) - tol:
+        return PhasorFit(nan + 0j, nan + 0j, nan, False, "fewer than two complete windows after t_fit")
+    last = (t >= end - width - tol) & (t <= end + tol)
+    prev = (t >= end - 2.0 * width - tol) & (t <= end - width + tol)
     X1, r1 = _window_fit(t[last], Q[last], omega)
     X0, _ = _window_fit(t[prev], Q[prev], omega)
     agree = np.abs(X1 - X0) <= np.maximum(0.002 * s, 0.1 * f)
@@ -213,25 +214,27 @@ def judged_channels(reference, scales, floors):
 
 
 def settling_time(times, q, amplitudes, t_max_period: float, hold_windows: int = 3):
-    """ADR-015 section 8 free-decay settling: e(t) = max_k |q_k| / a_k; complete windows of 2 T_max from t = 0; t_s is
-    the start of the first window after which every later complete window has e <= max(1e-3 max e, 1e-9), held for
-    at least ``hold_windows`` windows. Returns t_s or None (unresolved)."""
+    """ADR-015 section 8 free-decay settling: e(t) = max_k |q_k| / a_k; complete windows [2 w T_max, 2 (w+1) T_max] in
+    physical time from t = 0 (a trailing partial window is ignored); t_s is the start of the first window after which
+    every later complete window has e <= max(1e-3 max e, 1e-9), with at least ``hold_windows`` such windows.
+    Returns t_s (a window boundary) or None (unresolved)."""
     t = np.asarray(times, dtype=float)
     Q = np.asarray(q, dtype=float).reshape(t.size, -1)
     a = np.asarray(amplitudes, dtype=float)
     e = np.max(np.abs(Q) / a, axis=1)
     level = max(1e-3 * float(np.max(e)), 1e-9)
-    dt = t[1] - t[0]
-    width = int(round(2.0 * t_max_period / dt))
-    windows = (t.size) // width
-    peaks = [float(np.max(e[w * width:(w + 1) * width])) for w in range(windows)]
+    width = 2.0 * t_max_period
+    tol = 1e-9 * max(1.0, abs(float(t[-1])))
+    windows = int(math.floor((float(t[-1]) + tol) / width))           # complete windows only
+    peaks = []
     for w in range(windows):
-        if all(p <= level for p in peaks[w:]) and windows - w >= hold_windows:
-            return float(t[w * width])
+        inside = (t >= w * width - tol) & (t <= (w + 1) * width + tol)
+        peaks.append(float(np.max(e[inside])))
+    for w in range(windows):
+        if windows - w >= hold_windows and all(p <= level for p in peaks[w:]):
+            return w * width
     return None
 
-
-# ---------------------------------------------------------------------------------------------- energy
 
 def memory_work(dt: float, velocities, memory_forces) -> np.ndarray:
     """Cumulative memory work W_mem(n) = sum_{k<n} dt vbar_k . mbar_k (trapezoidal step averages)."""
@@ -254,36 +257,72 @@ def stored_kernel_transform(kernel, dt, s, cutoff_index=None) -> np.ndarray:
     return dt * np.einsum("l,lij->ij", weights * np.exp(-s * lags * dt), K[:last + 1])
 
 
-def matrix_pencil(samples, dt, order):
-    """Exponents s_m of a sum of ``order`` complex exponentials fitted to a uniformly sampled scalar sequence."""
+def matrix_pencil(samples, dt, order, rank_tolerance: float = 1e-10):
+    """Exponents s_m of a sum of ``order`` complex exponentials fitted to a uniformly sampled scalar sequence.
+
+    The order must not exceed the numerical rank of the Hankel matrix (singular values above rank_tolerance x the
+    largest); otherwise the extra modes are unidentifiable and the fit is refused (LinearFdError).
+    """
     y = np.asarray(samples, dtype=float)
+    if order < 1 or 2 * order + 1 > y.size:
+        raise LinearFdError("matrix pencil order must be >= 1 and leave enough samples")
     L = y.size // 2
     Y = np.array([y[i:i + L + 1] for i in range(y.size - L)])
     U, sigma, Vh = np.linalg.svd(Y, full_matrices=False)
+    rank = int(np.sum(sigma > rank_tolerance * sigma[0])) if sigma[0] > 0 else 0
+    if order > rank:
+        raise LinearFdError(f"matrix pencil order {order} exceeds the numerical rank {rank} of the samples")
     V = Vh[:order].conj().T
     V1, V2 = V[:-1], V[1:]
     z = np.linalg.eigvals(np.linalg.pinv(V1) @ V2)
     return np.log(z.astype(complex)) / dt
 
 
-def newton_pole(mass, damping, stiffness, kernel, dt, s0, cutoff_index=None, iterations=60):
-    """Refine a pole of det[s^2 M + s (C + Ktilde(s)) + K] = 0 by Newton with a finite-difference derivative."""
-    M, C, K = (np.asarray(x, dtype=float) for x in (mass, damping, stiffness))
+@dataclass(frozen=True)
+class PoleResult:
+    s: complex
+    converged: bool
+    relative_singular_value: float       # sigma_min of the row-scaled system matrix at s (unit rows at s0)
+
+
+def newton_pole(mass, damping, stiffness, kernel, dt, s0, cutoff_index=None, iterations=60,
+                root_tolerance: float = 1e-9) -> PoleResult:
+    """Refine a pole of det[s^2 M + s (C + Ktilde(s)) + K] = 0 by Newton (diagnostic only).
+
+    The determinant is evaluated on the system matrix scaled by a fixed diagonal from the start point (no
+    under/overflow for badly scaled units); the result reports convergence and the scale-free residual (smallest
+    singular value of that row-scaled matrix); ``converged`` requires a vanishing Newton step and residual <= tolerance.
+    """
+    M, C, K = (np.atleast_2d(np.asarray(x, dtype=float)) for x in (mass, damping, stiffness))
+
+    def system(s):
+        return s * s * M + s * (C + stored_kernel_transform(kernel, dt, s, cutoff_index)) + K
+    rows = np.linalg.norm(system(complex(s0)), axis=1)
+    rows = np.where(rows > 0, rows, 1.0)
+    D = np.diag(1.0 / rows)
 
     def f(s):
-        return np.linalg.det(s * s * M + s * (C + stored_kernel_transform(kernel, dt, s, cutoff_index)) + K)
+        return np.linalg.det(D @ system(s))
+
+    def residual(s):
+        # smallest singular value of the row-scaled matrix (unit rows at the start point): scale-free, and it stays
+        # meaningful when every entry vanishes together at a multiple root
+        return float(np.linalg.svd(D @ system(s), compute_uv=False)[-1])
     s = complex(s0)
+    stepped = False
     for _ in range(iterations):
         h = 1e-7 * max(1.0, abs(s))
         value = f(s)
         derivative = (f(s + h) - f(s - h)) / (2 * h)
-        if derivative == 0:
+        if derivative == 0 or not np.isfinite(derivative):
             break
         step = value / derivative
         s -= step
         if abs(step) <= 1e-13 * max(1.0, abs(s)):
+            stepped = True
             break
-    return s
+    rel = residual(s)
+    return PoleResult(s=s, converged=bool(stepped and rel <= root_tolerance), relative_singular_value=rel)
 
 
 def augmented_poles(mass, damping, stiffness, residues, rates):
@@ -314,6 +353,8 @@ def bartlett_taper(kernel, dt: float, cutoff_seconds: float) -> tuple[np.ndarray
     """
     K = np.asarray(kernel, dtype=float)
     cutoff = int(round(cutoff_seconds / dt))
+    if cutoff < 1 or K.shape[0] <= cutoff:
+        raise LinearFdError("the stored kernel must cover the whole taper support [0, H] (samples through L_H)")
     t = dt * np.arange(K.shape[0])
     window = np.clip(1.0 - t / (cutoff * dt), 0.0, None)
     window[cutoff:] = 0.0

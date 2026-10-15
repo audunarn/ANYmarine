@@ -98,8 +98,12 @@ def test_weights_oracle_nonzero_last_retained_sample():
 
 def test_continuous_reference_and_input_refusals():
     M, A, C, K, S = _system()
-    X = fd.continuous_reference(M, A, 0.1 * S, C, K, 0.6, np.array([1.0, 0.0]))
-    assert X.shape == (2,) and np.iscomplexobj(X)
+    w = 0.6
+    X = fd.continuous_reference(M, A, 0.1 * S, C, K, w, np.array([1.0, 0.0]))
+    Z = K - w ** 2 * (M + A) - 1j * w * (0.1 * S + C)
+    assert np.allclose(Z @ X, [1.0, 0.0], rtol=0, atol=1e-15)
+    one = fd.continuous_reference([[2.0]], [[1.0]], [[0.5]], [[0.25]], [[9.0]], 1.0, np.array([3.0]))
+    assert one[0] == pytest.approx(3.0 / (9.0 - 3.0 - 0.75j), rel=1e-15)
     with pytest.raises(fd.LinearFdError, match="after the declared cutoff"):
         fd.memory_transfer(np.ones((4, 1, 1)), 0.1, 0.5, cutoff_index=1)
     with pytest.raises(fd.LinearFdError, match="Nyquist"):
@@ -201,16 +205,22 @@ def test_pole_oracle_one_dof_exponential_kernel():
     assert -1 / oscillatory.real == pytest.approx(9.76, abs=0.01) and -1 / real.real == pytest.approx(200.1, abs=0.1)
 
 
-@pytest.mark.parametrize("H, decay", [(300.0, 171.4), (450.0, 187.9)])
+# decays from the analytic geometric-sum determinant (ADR-015 section 8 oracle (ii)); a half weight at the last
+# retained sample would give 171.4312 / 187.9093
+@pytest.mark.parametrize("H, decay", [(300.0, 171.4354), (450.0, 187.9110)])
 def test_pole_oracle_sampled_and_cut_kernel(H, decay):
     dt = 0.05
     n = int(round(H / dt)) + 1
     kernel = np.exp(-0.01 * dt * np.arange(n))[:, None, None]
-    s = fd.newton_pole(np.eye(1), 0.2 * np.eye(1), np.eye(1), kernel, dt, -0.005)
-    assert -1 / s.real == pytest.approx(decay, abs=0.1)
-    I = np.eye(1)
-    det = np.linalg.det(s * s * I + s * (0.2 * I + fd.stored_kernel_transform(kernel, dt, s)) + I)
-    assert abs(det) <= 1e-10
+    pole = fd.newton_pole(np.eye(1), 0.2 * np.eye(1), np.eye(1), kernel, dt, -0.005)
+    assert pole.converged and pole.relative_singular_value <= 1e-9
+    assert -1 / pole.s.real == pytest.approx(decay, abs=1e-3)
+    # independent stored-kernel transform: the analytic finite geometric sum with the solver's weights
+    s = pole.s
+    r = np.exp(-(0.01 + s) * dt)
+    geometric = dt * ((1 - r ** n) / (1 - r) - 0.5)
+    assert abs(fd.stored_kernel_transform(kernel, dt, s)[0, 0] - geometric) <= 1e-12 * abs(geometric)
+    assert abs(s * s + s * (0.2 + geometric) + 1) <= 1e-9
 
 
 def test_matrix_pencil_recovers_kernel_exponents():
@@ -230,3 +240,52 @@ def test_memory_oracle_reproduces_the_solver_memory_force():
     _, result = _solve(M, A, C, K, kernel, dt, forces)
     oracle = fd.memory_oracle(kernel, result.velocities, dt)
     assert np.max(np.abs(oracle - result.memory_forces)) <= 1e-10 * np.max(np.abs(result.memory_forces))
+
+
+# ---------------------------------------------------------------------------------------------- review round 1 regressions
+
+def test_fit_windows_are_whole_periods_in_physical_time():
+    """Codex: with T = 1.0009 s two 5-period windows need 10.009 s; a 10 s record must not be accepted."""
+    dt, T = 0.01, 1.0009
+    omega = 2 * math.pi / T
+    t = dt * np.arange(1001)                                          # 0 .. 10.0 s
+    q = np.cos(omega * t)[:, None]
+    assert not fd.fit_phasors(t, q, omega, 0.0, [1.0], [1e-4]).accepted
+    t2 = dt * np.arange(1002)                                         # 0 .. 10.01 s: two windows fit
+    assert fd.fit_phasors(t2, np.cos(omega * t2)[:, None], omega, 0.0, [1.0], [1e-4]).accepted
+
+
+def test_settling_counts_only_complete_physical_windows():
+    """Codex: T_max = 1.0009 s, record to 8.0 s: three complete 2.0018 s windows, two settled -> unresolved."""
+    dt = 0.01
+    t = dt * np.arange(801)
+    q = np.zeros(t.size)
+    q[0] = 1.0
+    assert fd.settling_time(t, q, [1.0], 1.0009) is None
+    t_long = dt * np.arange(1001)                                     # four complete windows, three settled
+    q_long = np.zeros(t_long.size)
+    q_long[0] = 1.0
+    assert fd.settling_time(t_long, q_long, [1.0], 1.0009) == pytest.approx(2.0018)
+
+
+def test_newton_reports_non_convergence_and_is_scale_free():
+    bad = fd.newton_pole(np.eye(1), np.zeros((1, 1)), np.eye(1), np.zeros((2, 1, 1)), 0.1, 0.0)
+    assert not bad.converged and bad.relative_singular_value > 0.5
+    mass = 1e-60 * np.eye(6)
+    stiffness = 1e-60 * np.diag(np.arange(1.0, 7.0) ** 2)               # roots +/- i k, k = 1..6 (simple)
+    root = fd.newton_pole(mass, np.zeros((6, 6)), stiffness, np.zeros((2, 6, 6)), 0.1, 0.2 + 0.9j)
+    assert root.converged and abs(root.s - 1j) <= 1e-9                  # despite determinant underflow (1e-360)
+
+
+def test_matrix_pencil_refuses_unidentifiable_orders():
+    dt = 0.05
+    t = dt * np.arange(200)
+    with pytest.raises(fd.LinearFdError, match="numerical rank"):
+        fd.matrix_pencil(np.exp(-0.3 * t), dt, 4)
+    with pytest.raises(fd.LinearFdError, match="numerical rank"):
+        fd.matrix_pencil(np.zeros(t.size), dt, 1)
+
+
+def test_bartlett_taper_needs_the_whole_support():
+    with pytest.raises(fd.LinearFdError, match="whole taper support"):
+        fd.bartlett_taper(np.exp(-0.1 * np.arange(2))[:, None, None], 1.0, 3.0)

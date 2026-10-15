@@ -84,6 +84,38 @@ of ADR-015 section 8 (iv), then W_mem(N) >= 0 for every N. Consequently E_N <= E
 
    Therefore W_mem(N) >= 0.  QED.
 
+## Admission tolerance: a round-off-level perturbation bound
+
+The theorem above assumes exactly positive semi-definite damping samples. Structural admission (ADR-015 section 8
+(iii)-(iv)) admits eigenvalues down to -64 eps ||B|| (and -64 eps ||C||). Such a sample is not exactly positive
+semi-definite, and a tiny negative W_mem is then possible (Codex review L6-A round 1 gives an example of size
+-eps/(8 pi)). The claim is therefore stated for the admitted class with the following bound.
+
+**Notation.**
+- Let delta = max over all samples i of max(0, -lambda_min(B_i)), so delta <= 64 eps max_i ||B_i||.
+- Let omega_max be the top of the stored band.
+
+**Steps.**
+1. The piecewise-linear interpolant of the samples, with a linear-to-zero or zero low tail and a truncated high
+   tail, satisfies B(w) >= -delta I on [0, omega_max] and B(w) = 0 above it. This holds because the negative part of
+   a convex combination is bounded by the same delta.
+2. The Bartlett-tapered spectrum is the convolution of B with the normalised non-negative Fejer kernel. That kernel
+   integrates to w(0) = 1, so Btilde(w) >= -delta (F * 1_band)(w) I, where 1_band is the indicator of the band.
+3. Sum the aliases. The sum of F * 1_band over the shifted copies (w + 2 pi m / dt) is at most
+   c = ceil(omega_max dt / pi) + 1, the number of copies that overlap. Hence dt G(theta) >= -2 c delta I.
+   If the band lies below Nyquist (omega_max dt <= pi), then c <= 2.
+4. By Parseval, (1 / 2 pi) int |S|^2 d theta = sum_n |s_n|^2, so
+
+       W_mem(N) >= -(dt / 4) c delta sum_n |s_n|^2,    with delta <= 64 eps max_i ||B_i||.
+
+**Interpretation.**
+- Relative to the radiation-dissipation scale (dt / 4) max ||B|| sum |s_n|^2, the deficit is at most 64 c eps,
+  that is about 3e-14 for c <= 2.
+- The external damping obeys the same kind of bound: W_C >= -64 eps ||C|| sum dt |vbar_n|^2.
+- ADR-015 section 8 (v) "bounded total energy" is accepted in this form: exact for exactly positive semi-definite
+  inputs, and up to this round-off-level deficit for inputs admitted with the -64 eps tolerance. This is an owner
+  acceptance item.
+
 ## Scope and limits
 
 - **v_0 = 0 is used.** With a nonzero initial velocity, the starting-endpoint term 1/2 dt K_n v_0 does not cancel in
