@@ -69,6 +69,9 @@ from ..domain import (
     LINEAR_SOURCE_ANALYTIC_DEMO,
     LINEAR_SOURCE_EXPLICIT,
     LINEAR_SOURCE_HYDRO,
+    Body,
+    BodyMesh,
+    EquilibriumMetadata,
     ProjectModel,
     ResultRecord,
 )
@@ -658,6 +661,10 @@ class MainWindow(QMainWindow):
         static_example_action=QAction('Load coupled static equilibrium example',self)
         static_example_action.triggered.connect(self.load_equilibrium_example)
         examples_menu.addAction(static_example_action)
+        examples_menu.addSeparator()
+        l01_action = QAction('Load L01 default vessel — OrcaWave vs ANYhydro (local data)', self)
+        l01_action.triggered.connect(self.load_l01_reference_example)
+        examples_menu.addAction(l01_action)
         file_menu.addAction(save_action)
         file_menu.addSeparator()
         file_menu.addMenu(examples_menu)
@@ -913,6 +920,66 @@ class MainWindow(QMainWindow):
         self.setWindowTitle('ANYmarine — attached plates (geometry preview, unsaved)')
         self.statusBar().showMessage('Two rigid bodies with submerged plates; geometry preview. Native sheet hydrodynamics are unsupported.')
         self._diagnostics.appendPlainText('Attached plates share owner motion. No numerical coefficients, added mass, fictitious displacement or qualification implied.')
+
+    # Local, licensed reference data: never shipped. A prepared artifact is looked up next to a sibling
+    # ANYhydro checkout, then at the location the user picked last time.
+    L01_RELATIVE = Path('ANYhydro') / 'examples' / 'L01 Default vessel' / 'anymarine-prepared' / 'reference_comparison.json'
+    L01_SETTING = 'examples/l01_reference_comparison'
+
+    def _l01_reference_candidates(self) -> list:
+        from PySide6.QtCore import QSettings
+        candidates = []
+        # Source checkout only (<workspace>/ANYmarine/src/anymarine/qtapp): a sibling ANYhydro checkout.
+        parents = Path(__file__).resolve().parents
+        if len(parents) > 4 and parents[2].name == 'src' and (parents[3] / 'pyproject.toml').is_file():
+            candidates.append(parents[4] / self.L01_RELATIVE)
+        remembered = QSettings('ANYmarine', 'ANYmarine').value(self.L01_SETTING, '')
+        if remembered:
+            candidates.append(Path(str(remembered)))
+        return candidates
+
+    def _remember_l01_reference(self, path: Path) -> None:
+        from PySide6.QtCore import QSettings
+        QSettings('ANYmarine', 'ANYmarine').setValue(self.L01_SETTING, str(path))
+
+    def load_l01_reference_example(self) -> None:
+        """OrcaWave L01 default vessel vs ANYhydro RAOs from a locally prepared reference comparison."""
+        from ..reference_comparison import ReferenceComparisonError, load
+        if not self._confirm_discard():
+            return
+        path = next((p for p in self._l01_reference_candidates() if p.is_file()), None)
+        if path is None:
+            self._notify_info('L01 reference comparison',
+                'The L01 example uses licensed OrcaWave data that is not shipped with ANYmarine. Prepare '
+                'reference_comparison.json from the OrcaWave L01 results (tools/orcawave_extract.py and '
+                'tools/reference_comparison.py) and choose it in the next dialog.')
+            chosen = self._ask_open_file('Open L01 reference comparison', 'Reference comparison (*.json)')
+            if not chosen:
+                return
+            path = Path(chosen)
+        try:
+            data = load(path)
+        except ReferenceComparisonError as error:
+            self._notify_warning('L01 reference comparison', str(error))
+            return
+        self._remember_l01_reference(path)
+        body = data['body']
+        mesh = BodyMesh(positions=tuple(tuple(p) for p in body['display_mesh']['positions']),
+                        triangles=tuple(tuple(t) for t in body['display_mesh']['triangles']))
+        vessel = Body(body_id='reference-vessel', name=body['name'], reference_position=(0.0, 0.0, 0.0),
+                      mass=float(body['mass_kg']), mesh=mesh, color='#8796ab')
+        project = ProjectModel(name=data['title'], bodies=(vessel,),
+            equilibrium=EquilibriumMetadata(description='Display geometry of an external reference comparison; '
+                                            'no ANYmarine analysis.'))
+        self._project_root = None
+        self._set_project(project)
+        self._dirty = False
+        self._rao.show_reference(data)
+        self._set_mode('rao')
+        self.setWindowTitle(f"ANYmarine — {data['title']} (reference comparison, unqualified)")
+        self.statusBar().showMessage('External reference comparison in RAO mode: one line per program; development, unqualified')
+        self._diagnostics.appendPlainText(f'Loaded reference comparison {path} (hash {data["artifact_hash"][:12]}). '
+                                          'External programs; not an ANYmarine RAO case; unqualified.')
 
     def load_native_example(self) -> None:
         if not self._confirm_discard():

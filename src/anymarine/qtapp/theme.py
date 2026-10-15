@@ -119,6 +119,7 @@ WORKBENCH_STYLESHEET = f"""
         QFrame#Transport QPushButton {{ padding: 4px 12px; }}
         QToolButton#JobsIndicator {{ color: {MUTED}; padding: 1px 8px; }}
         QToolButton#JobsIndicator:checked {{ background: {ACCENT_SOFT}; color: {ACCENT}; }}
+        QLabel#ReferenceBanner {{ background: {WARN_BG}; color: {WARN_TEXT}; border-radius: 6px; padding: 6px 8px; }}
         QFrame#Card {{ background: {PANEL_BG}; border: 1px solid {BORDER}; border-radius: 8px; }}
         QStatusBar {{ background: {PANEL_BG}; border-top: 1px solid {BORDER}; color: {MUTED}; }}
         QStatusBar::item {{ border: none; }}

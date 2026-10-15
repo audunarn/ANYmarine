@@ -313,11 +313,14 @@ class RaoPanel(QWidget):
         self.run_button = QPushButton('Run TD campaign')
         self.open_button = QPushButton('Open results…')
         self.cancel_button = QPushButton('Cancel')
+        self.reference_button = QPushButton('Reference comparison…')
+        self.reference_button.setToolTip('Open an external reference comparison (e.g. OrcaWave vs ANYhydro RAOs)')
+        self.reference_view = None
         self.register_button.setProperty('primary', True)
         # Two columns keep the panel readable in a narrow context panel.
         buttons = QGridLayout()
         for i, b in enumerate((self.register_button, self.open_button, self.table_button, self.run_button,
-                               self.cancel_button)):
+                               self.cancel_button, self.reference_button)):
             buttons.addWidget(b, i // 2, i % 2)
         layout.addLayout(buttons)
         self.case_label = QLabel('No RAO case. Register one from a JSON specification (see docs/RAO_REPORTING.md).')
@@ -399,6 +402,7 @@ class RaoPanel(QWidget):
         self.run_button.clicked.connect(lambda: self.start('rao-run'))
         self.open_button.clicked.connect(self.open_results_dialog)
         self.cancel_button.clicked.connect(self.cancel)
+        self.reference_button.clicked.connect(self.open_reference_dialog)
         self.dof.currentIndexChanged.connect(self.refresh)
         self.point.currentIndexChanged.connect(self.refresh)
         for combo in (self.owner, self.quantity, self.contribution, self.heading, self.amplitude, self.x_axis):
@@ -557,6 +561,32 @@ class RaoPanel(QWidget):
             self.status.setText(f'results could not be displayed: {error}')
             return
         self.results_loaded.emit(str(directory))
+
+    def open_reference_dialog(self):
+        path, _ = QFileDialog.getOpenFileName(self, 'Open reference comparison', '',
+                                              'Reference comparison (*.json)')
+        if path:
+            self.open_reference(path)
+
+    def open_reference(self, path) -> bool:
+        """Load and show an ``anymarine_reference_comparison_v1`` file; False (with a status) if refused."""
+        from ..reference_comparison import ReferenceComparisonError, load
+        try:
+            data = load(path)
+        except ReferenceComparisonError as error:
+            self.status.setText(f'reference comparison refused: {error}')
+            return False
+        self.show_reference(data)
+        return True
+
+    def show_reference(self, data) -> None:
+        from .reference_view import ReferenceComparisonView
+        if self.reference_view is None:
+            self.reference_view = ReferenceComparisonView()
+            self.tabs.addTab(self.reference_view, 'Reference')
+        self.reference_view.set_artifact(data)
+        self.tabs.setCurrentWidget(self.reference_view)
+        self.status.setText(f"Reference comparison: {data['title']} (external programs, unqualified)")
 
     def _clear(self):
         self.case = self.table = self.report = self._directory = None

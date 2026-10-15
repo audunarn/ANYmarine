@@ -22,6 +22,13 @@ from pathlib import Path
 SCHEMA = 'orcawave_reference_v1'
 TONNE, KILONEWTON = 1000.0, 1000.0
 INFINITE_DEPTH = 1e300
+# OrcaWave BodyMeshSymmetry -> (OrcFxAPI PanelMeshSymmetry, exported mesh file name)
+MESH_SYMMETRY = {
+    'xz and yz planes': ('XZYZ', 'body_mesh_quarter_xz_yz.gdf'),
+    'xz plane': ('XZ', 'body_mesh_half_xz.gdf'),
+    'yz plane': ('YZ', 'body_mesh_half_yz.gdf'),
+    'None': (None, 'body_mesh_full.gdf'),     # no OrcFxAPI export: written from the panel geometry
+}
 
 
 def _pairs(array):
@@ -30,6 +37,30 @@ def _pairs(array):
 
 def _matrix(m, scale=1.0):
     return [[float(v) * scale for v in row] for row in m]
+
+
+def _optional_text(value):
+    return None if value is None else str(value)
+
+
+def _external(d, name):
+    """A single body's 6x6 external matrix in SI (file force units kN -> N; rows by GetData index)."""
+    columns = ('x', 'y', 'z', 'Rx', 'Ry', 'Rz')
+    return [[float(d.GetData(name + c, row)) * KILONEWTON for c in columns] for row in range(6)]
+
+
+def write_gdf(path: Path, panel_geometry, g: float) -> None:
+    """WAMIT GDF (ULEN 1, no symmetry) from OrcFxAPI panelGeometry; a triangle repeats its last vertex."""
+    lines = ['OrcaWave panel geometry (wet panels, no symmetry)', f'1 {g!r} ULEN GRAV', '0 0 ISX ISY',
+             f'{len(panel_geometry)} NPAN']
+    for row in panel_geometry:
+        corners = [[float(v) for v in vertex] for vertex in row['vertices'] if all(math.isfinite(float(v)) for v in vertex)]
+        if len(corners) not in (3, 4):
+            raise SystemExit(f'panel with {len(corners)} vertices cannot be written as GDF')
+        while len(corners) < 4:
+            corners.append(corners[-1])
+        lines += [' '.join(repr(v) for v in vertex) for vertex in corners]
+    path.write_text('\n'.join(lines) + '\n', encoding='utf-8')
 
 
 def extract(owr: Path, out: Path) -> dict:
@@ -47,8 +78,14 @@ def extract(owr: Path, out: Path) -> dict:
     headings = np.asarray(d.headings, dtype=float)
     depth = float(d.WaterDepth)
     out.mkdir(parents=True, exist_ok=True)
-    mesh_name = 'body_mesh_quarter_xz_yz.gdf'          # WAMIT GDF, ISX = ISY = 1
-    d.SaveSymmetrisedBodyMesh(ofx.PanelMeshSymmetry.XZYZ, 1e-6, str(out / mesh_name))
+    # The mesh is saved with the body's own symmetry (WAMIT GDF): xz -> ISY = 1, yz -> ISX = 1.
+    symmetry_name = str(d.GetData('BodyMeshSymmetry', 0))
+    symmetry, mesh_name = MESH_SYMMETRY[symmetry_name]
+    if symmetry is None:
+        # SaveSymmetrisedBodyMesh admits XZ, YZ and XZYZ only; write OrcaWave's own (wet) panels instead.
+        write_gdf(out / mesh_name, d.panelGeometry, float(d.g))
+    else:
+        d.SaveSymmetrisedBodyMesh(getattr(ofx.PanelMeshSymmetry, symmetry), 1e-6, str(out / mesh_name))
     h = d.hydrostaticResults[0]
     added = np.asarray(d.addedMass, dtype=float) * TONNE          # te, te.m, te.m^2 -> kg, kg.m, kg.m^2
     damping = np.asarray(d.damping, dtype=float) * KILONEWTON     # kN.s/m (and moments) -> N.s/m
@@ -69,6 +106,12 @@ def extract(owr: Path, out: Path) -> dict:
         restoring_matrix_si=_matrix(h['restoringMatrix'], KILONEWTON),
         inertia_matrix_si=_matrix(h['inertiaMatrix'], TONNE),
         waterplane_area_m2=float(h['Awp']),
+        # Body inputs that enter OrcaWave's displacement RAOs besides A, B, loads, inertia and restoring.
+        external_stiffness_si=_external(d, 'BodyExternalStiffnessMatrix'),
+        external_stiffness_origin=str(d.GetData('BodyExternalStiffnessMatrixOriginType', 0)),
+        external_damping_si=_external(d, 'BodyExternalDampingMatrix'),
+        external_damping_origin=str(d.GetData('BodyExternalDampingMatrixOriginType', 0)),
+        increase_roll_damping_to_target=str(d.GetData('BodyIncreaseRollDampingToTarget', 0)),
         # OrcaWave reports NaN when no body position applies; JSON gets null (strict parsers).
         position_m=None if not all(math.isfinite(float(v)) for v in h['position']) else [float(v) for v in h['position']],
     )
@@ -78,7 +121,9 @@ def extract(owr: Path, out: Path) -> dict:
                     file_units=dict(system='SI', length='m', mass='te', force='kN')),
         environment=dict(water_depth_m=None if depth >= INFINITE_DEPTH else depth,
                          water_density_kg_m3=float(d.WaterDensity) * TONNE, g_m_s2=float(d.g)),
-        settings=dict(solve_type=str(d.SolveType), load_rao_method=str(d.LoadRAOCalculationMethod)),
+        settings=dict(solve_type=str(d.SolveType), load_rao_method=str(d.LoadRAOCalculationMethod),
+                      # None (JSON null) when only one load method was calculated
+                      preferred_load_rao_method=_optional_text(d.GetData('PreferredLoadRAOCalculationMethod', -1))),
         body=body,
         periods_s=[float(t) for t in periods],
         omegas_rad_s=[2.0 * math.pi / float(t) for t in periods],
