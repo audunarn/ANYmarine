@@ -288,3 +288,24 @@ def test_non_finite_dry_mass_assembly_is_refused():
     project = _project(cg=(0.0, 0.0, 1e155))
     with pytest.raises(ValueError):
         _inputs(project, [("surge", "pitch"), ("surge",)], mass_dry=np.eye(3))
+
+
+def test_linear_results_bound_to_rigid_inputs_are_refused_at_every_boundary(tmp_path):
+    """Review round 2: attachment, project construction (load path) and add_result refuse such results."""
+    from pathlib import Path
+    from anymarine.domain import ResultRecord
+    from anymarine.services import ApplicationService
+    project = _project()
+    inputs = _inputs(project, [("sway", "roll"), ("sway", "yaw")])
+    project = dataclasses.replace(project, linear_inputs=inputs)
+    frozen = json.loads((Path(__file__).parent / "fixtures" / "linear-legacy" / "demo_result.json")
+                        .read_text(encoding="utf-8"))
+    frozen["input_hash"] = linear_input_hash(inputs)
+    frozen["body_ids"] = [b.body_id for b in inputs.bindings]
+    for key in ("positions", "orientations"):
+        frozen[key] = {b.body_id: rows for b, rows in zip(inputs.bindings, frozen[key].values())}
+    record = ResultRecord.from_dict(frozen)
+    with pytest.raises(ValueError, match="not supported yet"):
+        dataclasses.replace(project, results=(record,))
+    with pytest.raises(Exception, match="not supported yet"):
+        ApplicationService(tmp_path).add_result(project, record)

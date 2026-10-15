@@ -1770,6 +1770,16 @@ class ProjectModel:
             if (self.linear_inputs is not None or self.hydro_provenance is not None
                     or any(body.hydro_sidecar is not None for body in self.bodies)):
                 raise ValueError("native dry intent cannot coexist with configured hydrodynamics")
+        if self.linear_inputs is not None and self.linear_inputs.layout != LINEAR_LAYOUT_LEGACY:
+            # ADR-015 slice L6-2 owns the rigid result mapping: until then no linear result may be bound to
+            # rigid_subset_v1 inputs (persistence, add_result and replay all construct this record)
+            from . import RESULT_KIND_LINEAR
+            from .linear import linear_input_hash
+            producing_hash = linear_input_hash(self.linear_inputs)
+            if any(result.kind == RESULT_KIND_LINEAR and result.input_hash == producing_hash
+                   for result in self.results):
+                raise ValueError("linear results of rigid_subset_v1 inputs are not supported yet "
+                                 "(ADR-015 slice L6-2); refusing the result")
         if self.linear_inputs is not None and self.linear_inputs.surface_geometry is not None:
             from . import RESULT_KIND_LINEAR
             from .linear import linear_input_hash
