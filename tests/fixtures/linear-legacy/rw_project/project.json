@@ -1,0 +1,40 @@
+{
+  "bodies": {
+    "c89f4c28-519f-4332-b8e0-8a95b2666029": {
+      "sha256": "f02bdf2bb8d7dacc42773a8fae432bd09a18167ed139bccb3c4f153ef96d65e2",
+      "sidecar": "bodies/f02bdf2bb8d7dacc42773a8fae432bd09a18167ed139bccb3c4f153ef96d65e2.json"
+    },
+    "e5c29915-6cc9-4e16-a6f9-df16413f590d": {
+      "sha256": "f2599d30e21c25375f168b112f4119cda101df9681ccd8856f4e24e1495a776b",
+      "sidecar": "bodies/f2599d30e21c25375f168b112f4119cda101df9681ccd8856f4e24e1495a776b.json"
+    }
+  },
+  "body_order": [
+    "c89f4c28-519f-4332-b8e0-8a95b2666029",
+    "e5c29915-6cc9-4e16-a6f9-df16413f590d"
+  ],
+  "equilibrium": {
+    "description": "Synthetic demonstration equilibrium (not a solved equilibrium).",
+    "source": "synthetic",
+    "waterline_z": 0.0
+  },
+  "linear_inputs": {
+    "sha256": "8260860561bfe6d37eb5a9ff45795e27c7db4b5d841f9536824b4b8218f1833c",
+    "sidecar": "linear_inputs/8260860561bfe6d37eb5a9ff45795e27c7db4b5d841f9536824b4b8218f1833c.json"
+  },
+  "name": "Regular wave rehearsal",
+  "results": [
+    {
+      "result_id": "225bf0e5-eb43-44ac-b95c-26cfbb1779a1",
+      "sha256": "66a4cdaed5b73c9dec285063ab3bca2d0481c405f4122fb1017640dd9a542448",
+      "sidecar": "results/66a4cdaed5b73c9dec285063ab3bca2d0481c405f4122fb1017640dd9a542448.json"
+    }
+  ],
+  "schema_version": 3,
+  "settings": {
+    "dt": 0.25,
+    "duration": 20.0,
+    "wave_amplitude": 0.8,
+    "wave_period": 6.0
+  }
+}
