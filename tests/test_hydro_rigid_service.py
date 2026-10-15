@@ -67,6 +67,21 @@ def test_job_snapshot_runs_in_the_worker(tmp_path):
     assert json.loads(out.read_text(encoding="utf-8"))["input_hash"] == project.hydro_provenance.linear_input_hash
 
 
+def test_multi_body_project_with_unsorted_ids_reopens(tmp_path):
+    """Review round 1: the manifest sorts JSON keys; the stored per-body DOF mapping is replayed in body order."""
+    source_dir, root = tmp_path / "source", tmp_path / "project"
+    source_dir.mkdir()
+    project = _project((_body("z"), _body("a", x0=30.0, cb_offset=(0.5, 0.0))))
+    ds_path, k_path, _, _ = _source(source_dir, project)
+    service = ApplicationService(root)
+    service.save(project, root=root)
+    imported = service.import_rigid_hydro_inputs(project, ds_path, k_path, _options(project, n_steps=401))
+    service.save(imported)
+    reopened = ApplicationService(root).load(root)
+    assert reopened.hydro_provenance.body_ids == ("z", "a")
+    assert linear_input_hash(reopened.linear_inputs) == imported.hydro_provenance.linear_input_hash
+
+
 def test_legacy_provenance_serialisation_has_no_rigid_key(tmp_path):
     _, _, project, _ = _imported(tmp_path)
     data = project.hydro_provenance.to_dict()

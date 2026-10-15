@@ -932,9 +932,17 @@ class ApplicationService:
             dataset_copy, kernel_copy = Path(temp_dir) / "dataset.nc", Path(temp_dir) / "kernel.nc"
             dataset_copy.write_bytes(payloads["dataset"])
             kernel_copy.write_bytes(payloads["kernel"])
+            # JSON objects are unordered (the manifest is written with sorted keys): the per-body DOF mapping is
+            # replayed in the project body order, which the record's body_ids must equal.
+            options = _jsonable_value(provenance.rigid_bundle["options"])
+            ids = [body.body_id for body in project.bodies]
+            if list(provenance.body_ids) != ids:
+                raise ServiceError("the rigid hydro provenance body order is not the project body order")
+            dofs = options.get("dofs")
+            if isinstance(dofs, dict) and set(dofs) == set(ids):
+                options["dofs"] = {body_id: dofs[body_id] for body_id in ids}
             try:
-                recompiled, data = _rigid_import(project, dataset_copy, kernel_copy,
-                                                 _jsonable_value(provenance.rigid_bundle["options"]))
+                recompiled, data = _rigid_import(project, dataset_copy, kernel_copy, options)
             except HydroImportError as error:
                 raise ServiceError(f"the authoritative rigid sources do not re-verify: {error}") from error
         if linear_input_hash(recompiled) != provenance.linear_input_hash:
