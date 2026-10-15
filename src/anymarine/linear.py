@@ -167,32 +167,62 @@ def body_length_scale(body) -> float:
     return float(max(extent.max(), 1.0e-9))
 
 
-def _rigid_kinematics(inputs, q: np.ndarray, snapshot) -> tuple[dict, dict, dict]:
-    """positions r0 + u, matrices Exp(theta) R0 and envelope flags per body from the DOF history q."""
+def rigid_kinematics(snapshot, q: np.ndarray) -> tuple[dict, dict, dict]:
+    """positions r0 + u, matrices Exp(theta) R0 and envelope flags per body from the DOF history q.
 
-    labels = list(inputs.labels)
+    Uses the producing snapshot only (labels give the retained DOFs, the snapshot bodies the reference pose), so
+    the same proof runs at the result decoding boundary and in ``verify_linear_result``.
+    """
+
+    labels = list(snapshot["labels"])
     envelope = snapshot["envelope"]
     positions, matrices, flags = {}, {}, {}
-    for binding in inputs.bindings:
-        frames = q.shape[0]
+    frames = q.shape[0]
+    for item in snapshot["bodies"]:
+        body_id = item["body_id"]
         u = np.zeros((frames, 3))
         theta = np.zeros((frames, 3))
-        for dof in binding.dofs:
-            column = q[:, labels.index(f"{binding.body_id}:{dof}")]
+        for index, label in enumerate(labels):
+            owner, dof = label.split(":", 1)
+            if owner != body_id:
+                continue
             if dof in _TRANSLATIONS:
-                u[:, _TRANSLATIONS.index(dof)] = column
+                u[:, _TRANSLATIONS.index(dof)] = q[:, index]
+            elif dof in _ROTATIONS:
+                theta[:, _ROTATIONS.index(dof)] = q[:, index]
             else:
-                theta[:, _ROTATIONS.index(dof)] = column
-        r0 = np.asarray(binding.reference_position, dtype=float)
-        R0 = np.asarray(binding.reference_orientation, dtype=float)
-        positions[binding.body_id] = tuple(tuple(float(v) for v in r0 + u[f]) for f in range(frames))
-        matrices[binding.body_id] = tuple(
+                raise ValueError(f"unknown DOF {dof!r} in the linear snapshot labels")
+        r0 = np.asarray(item["reference_position"], dtype=float)
+        R0 = np.asarray(item.get("reference_orientation", ((1., 0., 0.), (0., 1., 0.), (0., 0., 1.))), dtype=float)
+        positions[body_id] = tuple(tuple(float(v) for v in r0 + u[f]) for f in range(frames))
+        matrices[body_id] = tuple(
             tuple(tuple(float(v) for v in row) for row in rotation_from_vector(theta[f]) @ R0) for f in range(frames))
-        limit_u = envelope["max_translation_fraction"] * envelope["length_scale_m"][binding.body_id]
-        flags[binding.body_id] = tuple(
+        limit_u = envelope["max_translation_fraction"] * envelope["length_scale_m"][body_id]
+        flags[body_id] = tuple(
             1.0 if (np.linalg.norm(theta[f]) > envelope["max_rotation_rad"] or np.linalg.norm(u[f]) > limit_u)
             else 0.0 for f in range(frames))
     return positions, matrices, flags
+
+
+def check_rigid_result_kinematics(result) -> None:
+    """Decoding-boundary proof (ADR-015 section 6): stored positions, matrices and envelope flags are exactly
+    what the stored q channels imply about the producing snapshot. Raises ValueError otherwise."""
+
+    snapshot = result.linear_snapshot
+    labels = list(snapshot["labels"])
+    missing = [label for label in labels if f"q:{label}" not in result.channels]
+    if missing:
+        raise ValueError(f"rigid linear result lacks q channels {missing}")
+    q = np.column_stack([np.asarray(result.channels[f"q:{label}"], dtype=float) for label in labels])
+    positions, matrices, flags = rigid_kinematics(snapshot, q)
+    for body_id in result.body_ids:
+        if tuple(result.positions[body_id]) != positions[body_id]:
+            raise ValueError(f"replay positions for body {body_id} disagree with r0 + u from q")
+        stored = np.asarray(result.rotation_matrices[body_id], dtype=float)
+        if stored.shape != (q.shape[0], 3, 3) or np.max(np.abs(stored - np.asarray(matrices[body_id]))) > 1e-12:
+            raise ValueError(f"replay rotation matrices for body {body_id} disagree with Exp(theta) R0")
+        if tuple(result.channels.get(f"envelope_exceeded:{body_id}", ())) != flags[body_id]:
+            raise ValueError(f"envelope flags for body {body_id} disagree with the declared envelope")
 
 
 def _rigid_snapshot(inputs, producing_bodies) -> dict:
@@ -750,17 +780,72 @@ def _verify_rigid_result(result: ResultRecord, inputs: LinearDevelopmentInputs) 
             or envelope["max_translation_fraction"] != RIGID_ENVELOPE_MAX_TRANSLATION_FRACTION
             or dict(envelope["length_scale_m"]) != expected_scale):
         raise LinearResultIncomplete("the result's small-angle envelope is not the declared one")
-    q = np.column_stack([np.asarray(result.channels[f"q:{label}"], dtype=float) for label in inputs.labels])
-    positions, matrices, flags = _rigid_kinematics(inputs, q, snapshot)
-    for binding in inputs.bindings:
-        body_id = binding.body_id
-        if tuple(result.positions[body_id]) != positions[body_id]:
-            raise LinearResultIncomplete(f"replay positions for body {body_id} disagree with r0 + u from q")
-        stored = np.asarray(result.rotation_matrices[body_id], dtype=float)
-        if stored.shape != (q.shape[0], 3, 3) or np.max(np.abs(stored - np.asarray(matrices[body_id]))) > 1e-12:
-            raise LinearResultIncomplete(f"replay rotation matrices for body {body_id} disagree with Exp(theta) R0")
-        if tuple(result.channels.get(f"envelope_exceeded:{body_id}", ())) != flags[body_id]:
-            raise LinearResultIncomplete(f"envelope flags for body {body_id} disagree with the declared envelope")
+    try:
+        check_rigid_result_kinematics(result)
+    except ValueError as error:
+        raise LinearResultIncomplete(str(error)) from error
+    _verify_rigid_dynamics(result, inputs)
+
+
+# Decoder tolerances (relative to each quantity's run maximum): recomputed force components and the Newmark
+# update identities; the equation-of-motion balance uses the solver's own per-step scale.
+_DECODE_RELATIVE = 1.0e-9
+_BALANCE_RELATIVE = 1.0e-8
+
+
+def _verify_rigid_dynamics(result: ResultRecord, inputs: LinearDevelopmentInputs) -> None:
+    """The stored history is the trapezoidal Newmark solution of these inputs (ADR-015 section 6 decoder).
+
+    Checks the initial state and external forces exactly, recomputes every force component from the stored
+    q/v/a (memory by the solver's trapezoidal convolution), requires the per-step balance and the Newmark
+    update identities q_{n+1} = q_n + dt v_n + dt^2/4 (a_n + a_{n+1}), v_{n+1} = v_n + dt/2 (a_n + a_{n+1}).
+    Together they determine the history uniquely for the admitted (non-singular) effective system.
+    """
+
+    labels = inputs.labels
+    def stack(prefix):
+        return np.column_stack([np.asarray(result.channels[f"{prefix}{label}"], dtype=float) for label in labels])
+    q, v, a = stack("q:"), stack("v:"), stack("a:")
+    external = stack("force_external:")
+    if not (np.array_equal(q[0], np.asarray(inputs.q0)) and np.array_equal(v[0], np.asarray(inputs.v0))):
+        raise LinearResultIncomplete("the stored history does not start from the inputs' initial state")
+    if not np.array_equal(external, np.asarray(inputs.forces, dtype=float)):
+        raise LinearResultIncomplete("the stored external forces are not the inputs' forcing")
+    M, A = np.asarray(inputs.mass_dry), np.asarray(inputs.added_mass_infinite)
+    C, K = np.asarray(inputs.damping), np.asarray(inputs.stiffness)
+    kernel = np.asarray(inputs.radiation_kernel, dtype=float)
+    dt = inputs.dt
+    memory = np.zeros_like(q)
+    for n in range(1, q.shape[0]):
+        past = 0.5 * (kernel[n] @ v[0])
+        if n > 1:
+            past = past + np.einsum("lij,lj->i", kernel[1:n], v[n - 1:0:-1])
+        memory[n] = dt * past + 0.5 * dt * (kernel[0] @ v[n])
+    expected = {"force_dry_inertia:": a @ M.T, "force_added_inertia:": a @ A.T, "force_damping:": v @ C.T,
+                "force_stiffness:": q @ K.T, "force_memory:": memory}
+    stored = {prefix: stack(prefix) for prefix in expected}
+    for prefix, values in expected.items():
+        scale = max(float(np.max(np.abs(values))), float(np.max(np.abs(stored[prefix]))), 1e-300)
+        if np.max(np.abs(stored[prefix] - values)) > _DECODE_RELATIVE * scale:
+            raise LinearResultIncomplete(f"stored {prefix[:-1]} channels are not reproduced from q/v/a and the inputs")
+    residual = stack("force_residual:")
+    total = sum(stored.values())
+    if np.max(np.abs(residual - (external - total))) > _DECODE_RELATIVE * max(float(np.max(np.abs(external))),
+                                                                              float(np.max(np.abs(total))), 1e-300):
+        raise LinearResultIncomplete("stored residual forces are not external minus the force components")
+    for n in range(q.shape[0]):
+        scale = max(1.0, float(np.linalg.norm(external[n])),
+                    float(np.linalg.norm(stored["force_dry_inertia:"][n] + stored["force_added_inertia:"][n])),
+                    float(np.linalg.norm(stored["force_damping:"][n])), float(np.linalg.norm(stored["force_stiffness:"][n])),
+                    float(np.linalg.norm(stored["force_memory:"][n])))
+        if np.linalg.norm(residual[n]) > _BALANCE_RELATIVE * scale:
+            raise LinearResultIncomplete(f"the equation of motion is not satisfied at step {n}")
+    dq = q[1:] - q[:-1] - dt * v[:-1] - 0.25 * dt * dt * (a[:-1] + a[1:])
+    dv = v[1:] - v[:-1] - 0.5 * dt * (a[:-1] + a[1:])
+    q_scale = max(float(np.max(np.abs(q))), dt * float(np.max(np.abs(v))), dt * dt * float(np.max(np.abs(a))), 1e-300)
+    v_scale = max(float(np.max(np.abs(v))), dt * float(np.max(np.abs(a))), 1e-300)
+    if dq.size and (np.max(np.abs(dq)) > _DECODE_RELATIVE * q_scale or np.max(np.abs(dv)) > _DECODE_RELATIVE * v_scale):
+        raise LinearResultIncomplete("the stored q/v/a history violates the trapezoidal Newmark update")
 
 
 def _plain(value):
@@ -899,7 +984,7 @@ def run_linear(
     orientations = {}
     matrices = None
     if rigid:
-        positions, matrices, flags = _rigid_kinematics(inputs, q, snapshot)
+        positions, matrices, flags = rigid_kinematics(snapshot, q)
         for body_id, values in flags.items():
             channels[f"envelope_exceeded:{body_id}"] = values
     for body_index, binding in enumerate(() if rigid else inputs.bindings):
@@ -953,4 +1038,13 @@ def run_linear(
     # Self-check: the record must completely represent this run before it is
     # handed to any caller (worker, CLI, GUI).
     verify_linear_result(record, inputs)
+    # Limits and cancellation also bound the post-processing: nothing is returned after either fired.
+    if deadline is not None:
+        import time as _time
+        if _time.monotonic() > deadline:
+            raise LinearWallTimeExceeded(
+                f"the linear run exceeded max_wall_seconds {limits.max_wall_seconds:g} while building the result; "
+                "no result is produced")
+    if cancel is not None and (cancel() if callable(cancel) else bool(getattr(cancel, "is_cancelled", False))):
+        raise LinearCancelledError("the linear run was cancelled while building the result; no result is produced")
     return record

@@ -364,14 +364,22 @@ def _run_linear_child_job(service: ApplicationService, project, inputs):
         str(output_path),
         str(cancel_path),
     ]
-    completed = subprocess.run(
-        command,
-        cwd=str(Path(__file__).resolve().parent.parent.parent),
-        env=_child_environment(),
-        timeout=WORKER_TIMEOUT_SECONDS,
-        capture_output=True,
-        text=True,
-    )
+    # The child deadline follows the inputs' declared wall-time limit (ADR-015 section 9) plus a start-up
+    # margin; without one the historical bound applies.
+    limits = inputs.execution_limits
+    timeout = (WORKER_TIMEOUT_SECONDS if limits is None or limits.max_wall_seconds is None
+               else limits.max_wall_seconds + WORKER_TIMEOUT_SECONDS)
+    try:
+        completed = subprocess.run(
+            command,
+            cwd=str(Path(__file__).resolve().parent.parent.parent),
+            env=_child_environment(),
+            timeout=timeout,
+            capture_output=True,
+            text=True,
+        )
+    except subprocess.TimeoutExpired as error:
+        raise ServiceError(f"the linear worker exceeded its {timeout:g} s deadline; no result is produced") from error
     if completed.returncode == 0:
         return service.load_job_output(
             output_path, snapshot["input_hash"], snapshot=snapshot

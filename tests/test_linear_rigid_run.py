@@ -118,6 +118,13 @@ def _forced_case(project, dofs, M, K, C, F, omega, dt, n_steps):
     return X_d, X_c, fitted, q, times
 
 
+# ADR-015 section 8 (ii): the exact predicted difference |X_d|/|X| - 1 between the discrete (Newmark) and the
+# continuous transfer function, tabulated before running (normalised by the continuous amplitude |X|; zeta 0.05,
+# dt = T/200). TD vs continuous must reproduce it within 1e-6 relative to the tabulated difference itself.
+PREDICTED_DISCRETE_DIFFERENCE = {0.5: 1.3556805114278703e-05, 0.9: 4.5194418880578624e-04,
+                                 1.5: -6.591423029602694e-04}
+
+
 @pytest.mark.parametrize("dof", ["surge", "pitch"])
 @pytest.mark.parametrize("ratio", [0.5, 0.9, 1.5])
 def test_damped_forced_response_equals_the_discrete_particular_solution(dof, ratio):
@@ -134,8 +141,9 @@ def test_damped_forced_response_equals_the_discrete_particular_solution(dof, rat
     assert abs(abs(fitted[0]) - abs(X_d[0])) <= 1e-9 * abs(X_d[0])
     assert abs(np.angle(fitted[0] / X_d[0])) <= 1e-7
     assert np.max(np.abs(q[:, 0] - np.real(X_d[0] * np.exp(-1j * omega * times)))) <= 1e-9 * abs(X_d[0])
-    predicted = abs(X_d[0]) / abs(X_c[0]) - 1.0                     # tabulated discrete-vs-continuous difference
-    assert abs((abs(fitted[0]) / abs(X_c[0]) - 1.0) - predicted) <= 1e-6
+    predicted = PREDICTED_DISCRETE_DIFFERENCE[ratio]
+    assert abs(X_d[0]) / abs(X_c[0]) - 1.0 == pytest.approx(predicted, rel=1e-12)     # the frozen table holds
+    assert abs((abs(fitted[0]) / abs(X_c[0]) - 1.0) - predicted) <= 1e-6 * abs(predicted)
 
 
 def test_coupled_two_dof_forced_response_matches_independent_phasor_solution():
@@ -151,8 +159,8 @@ def test_coupled_two_dof_forced_response_matches_independent_phasor_solution():
     X_d, X_c, fitted, q, times = _forced_case(project, dofs, M, K, C, F, omega, dt, 4001)
     scale = np.max(np.abs(X_d))
     assert np.max(np.abs(fitted - X_d)) <= 1e-9 * scale
-    predicted = np.abs(X_d) / np.abs(X_c) - 1.0
-    assert np.max(np.abs((np.abs(fitted) / np.abs(X_c) - 1.0) - predicted)) <= 1e-6
+    predicted = np.abs(X_d) / np.abs(X_c) - 1.0                     # computed before comparing with the run
+    assert np.max(np.abs((np.abs(fitted) / np.abs(X_c) - 1.0) - predicted) / np.abs(predicted)) <= 1e-6
 
 
 # ---------------------------------------------------------------- mapping, decoder, persistence
@@ -214,9 +222,60 @@ def test_tampered_or_truncated_rigid_results_are_refused(tamper):
         data["channels"] = {k: v[:-1] for k, v in data["channels"].items()}
     else:
         data["linear_snapshot"]["envelope"]["length_scale_m"][body] *= 2
-    record = ResultRecord.from_dict(data)
+    # refused at the decoding boundary (kinematics) or by the run verifier (snapshot/envelope binding)
+    with pytest.raises((ValueError, LinearResultIncomplete)):
+        verify_linear_result(ResultRecord.from_dict(data), inputs)
+
+
+@pytest.mark.parametrize("tamper", ["matrix", "position", "flag"])
+def test_contradictory_kinematics_are_refused_when_decoding(tamper):
+    """Review round 1: persistence/worker decoding itself refuses q/matrix/position contradictions."""
+    _, _, result = _mixed_run()
+    data = result.to_dict()
+    body = result.body_ids[0]
+    if tamper == "matrix":
+        data["rotation_matrices"][body][10] = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]
+    elif tamper == "position":
+        data["positions"][body][10][2] += 1e-6
+    else:
+        data["channels"][f"envelope_exceeded:{body}"][3] = 1.0
+    with pytest.raises(ValueError):
+        ResultRecord.from_dict(data)
+
+
+def _consistent_motionless(result, data):
+    """A record with zero q/v/a and kinematics consistent with zero motion (passes the decoding boundary)."""
+    body = result.body_ids[0]
+    snapshot = result.linear_snapshot
+    frames = len(result.times)
+    for name in list(data["channels"]):
+        if name.split(":", 1)[0] in ("q", "v", "a", "envelope_exceeded"):
+            data["channels"][name] = [0.0] * frames
+    item = snapshot["bodies"][0]
+    data["positions"][body] = [list(item["reference_position"])] * frames
+    R0 = item.get("reference_orientation", [[1.0, 0, 0], [0, 1.0, 0], [0, 0, 1.0]])
+    data["rotation_matrices"][body] = [[list(map(float, row)) for row in R0]] * frames
+    return data
+
+
+@pytest.mark.parametrize("tamper", ["motionless", "velocity", "acceleration", "memory", "external"])
+def test_histories_that_are_not_the_run_are_refused(tamper):
+    """Review round 1: the verifier proves the stored history is the Newmark solution of the inputs."""
+    _, inputs, result = _mixed_run()
+    data = result.to_dict()
+    label = inputs.labels[3]
+    if tamper == "motionless":
+        data = _consistent_motionless(result, data)
+    elif tamper == "velocity":
+        data["channels"][f"v:{label}"][50] += 1e-6
+    elif tamper == "acceleration":
+        data["channels"][f"a:{label}"][50] *= 1.001
+    elif tamper == "memory":
+        data["channels"][f"force_memory:{label}"][50] += 1.0
+    else:
+        data["channels"][f"force_external:{label}"][50] += 1.0
     with pytest.raises(LinearResultIncomplete):
-        verify_linear_result(record, inputs)
+        verify_linear_result(ResultRecord.from_dict(data), inputs)
 
 
 def test_small_angle_envelope_labels_frames_outside_it():
@@ -277,6 +336,39 @@ def test_cancellation_latency_is_below_one_second_at_the_feasibility_size():
     finally:
         timer.cancel()
     assert "request" in stamp and time.perf_counter() - stamp["request"] <= 1.0
+
+
+def test_wall_time_also_bounds_result_materialisation(monkeypatch):
+    """Review round 1: a run whose solve finishes in time but whose post-processing does not is refused."""
+    import anymarine.linear as linear_module
+    project, inputs, _ = _mixed_run()
+    inputs = dataclasses.replace(inputs, execution_limits=LinearExecutionLimits(max_frames=1001, max_wall_seconds=0.2))
+    original = linear_module.rigid_kinematics
+
+    def slow(*args, **kwargs):
+        time.sleep(0.15)
+        return original(*args, **kwargs)
+    monkeypatch.setattr(linear_module, "rigid_kinematics", slow)
+    with pytest.raises(LinearWallTimeExceeded):
+        run_linear(inputs, producing_bodies=project.bodies)
+
+
+def test_cli_child_deadline_follows_the_wall_time_limit(monkeypatch, tmp_path):
+    import subprocess
+    import anymarine.cli as cli
+    from anymarine.services import ApplicationService, ServiceError
+    project, inputs, _ = _mixed_run()
+    inputs = dataclasses.replace(inputs, execution_limits=LinearExecutionLimits(max_frames=1001, max_wall_seconds=600))
+    project = dataclasses.replace(project, linear_inputs=inputs)
+    seen = {}
+
+    def fake_run(command, **kwargs):
+        seen["timeout"] = kwargs["timeout"]
+        raise subprocess.TimeoutExpired(command, kwargs["timeout"])
+    monkeypatch.setattr(cli.subprocess, "run", fake_run)
+    with pytest.raises(ServiceError, match="deadline"):
+        cli._run_linear_child_job(ApplicationService(), project, inputs)
+    assert seen["timeout"] == 600 + cli.WORKER_TIMEOUT_SECONDS
 
 
 def test_wall_time_limit_is_enforced():

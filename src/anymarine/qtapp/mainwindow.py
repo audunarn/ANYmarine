@@ -129,6 +129,16 @@ class _ElidedLabel(QLabel):
                          self.displayed_text())
 
 
+
+def _plain_json(value):
+    """Plain dict/list copy of a frozen JSON-like mapping (for Body.from_dict)."""
+    from collections.abc import Mapping as _Mapping
+    if isinstance(value, _Mapping):
+        return {str(k): _plain_json(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_plain_json(v) for v in value]
+    return value
+
 class MainWindow(QMainWindow):
     """Application shell: viewer, project tree, details, jobs, replay."""
 
@@ -2332,7 +2342,8 @@ class MainWindow(QMainWindow):
     # ----------------------------------------------------------------- replay
 
     def _set_result(self, result: Optional[ResultRecord], status: Optional[str] = None) -> None:
-        if result is not None and result.kind == 'linear_development' and result.surface_snapshot is None:
+        if (result is not None and result.kind == 'linear_development' and result.surface_snapshot is None
+                and result.result_layout is None):
             from ..surface_assignments import has_surface_intent
             source = self._project if status is None else (self._replay_project or self._project)
             if source is not None and has_surface_intent(source):
@@ -2350,6 +2361,15 @@ class MainWindow(QMainWindow):
         if result is not None and result.surface_snapshot is not None:
             from ..surface_assignments import project_from_surface_snapshot
             self._replay_project = project_from_surface_snapshot(result.surface_snapshot)
+            self._handles = {}
+            self.viewer.clear(keep_canvas=True)
+            self._sync_viewer_bodies(self._replay_project)
+        if result is not None and result.result_layout is not None:
+            # rigid linear result: replay the complete producing bodies of its snapshot (ADR-015 section 6)
+            from ..domain import Body, ProjectModel
+            self._replay_project = ProjectModel(
+                name="Rigid linear result (producing snapshot)",
+                bodies=tuple(Body.from_dict(_plain_json(item)) for item in result.linear_snapshot["bodies"]))
             self._handles = {}
             self.viewer.clear(keep_canvas=True)
             self._sync_viewer_bodies(self._replay_project)
@@ -2456,6 +2476,10 @@ class MainWindow(QMainWindow):
             self._frame_label.setText(
                 f"{self._result_status} — frame {index + 1}/{self._current_result.frame_count()} "
                 + (f"stage {index}: {self._current_result.equilibrium_evidence['frames'][index]['kind']}" if self._current_result.kind=='equilibrium_development' else f"t={self._current_result.times[index]:.2f}s")
+                + (" — OUTSIDE the small-angle envelope (linear, small-angle)"
+                   if self._current_result.result_layout is not None and any(
+                       self._current_result.channels[f"envelope_exceeded:{b}"][index]
+                       for b in self._current_result.body_ids) else "")
             )
         else:
             self._frame_label.setText(self._result_status)

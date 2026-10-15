@@ -566,6 +566,11 @@ class ResultRecord:
         object.__setattr__(self, "positions", MappingProxyType(positions))
         object.__setattr__(self, "orientations", MappingProxyType(orientations))
         object.__setattr__(self, "channels", MappingProxyType(frozen_channels))
+        if self.result_layout is not None:
+            # decoding boundary (persistence, worker output, replay): kinematics must follow from q and the
+            # producing snapshot - a record with contradictory q/matrices/positions is refused here
+            from .linear import check_rigid_result_kinematics
+            check_rigid_result_kinematics(self)
 
     @staticmethod
     def _freeze_samples(mapping, name: str, sample_count: int) -> dict:
