@@ -37,6 +37,18 @@ LINEAR_GRID_RELATIVE_TOLERANCE = 1.0e-9
 # form may admit a longer development job than this, and the ceiling itself is
 # never a qualification, only an execution bound.
 LINEAR_MAX_FRAMES_CEILING = 20001
+# Linear layouts (ADR-015 section 1). The legacy layout is never serialised, so
+# legacy records keep their exact bytes and input hashes.
+LINEAR_LAYOUT_LEGACY = "two_body_surge_heave_v1"
+LINEAR_LAYOUT_RIGID = "rigid_subset_v1"
+LINEAR_LAYOUTS = (LINEAR_LAYOUT_LEGACY, LINEAR_LAYOUT_RIGID)
+RIGID_DOFS = ("surge", "sway", "heave", "roll", "pitch", "yaw")
+# ADR-015 section 9: N > 12 retained DOFs is refused until assessed.
+LINEAR_RIGID_MAX_DOFS = 12
+# The stored dry mass must equal the solver-owned RigidBody6D assembly.
+LINEAR_DRY_MASS_RELATIVE_TOLERANCE = 1.0e-12
+_IDENTITY_ORIENTATION = ((1., 0., 0.), (0., 1., 0.), (0., 0., 1.))
+EXTERNAL_MATRIX_KINDS = ("damping", "stiffness")
 
 
 def new_body_id() -> str:
@@ -658,10 +670,34 @@ class LinearBodyBinding:
     lid_mesh_hash: Optional[str] = None
     surface_hash: Optional[str] = None
     hydro_lid_policy: str = "free_surface_v1"
+    # rigid_subset_v1 only (ADR-015 sections 1-2): the retained DOFs in canonical
+    # order, the dry mass record and the reference orientation. All omitted from
+    # the serialised form when absent/identity, so legacy bindings keep their bytes.
+    dofs: Optional[tuple] = None
+    mass_properties: Optional[BodyMassProperties] = None
+    reference_orientation: tuple = _IDENTITY_ORIENTATION
 
     def __post_init__(self) -> None:
         if not isinstance(self.body_id, str) or not self.body_id:
             raise ValueError("linear body binding body_id must be a non-empty string")
+        if self.dofs is not None:
+            dofs = tuple(self.dofs)
+            if not dofs or any(not isinstance(d, str) or d not in RIGID_DOFS for d in dofs):
+                raise ValueError(f"linear binding dofs must be a non-empty subset of {RIGID_DOFS}")
+            if list(dofs) != sorted(set(dofs), key=RIGID_DOFS.index):
+                raise ValueError("linear binding dofs must be distinct and in canonical order "
+                                 "(surge, sway, heave, roll, pitch, yaw)")
+            object.__setattr__(self, "dofs", dofs)
+            if self.mass_properties is None:
+                raise ValueError("rigid linear bindings require explicit mass_properties (CG and CG inertia)")
+        if self.mass_properties is not None and not isinstance(self.mass_properties, BodyMassProperties):
+            raise TypeError("linear binding mass_properties must be a BodyMassProperties record")
+        if self.mass_properties is not None and self.dofs is None:
+            raise ValueError("linear binding mass_properties are only admitted with retained dofs")
+        from .result_rotations import validated_rotation_matrix
+        object.__setattr__(self, "reference_orientation", validated_rotation_matrix(self.reference_orientation))
+        if self.dofs is None and self.reference_orientation != _IDENTITY_ORIENTATION:
+            raise ValueError("legacy linear bindings do not support nonidentity reference orientation")
         if not isinstance(self.name, str) or not self.name.strip():
             raise ValueError("linear body binding name must be a non-empty string")
         _finite_floats(self.reference_position, "linear binding reference_position", 3)
@@ -703,7 +739,16 @@ class LinearBodyBinding:
             data["hydro_lid_policy"] = self.hydro_lid_policy
         if self.surface_hash is not None:
             data["surface_hash"] = self.surface_hash
+        if self.dofs is not None:
+            data["dofs"] = list(self.dofs)
+            data["mass_properties"] = self.mass_properties.to_dict()
+        if self.reference_orientation != _IDENTITY_ORIENTATION:
+            data["reference_orientation"] = [list(row) for row in self.reference_orientation]
         return data
+
+    @property
+    def rigid(self) -> bool:
+        return self.dofs is not None
 
     @classmethod
     def from_dict(cls, data: dict) -> "LinearBodyBinding":
@@ -716,7 +761,63 @@ class LinearBodyBinding:
             lid_mesh_hash=data.get("lid_mesh_hash"),
             surface_hash=data.get("surface_hash"),
             hydro_lid_policy=data.get("hydro_lid_policy", "free_surface_v1"),
+            dofs=tuple(data["dofs"]) if data.get("dofs") is not None else None,
+            mass_properties=(BodyMassProperties.from_dict(data["mass_properties"])
+                             if data.get("mass_properties") is not None else None),
+            reference_orientation=data.get("reference_orientation", _IDENTITY_ORIENTATION),
         )
+
+
+@dataclass(frozen=True)
+class ExternalMatrixRecord:
+    """Explicit constant external linear damping or stiffness (ADR-015 section 5).
+
+    Ordered solver DOF labels (``body:dof``), SI units, world axes, each body's
+    reference point (its binding reference position), additive semantics,
+    constant scope and the source identity. The record is provenance: the
+    effective solver matrices already contain it; it is hashed with the inputs
+    and never folded silently into hydrodynamic coefficients.
+    """
+
+    kind: str
+    dofs: tuple
+    matrix: tuple
+    source: str
+    axes: str = "world"
+    reference: str = "binding_reference_position"
+    semantics: str = "additive"
+    scope: str = "constant"
+    units: str = "SI"
+
+    _FIXED = dict(axes="world", reference="binding_reference_position", semantics="additive",
+                  scope="constant", units="SI")
+    _KEYS = ("kind", "dofs", "matrix", "source", "axes", "reference", "semantics", "scope", "units")
+
+    def __post_init__(self) -> None:
+        if self.kind not in EXTERNAL_MATRIX_KINDS:
+            raise ValueError(f"external matrix kind must be one of {EXTERNAL_MATRIX_KINDS}")
+        dofs = tuple(self.dofs)
+        if not dofs or any(not isinstance(d, str) or ":" not in d for d in dofs) or len(set(dofs)) != len(dofs):
+            raise ValueError("external matrix dofs must be distinct solver labels 'body:dof'")
+        object.__setattr__(self, "dofs", dofs)
+        object.__setattr__(self, "matrix", _frozen_matrix("external matrix", self.matrix, len(dofs), len(dofs)))
+        if not isinstance(self.source, str) or not self.source.strip():
+            raise ValueError("external matrix source must be a non-empty string")
+        for key, value in self._FIXED.items():
+            if getattr(self, key) != value:
+                raise ValueError(f"external matrix {key} must be {value!r}")
+
+    def to_dict(self) -> dict:
+        return {"kind": self.kind, "dofs": list(self.dofs), "matrix": [list(row) for row in self.matrix],
+                "source": self.source, **self._FIXED}
+
+    @classmethod
+    def from_dict(cls, data) -> "ExternalMatrixRecord":
+        if not isinstance(data, Mapping) or set(data) != set(cls._KEYS):
+            raise ValueError(f"external matrix record must contain exactly {list(cls._KEYS)}")
+        return cls(kind=data["kind"], dofs=tuple(data["dofs"]),
+                   matrix=tuple(tuple(float(x) for x in row) for row in data["matrix"]), source=data["source"],
+                   **{key: data[key] for key in cls._FIXED})
 
 
 @dataclass(frozen=True)
@@ -1201,8 +1302,26 @@ class LinearExecutionLimits:
     """
 
     max_frames: int = LINEAR_MAX_FRAMES
+    # Optional explicit controls (ADR-015 section 9); omitted when None so
+    # existing records keep their bytes. Radiation samples are enforced at input
+    # construction; wall time by the worker/CLI (L6-2).
+    max_radiation_samples: Optional[int] = None
+    max_wall_seconds: Optional[float] = None
 
     def __post_init__(self) -> None:
+        if self.max_radiation_samples is not None:
+            samples = self.max_radiation_samples
+            if isinstance(samples, bool) or not isinstance(samples, int) or samples < 2:
+                raise ValueError("linear execution limits max_radiation_samples must be an integer >= 2")
+            if samples > LINEAR_MAX_FRAMES_CEILING:
+                raise ValueError(f"linear execution limits max_radiation_samples exceeds the hard ceiling of "
+                                 f"{LINEAR_MAX_FRAMES_CEILING}")
+        if self.max_wall_seconds is not None:
+            seconds = self.max_wall_seconds
+            if isinstance(seconds, bool) or not isinstance(seconds, (int, float)) or not math.isfinite(seconds) \
+                    or seconds <= 0:
+                raise ValueError("linear execution limits max_wall_seconds must be a positive finite number")
+            object.__setattr__(self, "max_wall_seconds", float(seconds))
         value = self.max_frames
         if isinstance(value, bool):
             raise ValueError(
@@ -1242,7 +1361,12 @@ class LinearExecutionLimits:
         object.__setattr__(self, "max_frames", int(frames))
 
     def to_dict(self) -> dict:
-        return {"max_frames": int(self.max_frames)}
+        data = {"max_frames": int(self.max_frames)}
+        if self.max_radiation_samples is not None:
+            data["max_radiation_samples"] = int(self.max_radiation_samples)
+        if self.max_wall_seconds is not None:
+            data["max_wall_seconds"] = float(self.max_wall_seconds)
+        return data
 
     @classmethod
     def from_dict(cls, data: dict) -> "LinearExecutionLimits":
@@ -1251,17 +1375,19 @@ class LinearExecutionLimits:
                 "linear execution limits must be a JSON object with a "
                 "max_frames control"
             )
-        unknown = sorted(set(data) - {"max_frames"})
+        allowed = {"max_frames", "max_radiation_samples", "max_wall_seconds"}
+        unknown = sorted(set(data) - allowed)
         if unknown:
             raise ValueError(
                 f"linear execution limits contain unknown control(s) {unknown}; "
-                "only ['max_frames'] is supported and nothing is silently ignored"
+                f"only {sorted(allowed)} are supported and nothing is silently ignored"
             )
         if "max_frames" not in data:
             raise ValueError(
                 "linear execution limits must declare max_frames explicitly"
             )
-        return cls(max_frames=data["max_frames"])
+        return cls(max_frames=data["max_frames"], max_radiation_samples=data.get("max_radiation_samples"),
+                   max_wall_seconds=data.get("max_wall_seconds"))
 
 
 @dataclass(frozen=True)
@@ -1304,17 +1430,34 @@ class LinearDevelopmentInputs:
     # input hash, and its max_frames is the enforced job bound.
     execution_limits: Optional[LinearExecutionLimits] = None
     surface_geometry: Optional[Mapping] = None
+    # ADR-015: the legacy layout is never serialised (exact legacy bytes/hashes).
+    layout: str = LINEAR_LAYOUT_LEGACY
+    external_matrices: tuple = ()
 
     def __post_init__(self) -> None:
+        if self.layout not in LINEAR_LAYOUTS:
+            raise ValueError(f"unknown linear layout {self.layout!r}; supported: {LINEAR_LAYOUTS}")
         bindings = tuple(self.bindings)
-        if len(bindings) != 2:
-            raise ValueError(
-                f"linear development inputs bind exactly 2 bodies in order; "
-                f"received {len(bindings)} binding(s)"
-            )
         for binding in bindings:
             if not isinstance(binding, LinearBodyBinding):
                 raise TypeError("linear bindings must be LinearBodyBinding records")
+        if self.layout == LINEAR_LAYOUT_LEGACY:
+            if len(bindings) != 2:
+                raise ValueError(
+                    f"linear development inputs bind exactly 2 bodies in order; "
+                    f"received {len(bindings)} binding(s)"
+                )
+            if any(binding.rigid for binding in bindings):
+                raise ValueError("the legacy two-body surge/heave layout refuses bindings with retained dofs "
+                                 "or mass properties (use rigid_subset_v1)")
+        else:
+            if not bindings or not all(binding.rigid for binding in bindings):
+                raise ValueError("rigid_subset_v1 needs at least one binding, each with retained dofs and "
+                                 "mass properties")
+            ndof = sum(len(binding.dofs) for binding in bindings)
+            if ndof > LINEAR_RIGID_MAX_DOFS:
+                raise ValueError(f"rigid_subset_v1 retains {ndof} DOFs; more than {LINEAR_RIGID_MAX_DOFS} is "
+                                 "refused until assessed (ADR-015 section 9)")
         ids = [binding.body_id for binding in bindings]
         if len(set(ids)) != len(ids):
             raise ValueError("linear bindings must reference distinct body ids")
@@ -1365,6 +1508,7 @@ class LinearDevelopmentInputs:
                 f"{effective_max_frames} frames"
             )
         object.__setattr__(self, "n_steps", int(n_steps))
+        ndof = self.ndof
         # The derived time grid t0 + k*dt must stay finite: an overflowing
         # dt*n product is refused at construction, not discovered later.
         if not math.isfinite(t0 + (n_steps - 1) * dt):
@@ -1373,12 +1517,11 @@ class LinearDevelopmentInputs:
                 "(dt*n_steps overflows); refusing the inputs"
             )
 
-        forces = _frozen_matrix("linear forces", self.forces, n_steps, LINEAR_DOF_COUNT)
+        forces = _frozen_matrix("linear forces", self.forces, n_steps, ndof)
         object.__setattr__(self, "forces", forces)
         for name in ("mass_dry", "added_mass_infinite", "damping", "stiffness"):
             object.__setattr__(
-                self, name, _frozen_matrix(f"linear {name}", getattr(self, name),
-                                            LINEAR_DOF_COUNT, LINEAR_DOF_COUNT)
+                self, name, _frozen_matrix(f"linear {name}", getattr(self, name), ndof, ndof)
             )
 
         kernel = tuple(self.radiation_kernel)
@@ -1387,9 +1530,14 @@ class LinearDevelopmentInputs:
                 f"linear radiation_kernel has {len(kernel)} samples but must cover "
                 f"every lag of the {n_steps}-step grid"
             )
+        if (self.execution_limits is not None and self.execution_limits.max_radiation_samples is not None
+                and len(kernel) > self.execution_limits.max_radiation_samples):
+            raise ValueError(
+                f"linear radiation_kernel has {len(kernel)} samples, more than the declared "
+                f"max_radiation_samples {self.execution_limits.max_radiation_samples}"
+            )
         frozen_kernel = tuple(
-            _frozen_matrix("linear radiation_kernel sample", sample,
-                           LINEAR_DOF_COUNT, LINEAR_DOF_COUNT)
+            _frozen_matrix("linear radiation_kernel sample", sample, ndof, ndof)
             for sample in kernel
         )
         object.__setattr__(self, "radiation_kernel", frozen_kernel)
@@ -1404,10 +1552,23 @@ class LinearDevelopmentInputs:
                 )
         object.__setattr__(self, "kernel_times", kernel_times)
 
-        q0 = self.q0 if self.q0 is not None else (0.0, 0.0, 0.0, 0.0)
-        v0 = self.v0 if self.v0 is not None else (0.0, 0.0, 0.0, 0.0)
-        object.__setattr__(self, "q0", _finite_floats(q0, "linear q0", LINEAR_DOF_COUNT))
-        object.__setattr__(self, "v0", _finite_floats(v0, "linear v0", LINEAR_DOF_COUNT))
+        q0 = self.q0 if self.q0 is not None else (0.0,) * ndof
+        v0 = self.v0 if self.v0 is not None else (0.0,) * ndof
+        object.__setattr__(self, "q0", _finite_floats(q0, "linear q0", ndof))
+        object.__setattr__(self, "v0", _finite_floats(v0, "linear v0", ndof))
+
+        externals = tuple(self.external_matrices)
+        if externals and self.layout == LINEAR_LAYOUT_LEGACY:
+            raise ValueError("external matrix records require the rigid_subset_v1 layout")
+        for record in externals:
+            if not isinstance(record, ExternalMatrixRecord):
+                raise TypeError("linear external_matrices must be ExternalMatrixRecord records")
+            unknown = [d for d in record.dofs if d not in self.labels]
+            if unknown:
+                raise ValueError(f"external matrix dofs {unknown} are not retained DOFs of these inputs")
+        object.__setattr__(self, "external_matrices", externals)
+        if self.layout == LINEAR_LAYOUT_RIGID:
+            self._verify_rigid_dry_mass()
 
         if not isinstance(self.provenance, LinearProvenance):
             raise TypeError("linear provenance must be a LinearProvenance record")
@@ -1432,7 +1593,30 @@ class LinearDevelopmentInputs:
     # ---------------------------------------------------------------- views
 
     @property
-    def labels(self) -> tuple[str, str, str, str]:
+    def ndof(self) -> int:
+        if self.layout == LINEAR_LAYOUT_LEGACY:
+            return LINEAR_DOF_COUNT
+        return sum(len(binding.dofs) for binding in self.bindings)
+
+    def _verify_rigid_dry_mass(self) -> None:
+        """mass_dry must be the solver-owned RigidBody6D assembly (ADR-015 section 2)."""
+        from .linear import rigid_dry_mass
+        try:
+            expected = rigid_dry_mass(self.bindings)
+        except Exception as error:   # solver unavailable or inadmissible mass record: fail closed
+            raise ValueError(f"rigid_subset_v1 dry mass cannot be assembled: {error}") from error
+        scale = max(abs(v) for row in expected for v in row) or 1.0
+        worst = max(abs(a - b) for row_a, row_b in zip(self.mass_dry, expected) for a, b in zip(row_a, row_b))
+        if worst > LINEAR_DRY_MASS_RELATIVE_TOLERANCE * scale:
+            raise ValueError(
+                f"rigid_subset_v1 mass_dry differs from the RigidBody6D dry mass assembly by {worst:.3e} "
+                f"(> {LINEAR_DRY_MASS_RELATIVE_TOLERANCE:g} x {scale:.3e}); dry mass is solver-owned (ADR-003)"
+            )
+
+    @property
+    def labels(self) -> tuple[str, ...]:
+        if self.layout == LINEAR_LAYOUT_RIGID:
+            return tuple(f"{binding.body_id}:{dof}" for binding in self.bindings for dof in binding.dofs)
         body_a, body_b = self.bindings
         return (
             f"{body_a.body_id}:surge",
@@ -1471,6 +1655,10 @@ class LinearDevelopmentInputs:
             # Omitted when None: legacy inputs keep their exact bytes and
             # input hashes.
             data["execution_limits"] = self.execution_limits.to_dict()
+        if self.layout != LINEAR_LAYOUT_LEGACY:
+            data["layout"] = self.layout
+        if self.external_matrices:
+            data["external_matrices"] = [record.to_dict() for record in self.external_matrices]
         return data
 
     @classmethod
@@ -1504,6 +1692,9 @@ class LinearDevelopmentInputs:
                 if data.get("execution_limits") is not None
                 else None
             ),
+            layout=data.get("layout", LINEAR_LAYOUT_LEGACY),
+            external_matrices=tuple(ExternalMatrixRecord.from_dict(item)
+                                    for item in data.get("external_matrices", ())),
         )
 
 
@@ -1530,7 +1721,8 @@ class ProjectModel:
             object.__setattr__(self,"equilibrium_adoption",validate_receipt(self.equilibrium_adoption))
         if self.equilibrium.source == "adopted_static_development_v1" and self.equilibrium_adoption is None:
             raise ValueError("adopted equilibrium requires its transition receipt")
-        if self.linear_inputs is not None and any(b.reference_orientation != ((1.,0.,0.),(0.,1.,0.),(0.,0.,1.)) for b in self.bodies):
+        if (self.linear_inputs is not None and getattr(self.linear_inputs, "layout", None) == LINEAR_LAYOUT_LEGACY
+                and any(b.reference_orientation != ((1.,0.,0.),(0.,1.,0.),(0.,0.,1.)) for b in self.bodies)):
             raise ValueError("legacy linear inputs do not support nonidentity body reference orientation")
         ids = [body.body_id for body in self.bodies]
         if len(ids) != len(set(ids)):
@@ -1589,6 +1781,8 @@ class ProjectModel:
                     "a project with hydro provenance must also store the linear "
                     "inputs that provenance describes"
                 )
+            if self.linear_inputs.layout != LINEAR_LAYOUT_LEGACY:
+                raise ValueError("hydro provenance for rigid_subset_v1 inputs is not supported yet (ADR-015 L6-3)")
             if self.linear_inputs.provenance.source != LINEAR_SOURCE_HYDRO:
                 raise ValueError(
                     "hydro provenance may only accompany linear inputs whose "

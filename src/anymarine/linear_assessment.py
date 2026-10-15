@@ -736,6 +736,10 @@ def prepare_case(spec: dict, inputs: LinearDevelopmentInputs) -> AssessmentCase:
     The specification is closed-world: unknown fields are refused.
     """
 
+    if getattr(inputs, "layout", "two_body_surge_heave_v1") != "two_body_surge_heave_v1":
+        raise AssessmentCaseError(
+            "linear assessment is not available for six-DOF layouts ({}) yet; only the legacy two-body surge/heave "
+            "layout is supported (ADR-015 section 7)".format(inputs.layout))
     if not isinstance(spec, dict):
         raise AssessmentCaseError("the case specification must be a JSON object")
     # The caller's specification may omit schema_version (it defaults to the
@@ -2698,6 +2702,10 @@ def assess_result(case: AssessmentCase, result: ResultRecord,
     actual stored sources are re-proved. Physics failures are NOT
     refusals: they produce a NoGo report with every raw metric preserved.
     """
+    if getattr(inputs, "layout", "two_body_surge_heave_v1") != "two_body_surge_heave_v1":
+        raise AssessmentRefusalError(
+            "linear assessment is not available for six-DOF layouts ({}) yet; only the legacy two-body surge/heave "
+            "layout is supported (ADR-015 section 7)".format(inputs.layout))
 
     if not isinstance(case, AssessmentCase):
         raise AssessmentCaseError("case must be an AssessmentCase")
@@ -2863,6 +2871,14 @@ def assess_refinement(case_coarse: AssessmentCase, case_fine: AssessmentCase,
     per-DOF unit scales (no mixed-unit maximum).
     """
 
+    if getattr(inputs_coarse, "layout", "two_body_surge_heave_v1") != "two_body_surge_heave_v1":
+        raise AssessmentRefusalError(
+            "refinement assessment is not available for six-DOF layouts ({}) yet; only the legacy two-body surge/heave "
+            "layout is supported (ADR-015 section 7)".format(inputs_coarse.layout))
+    if getattr(inputs_fine, "layout", "two_body_surge_heave_v1") != "two_body_surge_heave_v1":
+        raise AssessmentRefusalError(
+            "refinement assessment is not available for six-DOF layouts ({}) yet; only the legacy two-body surge/heave "
+            "layout is supported (ADR-015 section 7)".format(inputs_fine.layout))
     if case_coarse.mode != case_fine.mode:
         raise AssessmentRefusalError("refinement requires the same mode")
     refinement_coarse = case_coarse.refinement

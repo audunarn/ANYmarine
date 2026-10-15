@@ -30,7 +30,9 @@ import numpy as np
 from . import RESULT_KIND_LINEAR
 from .domain import (
     HYDRO_ROUTE_DERIVED,
+    LINEAR_LAYOUT_LEGACY,
     LINEAR_SOURCE_ANALYTIC_DEMO,
+    RIGID_DOFS,
     LINEAR_SOURCE_HYDRO,
     LINEAR_SOURCES,
     LinearBodyBinding,
@@ -117,6 +119,78 @@ class LinearResultIncomplete(LinearError):
     """A result record does not completely represent its own linear run."""
 
 
+class LinearLayoutUnsupported(LinearError):
+    """The entry point does not support this linear layout yet (ADR-015 section 7)."""
+
+
+def require_legacy_layout(inputs, what: str) -> None:
+    """Refuse rigid_subset_v1 inputs at entry points that are not generalised yet (explicit, never silent)."""
+
+    layout = getattr(inputs, "layout", LINEAR_LAYOUT_LEGACY)
+    if layout != LINEAR_LAYOUT_LEGACY:
+        raise LinearLayoutUnsupported(
+            f"{what} is not available for the {layout} layout yet; only the legacy two-body "
+            "surge/heave layout is supported here (ADR-015 section 7)"
+        )
+
+
+def rigid_binding(body, dofs) -> LinearBodyBinding:
+    """rigid_subset_v1 binding of one project body with its retained DOFs (ADR-015 sections 1-2).
+
+    Binds identity, name, reference pose, mass, mass properties and mesh/lid identity; bodies
+    without explicit mass properties or with hydrodynamic sheet surfaces are refused here.
+    """
+
+    if body.mass_properties is None:
+        raise LinearBindingError(f"body {body.name!r} has no explicit CG/inertia; the rigid layout needs them")
+    if body_surface_hash(body) is not None:
+        raise LinearBindingError(f"body {body.name!r} carries hydrodynamic sheet surfaces; not supported by the "
+                                 "rigid layout yet")
+    return LinearBodyBinding(
+        body_id=body.body_id, name=body.name, reference_position=body.reference_position, mass=float(body.mass),
+        mesh_hash=mesh_hash(body.mesh),
+        lid_mesh_hash=mesh_hash(body.hydro_lid) if body.hydro_lid is not None else None,
+        hydro_lid_policy=body.hydro_lid_policy, dofs=tuple(dofs), mass_properties=body.mass_properties,
+        reference_orientation=body.reference_orientation)
+
+
+def rigid_dry_mass(bindings) -> np.ndarray:
+    """Solver-owned dry mass for rigid_subset_v1 bindings (ADR-015 section 2).
+
+    Per body ``RigidBody6D(...).mass_matrix(state())`` at zero increments: about the
+    reference point, world axes, including the -m S(c) coupling; the retained DOFs are a
+    row/column selection; bodies are block-diagonal in binding order. Gravity is not part
+    of it.
+    """
+
+    try:
+        from anysolver import marine_rigid
+    except Exception as error:
+        raise LinearSolverUnavailableError(
+            f"anysolver.marine_rigid is not available ({type(error).__name__}: {error}); the rigid "
+            "linear layout needs the solver-owned dry mass assembly"
+        ) from error
+    blocks = []
+    for binding in bindings:
+        body = marine_rigid.RigidBody6D(
+            body_id=binding.body_id, mass=float(binding.mass),
+            cg_body=binding.mass_properties.cg_body,
+            inertia_cg_body=binding.mass_properties.inertia_cg_body,
+            reference_origin=binding.reference_position,
+            reference_orientation=binding.reference_orientation)
+        full = np.asarray(body.mass_matrix(body.state()), dtype=float)
+        index = [RIGID_DOFS.index(dof) for dof in binding.dofs]
+        blocks.append(full[np.ix_(index, index)])
+    n = sum(block.shape[0] for block in blocks)
+    out = np.zeros((n, n))
+    start = 0
+    for block in blocks:
+        size = block.shape[0]
+        out[start:start + size, start:start + size] = block
+        start += size
+    return out
+
+
 def _import_solver():
     """Lazily import the optional solver module (never at package import)."""
 
@@ -166,7 +240,8 @@ def verify_body_binding(bodies, inputs: LinearDevelopmentInputs) -> None:
 
     bindings = inputs.bindings
     body_tuple = tuple(bodies)
-    if any(b.reference_orientation != ((1.,0.,0.),(0.,1.,0.),(0.,0.,1.)) for b in body_tuple):
+    legacy = getattr(inputs, "layout", LINEAR_LAYOUT_LEGACY) == LINEAR_LAYOUT_LEGACY
+    if legacy and any(b.reference_orientation != ((1.,0.,0.),(0.,1.,0.),(0.,0.,1.)) for b in body_tuple):
         raise LinearBindingError("legacy linear bindings do not support nonidentity body reference orientation")
     if len(body_tuple) != len(bindings):
         raise LinearBindingError(
@@ -196,6 +271,15 @@ def verify_body_binding(bodies, inputs: LinearDevelopmentInputs) -> None:
                 f"bound body {binding.body_id} mass changed "
                 f"({binding.mass} -> {body.mass}); the stored binding is stale"
             )
+        if not legacy:
+            # rigid_subset_v1 (ADR-015 section 2): the dry mass record and reference pose are bound too
+            if binding.mass_properties != body.mass_properties:
+                raise LinearBindingError(
+                    f"bound body {binding.body_id} mass properties (CG/inertia) changed; the stored "
+                    "binding is stale and dry mass is never silently rebound")
+            if binding.reference_orientation != body.reference_orientation:
+                raise LinearBindingError(
+                    f"bound body {binding.body_id} reference orientation changed; the stored binding is stale")
         if binding.surface_hash != body_surface_hash(body):
             raise LinearBindingError('bound hydrodynamic surface geometry/semantics changed; coefficients are stale and never silently rebound')
         if binding.mesh_hash != mesh_hash(body.mesh):
@@ -592,6 +676,7 @@ def run_linear(
     equilibrium reference positions and rotation is zero.
     """
 
+    require_legacy_layout(inputs, "the linear run (ADR-015 slice L6-2)")
     marine_linear = _import_solver()
     spec = marine_linear.MarineLinearSpec(
         labels=inputs.labels,

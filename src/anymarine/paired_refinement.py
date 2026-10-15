@@ -318,6 +318,9 @@ def _member_inputs(member: PairedMember):
             "a paired member's project carries no stored linear inputs; "
             "there is nothing to assess"
         )
+    if getattr(inputs, "layout", "two_body_surge_heave_v1") != "two_body_surge_heave_v1":
+        _refusal(f"paired refinement is not available for six-DOF layouts ({inputs.layout}) yet "
+                 "(ADR-015 section 7)")
     return inputs
 
 
