@@ -82,6 +82,17 @@ def test_multi_body_project_with_unsorted_ids_reopens(tmp_path):
     assert linear_input_hash(reopened.linear_inputs) == imported.hydro_provenance.linear_input_hash
 
 
+def test_save_as_copies_the_sources_and_reopens_without_the_originals(tmp_path):
+    import shutil
+    service, root, project, sources = _imported(tmp_path)
+    other = tmp_path / "copy"
+    service.save(project, root=other)
+    shutil.rmtree(tmp_path / "source")
+    shutil.rmtree(root)
+    reopened = ApplicationService(other).load(other)
+    assert reopened.hydro_provenance.to_dict() == project.hydro_provenance.to_dict()
+
+
 def test_legacy_provenance_serialisation_has_no_rigid_key(tmp_path):
     _, _, project, _ = _imported(tmp_path)
     data = project.hydro_provenance.to_dict()
