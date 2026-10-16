@@ -169,10 +169,10 @@ def _waterline_segments(vertices, triangles, tol):
                 if not on[a] and not on[b] and (zs[a] > 0) != (zs[b] > 0):
                     t = zs[a] / (zs[a] - zs[b])
                     cut.append((vertices[tri[a]] + t * (vertices[tri[b]] - vertices[tri[a]]))[:2])
-            if len(cut) == 2 and float(np.linalg.norm(cut[1] - cut[0])) > tol:
+            if len(cut) == 2 and float(np.linalg.norm(cut[1] - cut[0])) > 0.0:
                 segments.append(cut)
     for (i, j), count in below_count.items():
-        if count % 2 == 1 and float(np.linalg.norm(vertices[j][:2] - vertices[i][:2])) > tol:
+        if count % 2 == 1 and float(np.linalg.norm(vertices[j][:2] - vertices[i][:2])) > 0.0:
             segments.append([vertices[i][:2], vertices[j][:2]])
     return np.asarray(segments, dtype=np.float64).reshape(-1, 2, 2)
 
@@ -207,8 +207,9 @@ def require_lid_inside_waterline(lid_vertices, lid_triangles, segments, body_id,
     refused (a sliver could otherwise lie entirely inside the tolerance band), and every vertex must lie inside the
     region or within ``tol`` of the waterline. Raises HydroLidGeometryError."""
     segments = np.asarray(segments, dtype=np.float64).reshape(-1, 2, 2)
-    # zero-length segments bound nothing (they would read as chords through a face)
-    segments = segments[np.linalg.norm(segments[:, 1] - segments[:, 0], axis=1) > tol]
+    # exactly zero-length segments bound nothing (they would read as chords through a face); short but nonzero
+    # segments are kept: many of them can bound a resolved hole (review round 5), never filter by tolerance
+    segments = segments[np.linalg.norm(segments[:, 1] - segments[:, 0], axis=1) > 0.0]
     if segments.shape[0] < 3:
         raise HydroLidGeometryError(f"the hull of {body_id!r} has no closed waterline at z = 0 to bound its lid")
     xy = np.asarray(lid_vertices, dtype=np.float64)[:, :2]

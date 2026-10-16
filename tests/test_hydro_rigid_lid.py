@@ -297,3 +297,23 @@ def test_containment_is_translation_invariant_at_large_offsets():
         face = np.c_[tri, np.zeros(3)]
         require_lid_inside_waterline(face, [[0, 1, 2]], region, "far", 1.2e-8)
 
+
+# ---------------------------------------------------------------------------------------------- review round 5
+
+def test_a_hole_made_of_sub_tolerance_segments_is_not_erased():
+    """Review round 5 exact case: a 2e-5 m square hole drawn with 8,192 segments of 9.77e-9 m (below tol 1.2e-8)
+    must still bound the region; a lid face across it is refused."""
+    from anymarine.hydro_rigid import require_lid_inside_waterline
+    outer = _ring([(-6, -3), (6, -3), (6, 3), (-6, 3)])
+    h, n = 1e-5, 2048
+    corners = [(-h, -h), (h, -h), (h, h), (-h, h)]
+    hole = []
+    for k in range(4):
+        (x0, y0), (x1, y1) = corners[k], corners[(k + 1) % 4]
+        pts = [(x0 + (x1 - x0) * i / n, y0 + (y1 - y0) * i / n) for i in range(n + 1)]
+        hole += [[pts[i], pts[i + 1]] for i in range(n)]
+    region = np.array(outer + hole, float)
+    face = np.array([[-5, -2, 0], [0, 2, 0], [5, -2, 0]], float)
+    with pytest.raises(HydroLidGeometryError, match="over a hole"):
+        require_lid_inside_waterline(face, [[0, 1, 2]], region, "fine-hole", 1.2e-8)
+
