@@ -95,13 +95,14 @@ def _blocks(body):
 
 
 def _source(tmp_path, project, *, permutation=None, explicit_b0=None, dataset_lid=False, provenance_g=G, tag="s",
-            contract=True):
+            contract=True, stiffness_skew=0.0):
     bodies = project.bodies
     n = 6 * len(bodies)
     a_inf, C, K = np.zeros((n, n)), np.zeros((n, n)), np.zeros((n, n))
     baselines, hbodies, cbs = {}, [], []
     for k, body in enumerate(bodies):
         a, c, kk, base, cb = _blocks(body)
+        kk[3, 4] += stiffness_skew                          # unsymmetric source term (refusal tests)
         s = slice(6 * k, 6 * k + 6)
         a_inf[s, s], C[s, s], K[s, s] = a, c, kk
         baselines[body.body_id] = base
@@ -405,5 +406,24 @@ def test_a_source_without_hydrostatic_contract_is_refused(tmp_path):
     project = _project()
     ds_path, k_path, _, _ = _source(tmp_path, project, contract=False)
     with pytest.raises(HydroAdmissionError, match="ANYhydro source was refused|hydrostatic"):
+        import_rigid_hydro_inputs(project, ds_path, k_path, _options(project))
+
+
+def test_indefinite_restoring_is_refused(tmp_path):
+    """M-e review: a nonsingular but indefinite K_total (CG high above the CB: roll unstable) is refused, not only
+    the neutral (zero-eigenvalue) case."""
+    project = _project((dataclasses.replace(_body("vessel"), mass_properties=BodyMassProperties((0.0, 0.0, 3.0),
+                                                                                              INERTIA)),))
+    ds_path, k_path, _, _ = _source(tmp_path, project)
+    with pytest.raises(HydroAdmissionError, match="K_total"):
+        import_rigid_hydro_inputs(project, ds_path, k_path, _options(project))
+
+
+def test_skewed_source_buoyancy_stiffness_is_refused(tmp_path):
+    """M-e review: the declared symmetrisation refuses a source stiffness whose skew part (after the chart
+    conversion) exceeds 1e-2 of the operator - not only skewed external records."""
+    project = _project()
+    ds_path, k_path, _, _ = _source(tmp_path, project, stiffness_skew=0.5 * RHO * G * 864.0)
+    with pytest.raises(HydroAdmissionError, match="K_buoyancy_chart"):
         import_rigid_hydro_inputs(project, ds_path, k_path, _options(project))
 
