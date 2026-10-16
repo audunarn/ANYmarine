@@ -16,7 +16,7 @@ dependencies = ["numpy>=1.24"]
 gui = ["PySide6>=6.10.1,<6.11", "ANY3dView[qt,gpu]>=0.5.5,<0.6"]
 native-morison = ["ANYsolver>=0.4.7", "ANYloads>=0.1.0"]
 native-waves = ["ANYsolver>=0.4.7", "ANYloads>=0.1.0", "ANYhydro>=0.2.0,<0.3"]
-waves = ["ANYloads>=0.1.0", "anyhydro>=0.2.0,<0.3", "capytaine==3.0.0"]
+waves = ["ANYloads>=0.1.0", "anyhydro>=0.2.1,<0.3", "capytaine==3.0.0"]
 dev = [
     "pytest>=7",
     "build>=1",

@@ -460,3 +460,16 @@ def test_skewed_kernel_samples_are_refused(tmp_path):
     skewed_source = _source(tmp_path, project, damping_skew=0.5 * MASS * 13.0 * LAM, symmetry_tol=10.0, tag="b")
     with pytest.raises(HydroAdmissionError, match="damping-symmetry violations"):
         import_rigid_hydro_inputs(project, *skewed_source[:2], _options(project))
+
+
+@pytest.mark.parametrize("installed", ["0.2.0", "0.1.9", "", "dev"])
+def test_an_older_anyhydro_is_a_typed_refusal(tmp_path, monkeypatch, installed):
+    """The six-DOF route needs anyhydro >= 0.2.1; an older installation is refused with a typed error, not an
+    ImportError from a missing ANYhydro feature."""
+    from anymarine.hydro import HydroUnavailableError
+    project = _project()
+    ds_path, k_path, _, _ = _source(tmp_path, project)
+    monkeypatch.setattr(anyhydro, "__version__", installed)
+    with pytest.raises(HydroUnavailableError, match="anyhydro >= 0.2.1"):
+        import_rigid_hydro_inputs(project, ds_path, k_path, _options(project))
+

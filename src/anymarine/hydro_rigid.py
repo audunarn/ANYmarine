@@ -38,11 +38,15 @@ from . import linear_fd as fd
 from .domain import (HYDRO_ROUTE_RIGID, LINEAR_LAYOUT_RIGID, LINEAR_SOURCE_HYDRO, RIGID_DOFS, ExternalMatrixRecord,
                      LinearDevelopmentInputs, LinearExecutionLimits, LinearProvenance, ProjectModel)
 from .hashing import equilibrium_hash
-from .hydro import (HydroAdmissionError, HydroGeometryError, HydroImportError, HydroOptionsError, _import_anyhydro,
+from .hydro import (HydroAdmissionError, HydroGeometryError, HydroImportError, HydroOptionsError, HydroUnavailableError,
+                    _import_anyhydro,
                     _read_raw_source, _require_global_source_axes, _sha256_file)
 from .linear import linear_input_hash, rigid_binding, rigid_dry_mass
 
 RIGID_IMPORT_FORMAT = "anymarine-rigid-hydro-import-v1"
+#: the six-DOF route needs the ANYhydro L6-4 features (hydrostatic contract rate map/chart conversion, exact
+#: hydrostatics, Bartlett window, normalised full-block gate), first released in 0.2.1
+MIN_ANYHYDRO_VERSION = (0, 2, 1)
 #: route of the hydro provenance rigid bundle: raw dataset + kernel, re-run from the stored sidecars on verification
 RIGID_PROVENANCE_ROUTE = HYDRO_ROUTE_RIGID
 EQUILIBRIUM_RELATIVE = 1.0e-3
@@ -214,6 +218,21 @@ def _symmetrise(name, matrix, scale):
         raise HydroAdmissionError(f"declared symmetrisation refused (ADR-015 section 8): {error}") from error
 
 
+def _rigid_anyhydro():
+    """The installed ANYhydro, refused (typed) when older than MIN_ANYHYDRO_VERSION."""
+    anyhydro = _import_anyhydro()
+    raw = str(getattr(anyhydro, "__version__", ""))
+    try:
+        version = tuple(int(part) for part in raw.split("+")[0].split(".")[:3])
+    except ValueError:
+        version = ()
+    if len(version) != 3 or version < MIN_ANYHYDRO_VERSION:
+        required = ".".join(str(v) for v in MIN_ANYHYDRO_VERSION)
+        raise HydroUnavailableError(f"the six-DOF hydro import needs anyhydro >= {required}; the installed anyhydro is "
+                                    f"{raw or 'of unknown version'} (install the ANYmarine 'waves' extra)")
+    return anyhydro
+
+
 def _plain_options(options) -> dict:
     """The caller options as plain JSON (stored in the provenance rigid bundle and re-run on verification)."""
     try:
@@ -235,7 +254,7 @@ def import_rigid_hydro_inputs(project: ProjectModel, dataset_path, kernel_path, 
     including ANYhydro's own (e.g. an unresolved hydrostatic contract) and I/O failures of the private copies, is a
     typed ``HydroImportError`` with the cause preserved.
     """
-    anyhydro = _import_anyhydro()
+    anyhydro = _rigid_anyhydro()
     try:
         return _import_rigid(anyhydro, project, dataset_path, kernel_path, options)
     except HydroImportError:
@@ -523,7 +542,7 @@ def rigid_frequency_references(inputs: LinearDevelopmentInputs, provenance, data
     F is the run's forcing phasor amplitude * F_exc(w, heading) * exp(i phase). Free-decay imports have no forcing
     frequency and are refused. Returns plain JSON.
     """
-    anyhydro = _import_anyhydro()
+    anyhydro = _rigid_anyhydro()
     try:
         return _rigid_frequency_references(anyhydro, inputs, provenance, dataset_path)
     except HydroImportError:
