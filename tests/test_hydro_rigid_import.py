@@ -95,7 +95,7 @@ def _blocks(body):
 
 
 def _source(tmp_path, project, *, permutation=None, explicit_b0=None, dataset_lid=False, provenance_g=G, tag="s",
-            contract=True, stiffness_skew=0.0):
+            contract=True, stiffness_skew=0.0, a_inf_skew=0.0, damping_skew=0.0, symmetry_tol=1e-6):
     bodies = project.bodies
     n = 6 * len(bodies)
     a_inf, C, K = np.zeros((n, n)), np.zeros((n, n)), np.zeros((n, n))
@@ -116,8 +116,14 @@ def _source(tmp_path, project, *, permutation=None, explicit_b0=None, dataset_li
                                           face_sizes=np.array([4], np.uint8), body_id=body.body_id,
                                           outward_normals_verified=False, source_geometry_refs=("lid",), mesh_hash="")
         hbodies.append((body, mesh, lid))
+    # optional antisymmetric offsets (refusal tests): one on A_inf and every A(w) keeps the reconstruction
+    # consistent; one on B(w) reaches the kernel when the producer's symmetry tolerance is loose
+    skew_unit = np.zeros((n, n))
+    skew_unit[3, 4], skew_unit[4, 3] = 1.0, -1.0
+    a_inf = a_inf + a_inf_skew * skew_unit
     added = np.array([a_inf - C / (LAM ** 2 + w ** 2) for w in OMEGAS])
-    damping = np.array([C * LAM / (LAM ** 2 + w ** 2) for w in OMEGAS])
+    damping = np.array([C * LAM / (LAM ** 2 + w ** 2) + damping_skew * skew_unit * LAM / (LAM ** 2 + w ** 2)
+                        for w in OMEGAS])
     excitation = np.array([[[2e5 * (1 + 0.1 * i) * np.exp(1j * (0.2 * i + 0.05 * o)) for i in range(n)]]
                            for o, _ in enumerate(OMEGAS)])
     hydro_bodies = tuple(anyhydro.HydroBody(body_id=b.body_id, name=b.name, mesh=mesh, lid_mesh=lid,
@@ -153,7 +159,7 @@ def _source(tmp_path, project, *, permutation=None, explicit_b0=None, dataset_li
     low = dict(low_tail_policy="linear_to_zero_extension", extension_name="linear_to_zero")
     if explicit_b0 is not None:
         low = dict(low_tail_policy="explicit_zero_sample", zero_frequency_damping=explicit_b0)
-    settings = anyhydro.RadiationSettings(dt=DT, n_time=N_TIME, symmetry_tol=1e-6, passivity_tol=1e-6, time_window=H,
+    settings = anyhydro.RadiationSettings(dt=DT, n_time=N_TIME, symmetry_tol=symmetry_tol, passivity_tol=1e-6, time_window=H,
                                           time_window_shape="bartlett", quadrature_method="piecewise_linear_exact",
                                           execution_limits=anyhydro.RadiationExecutionLimits(max_time_samples=N_TIME),
                                           **low)
@@ -427,3 +433,30 @@ def test_skewed_source_buoyancy_stiffness_is_refused(tmp_path):
     with pytest.raises(HydroAdmissionError, match="K_buoyancy_chart"):
         import_rigid_hydro_inputs(project, ds_path, k_path, _options(project))
 
+
+def test_skewed_added_mass_infinite_is_refused(tmp_path):
+    """M-e review round 2: the producer copies A_inf without a symmetry refusal; the importer's own declared
+    symmetrisation of A_inf must refuse a skew part above 1e-2 (A(w) carries the same offset: consistent source)."""
+    project = _project()
+    ds_path, k_path, _, _ = _source(tmp_path, project, a_inf_skew=0.5 * MASS * 13.0)
+    with pytest.raises(HydroAdmissionError, match="A_inf"):
+        import_rigid_hydro_inputs(project, ds_path, k_path, _options(project))
+
+
+def test_skewed_kernel_samples_are_refused(tmp_path):
+    """M-e review round 2: the importer's own per-sample symmetrisation refuses a skewed kernel artifact (bound to
+    the dataset, zero producer diagnostics); a skewed source damping is already refused through the producer's
+    damping-symmetry diagnostics."""
+    project = _project()
+    ds_path, _, _, kernel = _source(tmp_path, project)
+    samples = np.array(kernel.kernel)
+    skew = np.zeros((6, 6))
+    skew[3, 4], skew[4, 3] = 1.0, -1.0
+    path = tmp_path / "skewed-kernel.nc"
+    anyhydro.save_radiation_kernel(dataclasses.replace(kernel, kernel=samples + 0.5 * np.abs(samples).max() * skew),
+                                   path)
+    with pytest.raises(HydroAdmissionError, match="kernel sample 0: skew part"):
+        import_rigid_hydro_inputs(project, ds_path, path, _options(project))
+    skewed_source = _source(tmp_path, project, damping_skew=0.5 * MASS * 13.0 * LAM, symmetry_tol=10.0, tag="b")
+    with pytest.raises(HydroAdmissionError, match="damping-symmetry violations"):
+        import_rigid_hydro_inputs(project, *skewed_source[:2], _options(project))
