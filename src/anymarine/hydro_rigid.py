@@ -145,6 +145,100 @@ def _world_mesh(anyhydro, body):
                                    source_geometry_refs=("anymarine-body-mesh+reference-pose",), mesh_hash="")
 
 
+def _waterline_segments(vertices, triangles, tol):
+    """The hull's waterline in the plane z = 0 as a segment soup: the cut of every triangle that strictly straddles
+    z = 0 plus every triangle edge lying on z = 0 that belongs to exactly one triangle with that edge on the plane
+    (the open boundary of a wet hull cut at the waterline). Returns an (m, 2, 2) array of xy segments."""
+    segments = []
+    on_plane_edges = {}
+    z = vertices[:, 2]
+    for tri in triangles:
+        pts = vertices[list(tri)]
+        zs = z[list(tri)]
+        on = np.abs(zs) <= tol
+        for a, b in ((0, 1), (1, 2), (2, 0)):
+            if on[a] and on[b]:
+                key = tuple(sorted((int(tri[a]), int(tri[b]))))
+                on_plane_edges[key] = on_plane_edges.get(key, 0) + 1
+        if np.any(zs > tol) and np.any(zs < -tol):
+            cut = []
+            for a, b in ((0, 1), (1, 2), (2, 0)):
+                if on[a]:
+                    cut.append(pts[a][:2])
+                elif not on[b] and (zs[a] > tol) != (zs[b] > tol):
+                    s = zs[a] / (zs[a] - zs[b])
+                    cut.append((pts[a] + s * (pts[b] - pts[a]))[:2])
+            unique = []
+            for point in cut:
+                if not any(np.allclose(point, other, atol=tol, rtol=0) for other in unique):
+                    unique.append(point)
+            if len(unique) == 2:
+                segments.append(unique)
+    for (i, j), count in on_plane_edges.items():
+        if count == 1:
+            segments.append([vertices[i][:2], vertices[j][:2]])
+    return np.asarray(segments, dtype=np.float64).reshape(-1, 2, 2)
+
+
+def _inside_or_on(point, segments, tol):
+    """Even-odd point-in-region test against the waterline segment soup (holes and several loops); points within
+    ``tol`` of a segment count as on the boundary (inside)."""
+    a, b = segments[:, 0], segments[:, 1]
+    ab = b - a
+    t = np.clip(np.einsum("ij,ij->i", point - a, ab) / np.maximum(np.einsum("ij,ij->i", ab, ab), 1e-300), 0.0, 1.0)
+    if np.min(np.linalg.norm(a + t[:, None] * ab - point, axis=1)) <= tol:
+        return True
+    crosses = (a[:, 1] > point[1]) != (b[:, 1] > point[1])
+    with np.errstate(divide="ignore", invalid="ignore"):
+        x_cross = a[:, 0] + (point[1] - a[:, 1]) * ab[:, 0] / ab[:, 1]
+    return bool(np.count_nonzero(crosses & (x_cross > point[0])) % 2)
+
+
+def _strictly_inside(point, segments, tol):
+    a, b = segments[:, 0], segments[:, 1]
+    ab = b - a
+    t = np.clip(np.einsum("ij,ij->i", point - a, ab) / np.maximum(np.einsum("ij,ij->i", ab, ab), 1e-300), 0.0, 1.0)
+    if np.min(np.linalg.norm(a + t[:, None] * ab - point, axis=1)) <= tol:
+        return False
+    return _inside_or_on(point, segments, tol)
+
+
+def _proper_crossing(p, q, r, s, tol):
+    def cross(o, u, v):
+        return (u[0] - o[0]) * (v[1] - o[1]) - (u[1] - o[1]) * (v[0] - o[0])
+    d1, d2, d3, d4 = cross(r, s, p), cross(r, s, q), cross(p, q, r), cross(p, q, s)
+    scale = tol * max(float(np.linalg.norm(q - p)), float(np.linalg.norm(s - r)), 1.0)
+    return ((d1 > scale and d2 < -scale) or (d1 < -scale and d2 > scale)) and \
+        ((d3 > scale and d4 < -scale) or (d3 < -scale and d4 > scale))
+
+
+def require_lid_inside_waterline(lid_vertices, lid_triangles, segments, body_id, tol):
+    """Every lid face lies inside the hull waterplane (ADR-015 L6-4a): its vertices inside or on the waterline, its
+    centroid strictly inside, no waterline segment properly crossing a lid edge and no waterline point strictly
+    inside the face (concave waterlines and holes). Raises HydroLidGeometryError."""
+    if segments.shape[0] < 3:
+        raise HydroLidGeometryError(f"the hull of {body_id!r} has no closed waterline at z = 0 to bound its lid")
+    xy = np.asarray(lid_vertices, dtype=np.float64)[:, :2]
+    ends = segments.reshape(-1, 2)
+    for index, tri in enumerate(np.asarray(lid_triangles).tolist()):
+        p = xy[tri]
+        if not all(_inside_or_on(v, segments, tol) for v in p) or not _strictly_inside(p.mean(axis=0), segments, tol):
+            raise HydroLidGeometryError(f"numerical lid face {index} of body {body_id!r} lies outside the hull "
+                                        "waterplane (the lid must cover only the interior of the waterline)")
+        for (u, v) in ((p[0], p[1]), (p[1], p[2]), (p[2], p[0])):
+            for r, s in segments:
+                if _proper_crossing(u, v, r, s, tol):
+                    raise HydroLidGeometryError(f"numerical lid face {index} of body {body_id!r} crosses the hull "
+                                                "waterline")
+        area = 0.5 * ((p[1, 0] - p[0, 0]) * (p[2, 1] - p[0, 1]) - (p[1, 1] - p[0, 1]) * (p[2, 0] - p[0, 0]))
+        for e in ends:
+            w = [((p[(k + 1) % 3, 0] - p[k, 0]) * (e[1] - p[k, 1]) - (p[(k + 1) % 3, 1] - p[k, 1]) * (e[0] - p[k, 0]))
+                 * np.sign(area) for k in range(3)]
+            if min(w) > tol * max(abs(area), 1.0):
+                raise HydroLidGeometryError(f"numerical lid face {index} of body {body_id!r} covers part of the "
+                                            "waterline (a hole or notch of the waterplane)")
+
+
 def _world_lid(anyhydro, body):
     """Expected world-space numerical lid at the reference pose (ADR-015 L6-4a): R0 x_lid + r0, every vertex on the
     equilibrium waterplane z = 0, nondegenerate faces with DOWN normals (the backend lid convention). The geometry is
@@ -166,6 +260,10 @@ def _world_lid(anyhydro, body):
         if not float(normal[2]) < 0.0:
             raise HydroLidGeometryError(f"numerical lid face {index} of body {body.body_id!r} does not point DOWN (the "
                                         "backend lid convention); lids are never flipped")
+    hull = np.asarray(body.mesh.positions, dtype=np.float64) @ R0.T + np.asarray(body.reference_position)
+    extent = float(np.max(np.ptp(hull, axis=0)))
+    segments = _waterline_segments(hull, np.asarray(body.mesh.triangles, dtype=np.int64), _LID_PLANE_TOLERANCE)
+    require_lid_inside_waterline(vertices, triangles, segments, body.body_id, 1e-9 * max(extent, 1.0))
     return anyhydro.HydroPanelMesh(vertices=vertices, faces=triangles,
                                    face_sizes=np.full(triangles.shape[0], 3, dtype=np.uint8), body_id=body.body_id,
                                    outward_normals_verified=False,

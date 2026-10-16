@@ -102,3 +102,105 @@ def test_lidded_import_saves_reopens_and_reverifies(tmp_path):
     from anymarine.services import ServiceError
     with pytest.raises(ServiceError, match="lid_mesh_hashes"):
         service.verify_hydro_provenance(forged)
+
+
+# ---------------------------------------------------------------------------------------------- review round 1
+
+def test_lid_beyond_the_hull_waterplane_is_refused(tmp_path):
+    """A lid extending past the waterline would change radiation and excitation; it is refused before any solve."""
+    big = dataclasses.replace(_body("vessel"), hydro_lid=BodyMesh(
+        positions=((-12.0, -6.0, 0.0), (12.0, -6.0, 0.0), (12.0, 6.0, 0.0), (-12.0, 6.0, 0.0)),
+        triangles=((0, 2, 1), (0, 3, 2))))
+    project = _project((big,))
+    with pytest.raises(HydroLidGeometryError, match="outside the hull waterplane"):
+        import_rigid_hydro_inputs(project, *_source(tmp_path, project)[:2], _options(project))
+
+
+def test_rotated_pose_and_mixed_lidded_lidless_bodies(tmp_path):
+    """The lid follows the reference orientation (R0 x + r0): a yawed lidded body and a lidless body in one import."""
+    yaw = ((0.0, -1.0, 0.0), (1.0, 0.0, 0.0), (0.0, 0.0, 1.0))
+    a = dataclasses.replace(_body("a"), reference_orientation=yaw, hydro_lid=_lid())
+    b = _body("b", x0=40.0)
+    project = _project((a, b))
+    inputs, provenance = import_rigid_hydro_inputs(project, *_source(tmp_path, project)[:2], _options(project))
+    assert inputs.ndof == 12
+    assert provenance["lid_mesh_hashes"][0] is not None and provenance["lid_mesh_hashes"][1] is None
+    identity = ((1.0, 0.0, 0.0), (0.0, 1.0, 0.0), (0.0, 0.0, 1.0))
+    unrotated = _project((dataclasses.replace(a, reference_orientation=identity), b))
+    with pytest.raises(HydroGeometryError):
+        import_rigid_hydro_inputs(unrotated, *_source(tmp_path, project, tag="r")[:2], _options(unrotated))
+
+
+@pytest.mark.parametrize("z, admitted", [(5e-10, True), (2e-9, False)])
+def test_lid_plane_tolerance_boundary(tmp_path, z, admitted):
+    project = _project((_lidded(z=z),))
+    source = _source(tmp_path, project)[:2]
+    if admitted:
+        import_rigid_hydro_inputs(project, *source, _options(project))
+    else:
+        with pytest.raises(HydroLidGeometryError, match="off the equilibrium waterplane"):
+            import_rigid_hydro_inputs(project, *source, _options(project))
+
+
+def test_degenerate_lid_faces_are_refused(tmp_path):
+    lid = _lid()
+    try:
+        repeated = BodyMesh(positions=lid.positions, triangles=lid.triangles + ((0, 0, 1),))
+    except ValueError:
+        pytest.skip("BodyMesh itself refuses repeated-index triangles")
+    project = _project((dataclasses.replace(_body("vessel"), hydro_lid=repeated),))
+    with pytest.raises(HydroLidGeometryError, match="degenerate"):
+        import_rigid_hydro_inputs(project, *_source(tmp_path, project)[:2], _options(project))
+
+
+def test_an_invented_lid_identity_on_a_lidless_import_is_refused(tmp_path):
+    from anymarine.services import ServiceError
+    source_dir, root = tmp_path / "source", tmp_path / "project"
+    source_dir.mkdir()
+    project = _project()
+    ds_path, k_path, _, _ = _source(source_dir, project)
+    service = ApplicationService(root)
+    service.save(project, root=root)
+    imported = service.import_rigid_hydro_inputs(project, ds_path, k_path, _options(project, n_steps=401))
+    forged = dataclasses.replace(imported, hydro_provenance=HydroBridgeProvenance.from_dict(
+        dict(imported.hydro_provenance.to_dict(), lid_mesh_hashes=["a" * 64])))
+    with pytest.raises(ServiceError, match="lid_mesh_hashes"):
+        service.verify_hydro_provenance(forged)
+
+
+def _ring(points):
+    return [[points[i], points[(i + 1) % len(points)]] for i in range(len(points))]
+
+
+def test_containment_handles_concave_waterlines_and_holes():
+    """Unit check of the face containment on an L-shaped waterline and on a square ring (outer + hole)."""
+    from anymarine.hydro_rigid import require_lid_inside_waterline
+    ell = np.array(_ring([(0, 0), (4, 0), (4, 2), (2, 2), (2, 4), (0, 4)]), float)
+    inside = np.array([[0, 0, 0], [2, 0, 0], [2, 2, 0], [0, 2, 0]], float)
+    require_lid_inside_waterline(inside, [[0, 2, 1], [0, 3, 2]], ell, "ell", 1e-9)
+    notch = np.array([[2, 0, 0], [4, 4, 0], [0, 4, 0]], float)            # spans the re-entrant corner
+    with pytest.raises(HydroLidGeometryError):
+        require_lid_inside_waterline(notch, [[0, 1, 2]], ell, "ell", 1e-9)
+    ring = np.array(_ring([(0, 0), (6, 0), (6, 6), (0, 6)]) + _ring([(2, 2), (2, 4), (4, 4), (4, 2)]), float)
+    over_hole = np.array([[0, 0, 0], [6, 0, 0], [6, 6, 0], [0, 6, 0]], float)
+    with pytest.raises(HydroLidGeometryError):
+        require_lid_inside_waterline(over_hole, [[0, 2, 1], [0, 3, 2]], ring, "ring", 1e-9)
+    in_hole = np.array([[2.5, 2.5, 0], [3.5, 2.5, 0], [3, 3.5, 0]], float)
+    with pytest.raises(HydroLidGeometryError):
+        require_lid_inside_waterline(in_hole, [[0, 2, 1]], ring, "ring", 1e-9)
+    strip = np.array([[0, 0, 0], [6, 0, 0], [6, 2, 0], [0, 2, 0]], float)
+    require_lid_inside_waterline(strip, [[0, 2, 1], [0, 3, 2]], ring, "ring", 1e-9)
+
+
+def test_waterline_of_an_open_wet_hull_cut_at_z0():
+    """A wet hull cut at the waterline (boundary edges on z = 0, as the L01 panels) yields its waterline."""
+    from anymarine.hydro_rigid import _waterline_segments
+    v = np.array([[-1, -1, 0], [1, -1, 0], [1, 1, 0], [-1, 1, 0], [-1, -1, -1], [1, -1, -1], [1, 1, -1], [-1, 1, -1]],
+                 float)
+    tris = [[4, 6, 5], [4, 7, 6], [0, 1, 5], [0, 5, 4], [1, 2, 6], [1, 6, 5], [2, 3, 7], [2, 7, 6], [3, 0, 4],
+            [3, 4, 7]]
+    segments = _waterline_segments(v, np.array(tris), 1e-9)
+    assert segments.shape == (4, 2, 2)
+    ends = sorted(tuple(point) for point in np.round(segments.reshape(-1, 2), 12).tolist())
+    assert ends == sorted([(-1.0, -1.0), (1.0, -1.0), (1.0, -1.0), (1.0, 1.0), (1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0),
+                           (-1.0, -1.0)])

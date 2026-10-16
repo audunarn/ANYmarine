@@ -58,9 +58,15 @@ def _project(bodies=None):
                         equilibrium=EquilibriumMetadata(waterline_z=0.0, description="analytic", source="synthetic"))
 
 
+def _posed(body, positions):
+    R0 = np.array(body.reference_orientation, float)
+    r0 = np.array(body.reference_position, float)
+    return np.array([[sum(R0[i][k] * p[k] for k in range(3)) + r0[i] for i in range(3)] for p in positions])
+
+
 def _independent_world_mesh(body):
-    """Oracle world mesh (identity orientation): body positions + reference position, not the importer's builder."""
-    vertices = np.asarray(body.mesh.positions, float) + np.asarray(body.reference_position, float)
+    """Oracle world mesh: sum_k R0[i, k] x[k] + reference position, written out here (not the importer's builder)."""
+    vertices = _posed(body, body.mesh.positions)
     faces = np.asarray(body.mesh.triangles, dtype=np.int32)
     return anyhydro.HydroPanelMesh(vertices=vertices, faces=faces, face_sizes=np.full(len(faces), 3, np.uint8),
                                    body_id=body.body_id, outward_normals_verified=False,
@@ -110,7 +116,7 @@ def _source(tmp_path, project, *, permutation=None, explicit_b0=None, dataset_li
         mesh = _independent_world_mesh(body)
         lid = None
         if body.hydro_lid is not None:                      # the project's own lid, built independently
-            lid_vertices = np.asarray(body.hydro_lid.positions, float) + np.asarray(body.reference_position, float)
+            lid_vertices = _posed(body, body.hydro_lid.positions)
             lid_faces = np.asarray(body.hydro_lid.triangles, dtype=np.int32)
             lid = anyhydro.HydroPanelMesh(vertices=lid_vertices, faces=lid_faces,
                                           face_sizes=np.full(len(lid_faces), 3, np.uint8), body_id=body.body_id,

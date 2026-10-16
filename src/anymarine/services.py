@@ -961,8 +961,14 @@ class ApplicationService:
                 "dataset/kernel sidecars; effective-operator tampering is not cured by re-hashing the provenance "
                 "bookkeeping and the project is refused")
         stored = provenance.to_dict()
-        for key, value in HydroBridgeProvenance.from_dict(data).to_dict().items():
-            if key in ("dataset_source_path", "kernel_source_path", "created_utc"):
+        replayed = HydroBridgeProvenance.from_dict(data).to_dict()
+        volatile = {"dataset_source_path", "kernel_source_path", "created_utc"}
+        extra = sorted(set(stored) - set(replayed) - volatile)
+        if extra:
+            raise ServiceError(f"the hydro provenance declares field(s) {extra} that the re-import from the "
+                               "authoritative sidecars does not produce; the project is refused")
+        for key, value in replayed.items():
+            if key in volatile:
                 continue
             if stored.get(key) != value:
                 raise ServiceError(
