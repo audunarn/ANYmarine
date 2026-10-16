@@ -503,3 +503,100 @@ def _import_rigid(anyhydro, project: ProjectModel, dataset_path, kernel_path, op
                          "options": plain_options},
     }
     return inputs, provenance_data
+
+
+RIGID_REFERENCE_FORMAT = "anymarine-rigid-frequency-references-v1"
+
+
+def rigid_frequency_references(inputs: LinearDevelopmentInputs, provenance, dataset_path) -> dict:
+    """The L6-A frequency-domain references of an imported rigid run, bound to its hydro provenance (ADR-015 s7).
+
+    ``inputs`` and ``provenance`` (a ``HydroBridgeProvenance`` with a rigid bundle) must already be verified by the
+    caller (the service re-imports from the sidecars); ``dataset_path`` is the authoritative dataset sidecar. At the
+    provenance's regular wave:
+
+    - discrete: X_d = Z_d^-1 F from the STORED run inputs (M_dry, A_inf, C, K, stored kernel, dt) - the exact
+      steady state of the solver in the finite-memory regime;
+    - continuous: X = Z(w)^-1 F with the dataset A(w), B(w) at the exact stored frequency (retained DOFs by
+      identity, declared per-operator symmetrisation as the import) and the same K, C and F.
+
+    F is the run's forcing phasor amplitude * F_exc(w, heading) * exp(i phase). Free-decay imports have no forcing
+    frequency and are refused. Returns plain JSON.
+    """
+    anyhydro = _import_anyhydro()
+    try:
+        return _rigid_frequency_references(anyhydro, inputs, provenance, dataset_path)
+    except HydroImportError:
+        raise
+    except fd.LinearFdError as error:
+        raise HydroAdmissionError(f"the frequency-domain references are not admissible: {error}") from error
+    except anyhydro.HydroError as error:
+        raise HydroAdmissionError(f"the ANYhydro source was refused: {error}") from error
+    except OSError as error:
+        raise HydroImportError(f"I/O failure while building the frequency-domain references: {error}") from error
+
+
+def _rigid_frequency_references(anyhydro, inputs, provenance, dataset_path) -> dict:
+    bundle = getattr(provenance, "rigid_bundle", None)
+    if bundle is None or inputs.layout != LINEAR_LAYOUT_RIGID:
+        raise HydroOptionsError("frequency-domain references are built for rigid_subset_v1 hydro imports only")
+    if linear_input_hash(inputs) != provenance.linear_input_hash:
+        raise HydroAdmissionError("the inputs are not the ones the hydro provenance describes (input hash)")
+    wave = provenance.wave
+    if wave is None:
+        raise HydroOptionsError("the import has no regular-wave forcing (free decay): no forcing frequency to "
+                                "reference")
+    dataset = anyhydro.load_hydro_dataset(dataset_path)
+    if anyhydro.dataset_content_hash(dataset) != provenance.dataset_content_hash:
+        raise HydroAdmissionError("the dataset is not the hydro provenance's source (content hash)")
+    omega, heading = float(wave["omega"]), float(wave["heading"])
+    amplitude, phase = float(wave["amplitude"]), float(wave["phase"])
+    keys = [str(k) for k in dataset["influenced_dof"].values]
+    labels = list(inputs.labels)
+    try:
+        index = [keys.index(label.replace(":", "::", 1)) for label in labels]
+    except ValueError as error:
+        raise HydroAdmissionError(f"a run DOF is not in the dataset: {error}") from error
+    if [key.replace("::", ":", 1) for key in provenance.dof_keys] != labels:
+        raise HydroAdmissionError("the run DOF labels differ from the hydro provenance DOF keys")
+    omegas = np.asarray(dataset["omega"].values, dtype=np.float64)
+    headings = np.asarray(dataset["wave_direction"].values, dtype=np.float64)
+    o, h = np.flatnonzero(omegas == omega), np.flatnonzero(headings == heading)
+    if o.size != 1 or h.size != 1:
+        raise HydroAdmissionError("the provenance wave is not an exact dataset grid value")
+    sel = np.ix_(index, index)
+    length_scale = _positive(bundle["options"]["length_scale"], "length_scale")
+    S = np.diag([1.0 if label.split(":")[1] in _TRANSLATIONS else 1.0 / length_scale for label in labels])
+    A_w = fd.symmetrise("A(w)", np.asarray(dataset["added_mass"].values[o[0]], dtype=np.float64)[sel], S)
+    B_w = fd.symmetrise("B(w)", np.asarray(dataset["radiation_damping"].values[o[0]], dtype=np.float64)[sel], S)
+    F = (amplitude * np.exp(1j * phase)
+         * np.asarray(dataset["excitation_force"].values[o[0], h[0], :], dtype=np.complex128)[index])
+    M_dry = np.asarray(inputs.mass_dry, dtype=np.float64)
+    C = np.asarray(inputs.damping, dtype=np.float64)
+    K = np.asarray(inputs.stiffness, dtype=np.float64)
+    X = fd.continuous_reference(M_dry, A_w.symmetric, B_w.symmetric, C, K, omega, F)
+    X_d = fd.discrete_reference(M_dry, np.asarray(inputs.added_mass_infinite, dtype=np.float64), C, K,
+                                np.asarray(inputs.radiation_kernel, dtype=np.float64), float(inputs.dt), omega, F)
+    peak = float(np.max(np.abs(S @ X)))
+    difference = float(np.max(np.abs(S @ (X - X_d)))) / peak if peak > 0 else 0.0
+
+    def pairs(z):
+        return [[float(v.real), float(v.imag)] for v in z]
+
+    return {
+        "format": RIGID_REFERENCE_FORMAT,
+        "linear_input_hash": provenance.linear_input_hash,
+        "dataset_content_hash": provenance.dataset_content_hash,
+        "dataset_raw_sha256": provenance.dataset_raw_sha256,
+        "labels": labels,
+        "wave": {"omega": omega, "heading": heading, "amplitude": amplitude, "phase": phase},
+        "phasor_convention": "x(t) = Re{X exp(-i w t)}",
+        "force": pairs(F),
+        "discrete": pairs(X_d),
+        "continuous": pairs(X),
+        "skew_ratios": {"A(w)": A_w.skew_ratio, "B(w)": B_w.skew_ratio},
+        "normalised_max_difference": difference,
+        "note": "development references, unqualified; discrete = solver steady state (finite-memory regime), "
+                "continuous = dataset RAO with the run's restoring, external damping and forcing",
+    }
+

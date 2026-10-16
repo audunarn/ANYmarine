@@ -969,6 +969,45 @@ class ApplicationService:
                     f"the hydro provenance field {key!r} does not match the re-import from the authoritative "
                     "sidecars; the project is refused")
 
+    def rigid_frequency_references(self, project: ProjectModel) -> dict:
+        """Frequency-domain references (discrete solver steady state and dataset RAO) of a rigid hydro import.
+
+        The project's hydro provenance is verified first (the import is re-run from the stored sidecars); the
+        references are then built from the stored inputs and the authoritative dataset sidecar at the provenance's
+        regular wave (ADR-015 section 7, slice L6-3 M-d). Returns plain JSON; development evidence, unqualified.
+        """
+
+        from .hydro_rigid import rigid_frequency_references as _references
+        import shutil
+        import tempfile
+
+        provenance = project.hydro_provenance
+        if provenance is None or provenance.rigid_bundle is None:
+            raise ServiceError("frequency-domain references need a rigid_subset_v1 hydro import with its provenance")
+        self.verify_hydro_provenance(project)
+        try:
+            payload = resolve_sidecar(self.root, provenance.dataset_sidecar).read_bytes()
+        except (OSError, UnsafePathError) as error:
+            raise ServiceError(f"cannot read the authoritative dataset sidecar: {error}") from error
+        if sha256_bytes(payload) != provenance.dataset_raw_sha256:
+            raise ServiceError("the dataset sidecar does not match the hydro provenance raw sha256")
+        try:
+            temp_dir = tempfile.mkdtemp(prefix="anymarine-rigid-references-")
+        except OSError as error:
+            raise ServiceError(f"cannot create the private dataset copy: {error}") from error
+        try:
+            copy = Path(temp_dir) / "dataset.nc"
+            try:
+                copy.write_bytes(payload)
+            except OSError as error:
+                raise ServiceError(f"cannot write the private dataset copy: {error}") from error
+            try:
+                return _references(project.linear_inputs, provenance, copy)
+            except HydroImportError as error:
+                raise ServiceError(str(error)) from error
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
     def import_derived_hydro_inputs(
         self,
         project: ProjectModel,
