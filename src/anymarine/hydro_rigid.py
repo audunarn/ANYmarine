@@ -65,7 +65,7 @@ def _skew(v):
 def _positive(value, name):
     try:
         out = float(value)
-    except (TypeError, ValueError) as error:
+    except (TypeError, ValueError, OverflowError) as error:
         raise HydroOptionsError(f"{name} must be a number") from error
     if isinstance(value, bool) or not (math.isfinite(out) and out > 0):
         raise HydroOptionsError(f"{name} must be a positive finite number")
@@ -75,7 +75,7 @@ def _positive(value, name):
 def _finite(value, name):
     try:
         out = float(value)
-    except (TypeError, ValueError) as error:
+    except (TypeError, ValueError, OverflowError) as error:
         raise HydroOptionsError(f"{name} must be a number") from error
     if isinstance(value, bool) or not math.isfinite(out):
         raise HydroOptionsError(f"{name} must be a finite number")
@@ -264,6 +264,8 @@ def import_rigid_hydro_inputs(project: ProjectModel, dataset_path, kernel_path, 
         raise HydroAdmissionError(f"the ANYhydro source was refused: {error}") from error
     except OSError as error:
         raise HydroImportError(f"I/O failure during the rigid import: {error}") from error
+    except OverflowError as error:
+        raise HydroOptionsError(f"a numeric rigid import option is out of range: {error}") from error
 
 
 def _import_rigid(anyhydro, project: ProjectModel, dataset_path, kernel_path, options):

@@ -70,3 +70,36 @@ def test_command_line_refusals_are_reported_not_raised(tmp_path, capsys):
     capsys.readouterr()
     assert cli.main(["rigid-references", "--project", str(root)]) == 1
     assert "free decay" in capsys.readouterr().err
+
+
+def test_malformed_out_of_range_and_unwritable_inputs_exit_cleanly(tmp_path, capsys):
+    """CLI review round 1: every refusal path ends in an exit code, never a traceback."""
+    root, ds_path, k_path, options_path = _setup(tmp_path)
+    args = ["import-rigid-hydro", "--project", str(root), "--dataset", str(ds_path), "--kernel", str(k_path)]
+    malformed = tmp_path / "malformed.json"
+    malformed.write_text("{not json", encoding="utf-8")
+    assert cli.main(args + ["--options", str(malformed)]) == 2
+    assert "cannot read import options" in capsys.readouterr().err
+    assert cli.main(args + ["--options", str(tmp_path / "missing.json")]) == 2
+    assert "cannot read import options" in capsys.readouterr().err
+    huge = json.loads(options_path.read_text(encoding="utf-8"))
+    huge["length_scale"] = 10 ** 400
+    huge_path = tmp_path / "huge.json"
+    huge_path.write_text(json.dumps(huge), encoding="utf-8")
+    assert cli.main(args + ["--options", str(huge_path)]) == 1
+    assert "length_scale" in capsys.readouterr().err
+    assert cli.main(args + ["--options", str(options_path)]) == 0
+    capsys.readouterr()
+    assert cli.main(["rigid-references", "--project", str(root), "--output", str(tmp_path)]) == 2
+    assert "cannot write" in capsys.readouterr().err
+
+
+def test_references_of_a_legacy_project_are_refused(tmp_path, capsys):
+    from anymarine.domain import default_two_body_project
+    from anymarine.linear import analytic_demo_inputs
+    root = tmp_path / "legacy"
+    project = default_two_body_project()
+    service = ApplicationService(root)
+    service.save(project.with_edits(linear_inputs=analytic_demo_inputs(project)), root=root)
+    assert cli.main(["rigid-references", "--project", str(root)]) == 1
+    assert "rigid_subset_v1 hydro import" in capsys.readouterr().err
