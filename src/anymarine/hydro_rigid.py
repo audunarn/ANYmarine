@@ -51,6 +51,8 @@ RIGID_IMPORT_FORMAT = "anymarine-rigid-hydro-import-v1"
 #: the six-DOF route needs the ANYhydro L6-4 features (hydrostatic contract rate map/chart conversion, exact
 #: hydrostatics, Bartlett window, normalised full-block gate), first released in 0.2.1
 MIN_ANYHYDRO_VERSION = (0, 2, 1)
+#: Newman slow drift of an irregular sea needs the drift series and stored mean-drift datasets (N2/N2b), 0.2.2
+MIN_ANYHYDRO_DRIFT_VERSION = (0, 2, 2)
 #: route of the hydro provenance rigid bundle: raw dataset + kernel, re-run from the stored sidecars on verification
 RIGID_PROVENANCE_ROUTE = HYDRO_ROUTE_RIGID
 EQUILIBRIUM_RELATIVE = 1.0e-3
@@ -390,14 +392,20 @@ def _symmetrise(name, matrix, scale):
         raise HydroAdmissionError(f"declared symmetrisation refused (ADR-015 section 8): {error}") from error
 
 
-def _rigid_anyhydro():
-    """The installed ANYhydro, refused (typed) when older than MIN_ANYHYDRO_VERSION."""
-    anyhydro = _import_anyhydro()
+def _anyhydro_release(anyhydro) -> tuple:
+    """(X, Y, Z) of a final ANYhydro release, () otherwise."""
     raw = str(getattr(anyhydro, "__version__", ""))
     # final releases only (PEP 440 release segment X.Y.Z, optional +local): pre-, post- and dev releases and
     # malformed strings are refused rather than guessed (0.2.1.dev0 precedes 0.2.1)
     match = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)(\+[A-Za-z0-9]+(?:\.[A-Za-z0-9]+)*)?", raw)
-    version = tuple(int(part) for part in match.groups()[:3]) if match else ()
+    return tuple(int(part) for part in match.groups()[:3]) if match else ()
+
+
+def _rigid_anyhydro():
+    """The installed ANYhydro, refused (typed) when older than MIN_ANYHYDRO_VERSION."""
+    anyhydro = _import_anyhydro()
+    raw = str(getattr(anyhydro, "__version__", ""))
+    version = _anyhydro_release(anyhydro)
     if len(version) != 3 or version < MIN_ANYHYDRO_VERSION:
         required = ".".join(str(v) for v in MIN_ANYHYDRO_VERSION)
         raise HydroUnavailableError(f"the six-DOF hydro import needs anyhydro >= {required}; the installed anyhydro is "
@@ -739,6 +747,10 @@ def _irregular_forcing(anyhydro, dataset, wave, criteria, run_keys, n_bodies, dt
                  "excitation_series_hash": series.content_hash, "slow_drift": None}
     method = wave["slow_drift"]
     if method is not None:
+        if _anyhydro_release(anyhydro) < MIN_ANYHYDRO_DRIFT_VERSION:
+            required = ".".join(str(v) for v in MIN_ANYHYDRO_DRIFT_VERSION)
+            raise HydroUnavailableError(f"Newman slow drift needs anyhydro >= {required}; the installed anyhydro is "
+                                        f"{getattr(anyhydro, '__version__', 'of unknown version')}")
         try:
             from anyhydro.slow_drift import build_drift_series
         except ImportError as error:

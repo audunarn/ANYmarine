@@ -244,3 +244,15 @@ def test_save_reopen_verify_run_and_reference_refusal(tmp_path):
     with pytest.raises(HydroOptionsError, match="irregular sea"):
         rigid_frequency_references(reopened.linear_inputs, reopened.hydro_provenance,
                                    root / reopened.hydro_provenance.dataset_sidecar)
+
+
+@pytest.mark.parametrize("installed", ["0.2.1", "0.2.1+local", "0.2.2.dev0", "0.2.2rc1"])
+def test_slow_drift_needs_anyhydro_0_2_2(tmp_path, monkeypatch, installed):
+    from anymarine.hydro import HydroUnavailableError
+    project = _project()
+    ds_path, k_path, _ = _drift_source(tmp_path, project)
+    monkeypatch.setattr(anyhydro, "__version__", installed)
+    if installed.startswith("0.2.1"):                                  # first order alone still runs on 0.2.1
+        import_rigid_hydro_inputs(project, ds_path, k_path, _options(project, wave=_wave(_realization())))
+    with pytest.raises(HydroUnavailableError, match="0.2.2"):
+        import_rigid_hydro_inputs(project, ds_path, k_path, _options(project, wave=_wave(_realization(), "geometric")))
