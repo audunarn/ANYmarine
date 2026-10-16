@@ -18,7 +18,10 @@ labels), never by position:
   <= 1e-2 in normalised coordinates, recorded) and the structural admission (M_eff PD, K_total PD, every external
   damping record PSD, every damping sample incl. B(0) PSD) before any inputs exist;
 - forcing: an optional regular wave at a dataset grid frequency INSIDE the admitted reconstruction window and a
-  dataset heading.
+  dataset heading, or an irregular sea (slice N3): a canonical ANYloads WaveRealization whose component frequencies
+  all lie inside that window, synthesised by ANYhydro's first-order excitation series (coefficients interpolated
+  inside the stored range, never extrapolated) plus, optionally, the declared Newman slow-drift series (single body,
+  unidirectional, from the dataset's far-field mean drift) on the retained surge/sway/yaw DOFs.
 
 Nothing is silently defaulted; every refusal is a typed ``HydroImportError``. Development evidence only.
 """
@@ -56,6 +59,8 @@ _OPTION_KEYS = {"dofs", "length_scale", "criteria", "n_steps", "gravity", "wave"
                 "execution_limits", "q0", "v0"}
 _CRITERIA_KEYS = {"omega_min", "omega_max", "block_rel_tol", "modal_rel_tol", "energetic_fraction", "cluster_fraction"}
 _RECORD_KEYS = set(ExternalMatrixRecord._KEYS)
+_IRREGULAR_KEYS = {"kind", "realization", "slow_drift"}
+_NEWMAN_METHODS = ("geometric", "arithmetic")
 
 
 def _skew(v):
@@ -123,8 +128,14 @@ def _parse(project: ProjectModel, options) -> dict:
             raise HydroOptionsError(f"external record keys must be within {sorted(_RECORD_KEYS)} and include kind, "
                                     "dofs, matrix, source")
     wave = options.get("wave")
-    if wave is not None and (not isinstance(wave, Mapping) or not {"omega", "heading", "amplitude"} <= set(wave)
-                             or set(wave) - {"omega", "heading", "amplitude", "phase"}):
+    if isinstance(wave, Mapping) and "kind" in wave:
+        if wave["kind"] != "irregular" or set(wave) != _IRREGULAR_KEYS or not isinstance(wave["realization"], Mapping):
+            raise HydroOptionsError("an irregular wave must be exactly {kind: 'irregular', realization: <ANYloads "
+                                    "WaveRealization dict>, slow_drift: null | 'geometric' | 'arithmetic'}")
+        if wave["slow_drift"] is not None and wave["slow_drift"] not in _NEWMAN_METHODS:
+            raise HydroOptionsError(f"slow_drift must be null or one of {list(_NEWMAN_METHODS)}")
+    elif wave is not None and (not isinstance(wave, Mapping) or not {"omega", "heading", "amplitude"} <= set(wave)
+                               or set(wave) - {"omega", "heading", "amplitude", "phase"}):
         raise HydroOptionsError("wave must contain omega, heading, amplitude and optionally phase")
     return dict(options, length_scale=_positive(options["length_scale"], "length_scale"),
                 gravity=_positive(options["gravity"], "gravity"), external_matrices=tuple(records))
@@ -585,8 +596,12 @@ def _import_rigid(anyhydro, project: ProjectModel, dataset_path, kernel_path, op
 
     # ---------------------------------------------------------------- forcing
     forces = np.zeros((n_steps, len(labels)))
-    wave_selection = None
-    if opt.get("wave") is not None:
+    wave_selection = irregular_selection = None
+    if opt.get("wave") is not None and "kind" in opt["wave"]:
+        run_keys = [f"{b.body_id}::{d}" for b in bindings for d in b.dofs]
+        forces, irregular_selection = _irregular_forcing(anyhydro, dataset, opt["wave"], criteria, run_keys,
+                                                         len(bodies), dt, n_steps)
+    elif opt.get("wave") is not None:
         wave = opt["wave"]
         omega = _positive(wave["omega"], "wave omega")
         if not (criteria.omega_min <= omega <= criteria.omega_max):
@@ -618,6 +633,7 @@ def _import_rigid(anyhydro, project: ProjectModel, dataset_path, kernel_path, op
         "skew_ratios": skew, "equilibrium_residuals": residuals,
         "hydrostatic_contract": contract.to_json(), "gravity": g, "kernel_settings": kernel.settings.to_dict(),
         "wave": wave_selection,
+        **({"irregular_wave": irregular_selection} if irregular_selection is not None else {}),
     }
     limits = opt.get("execution_limits")
     try:
@@ -689,6 +705,70 @@ def _import_rigid(anyhydro, project: ProjectModel, dataset_path, kernel_path, op
     return inputs, provenance_data
 
 
+def _irregular_forcing(anyhydro, dataset, wave, criteria, run_keys, n_bodies, dt, n_steps):
+    """Forces (n_steps, retained DOFs) of an irregular sea and the selection record (slice N3).
+
+    First order: ANYhydro's excitation series, F(t) = Re{sum_j a_j e^{i phi_j} X(w_j) e^{-i w_j t}} - the regular
+    wave's convention; second order (optional): the Newman slow-drift series of the same realization, added to the
+    retained surge/sway/yaw DOFs (the others are dropped, as the first-order forces of non-retained DOFs, and
+    recorded).
+    """
+    try:
+        from anyloads import LoadError, WaveRealization
+    except ImportError as error:
+        raise HydroUnavailableError("an irregular sea needs the ANYloads sea-state support (install the ANYmarine "
+                                    "'waves' extra)") from error
+    raw = wave["realization"]
+    try:
+        waves = WaveRealization.from_dict(dict(raw))
+    except (LoadError, TypeError, ValueError) as error:
+        raise HydroOptionsError(f"the irregular wave realization is not admissible: {error}") from error
+    if json.loads(json.dumps(waves.to_dict(), allow_nan=False)) != raw:
+        raise HydroOptionsError("the irregular wave realization must be canonical ANYloads data (its to_dict form)")
+    omegas = np.array([c.omega for c in waves.components], dtype=np.float64)
+    if not np.all((omegas >= criteria.omega_min) & (omegas <= criteria.omega_max)):
+        raise HydroOptionsError("every wave component frequency must lie inside the admitted reconstruction window "
+                                f"[{criteria.omega_min}, {criteria.omega_max}]")
+    times = dt * np.arange(n_steps)
+    series = anyhydro.build_excitation_series(dataset, waves, amplitude_normalization=anyhydro.UNIT_INCIDENT_AMPLITUDE,
+                                              phase_origin_xy=(0.0, 0.0))
+    series_keys = list(series.dof_keys)
+    forces = np.asarray(series.evaluate(times), dtype=np.float64)[:, [series_keys.index(k) for k in run_keys]]
+    selection = {"kind": "irregular", "realization_hash": waves.content_hash, "n_components": len(omegas),
+                 "omega_range": [float(omegas.min()), float(omegas.max())],
+                 "excitation_series_hash": series.content_hash, "slow_drift": None}
+    method = wave["slow_drift"]
+    if method is not None:
+        try:
+            from anyhydro.slow_drift import build_drift_series
+        except ImportError as error:
+            raise HydroUnavailableError("Newman slow drift needs an ANYhydro with the drift series (slice N2, "
+                                        "anyhydro.slow_drift.build_drift_series)") from error
+        if n_bodies != 1:
+            raise HydroOptionsError("Newman slow drift is single-body only (no multibody interaction terms)")
+        if "mean_drift_far_field" not in dataset.data_vars:
+            raise HydroOptionsError("slow drift needs the dataset's far-field mean drift (mean_drift_far_field); the "
+                                    "source has none")
+        drift = build_drift_series(dataset, waves, method)
+        F2 = drift.evaluate(times)
+        applied, dropped = [], []
+        for k, key in enumerate(drift.dof_keys):
+            if key in run_keys:
+                forces[:, run_keys.index(key)] += F2[:, k]
+                applied.append(key)
+            else:
+                dropped.append(key)
+        if not applied:
+            raise HydroOptionsError("slow drift acts on surge, sway and yaw; none of them is a retained DOF")
+        record = dataset.attrs["mean_drift_far_field"]          # JSON text (computed) or decoded (loaded)
+        record = json.loads(record) if isinstance(record, str) else dict(record)
+        selection["slow_drift"] = {"method": method, "drift_series_hash": drift.content_hash,
+                                   "heading": drift.heading_radians, "applied_dofs": applied, "dropped_dofs": dropped,
+                                   "mean": [float(v) for v in drift.mean()],
+                                   "source_method": record.get("method"), "source_motions": record.get("motions")}
+    return forces, selection
+
+
 RIGID_REFERENCE_FORMAT = "anymarine-rigid-frequency-references-v1"
 
 
@@ -728,6 +808,10 @@ def _rigid_frequency_references(anyhydro, inputs, provenance, dataset_path) -> d
     if linear_input_hash(inputs) != provenance.linear_input_hash:
         raise HydroAdmissionError("the inputs are not the ones the hydro provenance describes (input hash)")
     wave = provenance.wave
+    options_wave = bundle["options"].get("wave")
+    if wave is None and isinstance(options_wave, Mapping) and "kind" in options_wave:
+        raise HydroOptionsError("the import is forced by an irregular sea; frequency-domain references need a "
+                                "regular wave")
     if wave is None:
         raise HydroOptionsError("the import has no regular-wave forcing (free decay): no forcing frequency to "
                                 "reference")

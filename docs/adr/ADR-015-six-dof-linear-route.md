@@ -68,6 +68,17 @@ folder); `L6-0-inventory.md` is the raw search behind it.
 ### 5. Forcing, damping and external matrices
 - Regular wave (amplitude, omega, heading, phase) from dataset excitation at an omega in the dataset grid
   (existing `wave` option), all retained DOFs; ANYmarine phasor x = Re{X exp(-i w t)}.
+- Irregular sea (slice N3, 2026-10-16): `wave = {kind: "irregular", realization: <canonical ANYloads
+  WaveRealization dict>, slow_drift: null | "geometric" | "arithmetic"}`. Every component frequency inside the
+  admitted reconstruction window; first order by ANYhydro's excitation series (complex coefficients interpolated
+  linearly inside the stored range, never extrapolated; headings exact modulo 2 pi), same phasor convention as the
+  regular wave. Optional Newman slow drift (ANYhydro N2, docs/MEAN_DRIFT_CONTRACT.md section 8): single body,
+  unidirectional, from the dataset's far-field mean drift; added to the retained surge/sway/yaw DOFs (the others
+  are dropped and recorded; none retained is refused). Recorded in the import details (`irregular_wave`: realization,
+  excitation and drift series hashes, applied/dropped DOFs, mean drift); the provenance `wave` stays null (no
+  regular selection) and the frequency-domain references refuse irregular imports. The options (with the full
+  realization) are in the rigid bundle, so verification re-runs the synthesis. Regular and free-decay imports are
+  unchanged (bit-identical inputs and provenance).
 - Constant linear damping C and external stiffness: explicit records with ordered DOF keys, SI units, world axes,
   reference point, kind, additive semantics, source identity, constant scope; hashed and carried through
   recompilation; never folded into hydrodynamic coefficients.

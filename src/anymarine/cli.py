@@ -116,7 +116,8 @@ def _build_parser() -> argparse.ArgumentParser:
         required=True,
         help=(
             "JSON file with the explicit rigid import options (dofs per body, length_scale, criteria, n_steps, "
-            "gravity; optional wave, external_matrices, execution_limits, q0, v0)"
+            "gravity; optional wave (regular, or {kind: irregular, realization, slow_drift}), external_matrices, "
+            "execution_limits, q0, v0)"
         ),
     )
     rigid_refs = sub.add_parser(

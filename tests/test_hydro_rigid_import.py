@@ -101,7 +101,7 @@ def _blocks(body):
 
 
 def _source(tmp_path, project, *, permutation=None, explicit_b0=None, dataset_lid=False, provenance_g=G, tag="s",
-            contract=True, stiffness_skew=0.0, a_inf_skew=0.0, damping_skew=0.0, symmetry_tol=1e-6):
+            contract=True, stiffness_skew=0.0, a_inf_skew=0.0, damping_skew=0.0, symmetry_tol=1e-6, extend=None):
     bodies = project.bodies
     n = 6 * len(bodies)
     a_inf, C, K = np.zeros((n, n)), np.zeros((n, n)), np.zeros((n, n))
@@ -166,6 +166,8 @@ def _source(tmp_path, project, *, permutation=None, explicit_b0=None, dataset_li
         role="BUOYANCY_ONLY", force_basis="PHYSICAL_WRENCH", rate_map="spatial_increments_exp_chart_v1",
         stiffness_derivative="INCREMENTAL_ABOUT_EQUILIBRIUM", bodies=tuple(b.body_id for b in bodies),
         baseline_wrench=baselines, provenance=provenance, full_source=None)
+    if extend is not None:                            # extra dataset blocks (e.g. mean drift) before any binding
+        ds = extend(ds)
     if contract:
         ds = attach_hydrostatic_contract(ds, hydrostatic)
     low = dict(low_tail_policy="linear_to_zero_extension", extension_name="linear_to_zero")
