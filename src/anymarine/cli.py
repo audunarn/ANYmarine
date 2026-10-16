@@ -481,7 +481,11 @@ def _cmd_import_rigid_hydro(args) -> int:
         "not a qualified marine analysis)"
     )
     print(f"stored linear inputs: dt={inputs.dt} n_steps={inputs.n_steps} frames")
-    print("run with: anymarine run-linear --project <dir>; references: anymarine rigid-references --project <dir>")
+    if details.get("irregular_wave") is not None:
+        print("run with: anymarine run-linear --project <dir> (irregular sea: frequency-domain references need a "
+              "regular wave)")
+    else:
+        print("run with: anymarine run-linear --project <dir>; references: anymarine rigid-references --project <dir>")
     return 0
 
 

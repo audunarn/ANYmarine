@@ -115,8 +115,10 @@ class WavesPanel(QWidget):
     def _solved_in_waves(self,result):
         if result.kind=='linear_development':
             from ..services import ServiceError
-            try:return self.window._service.result_recorded_wave(self.window._project,result)[1] is not None
+            try:details,wave=self.window._service.result_recorded_wave(self.window._project,result)
             except ServiceError:return True  # producing inputs unknown: attempt and report the refusal
+            # an irregular sea is reported (regular waves only), not treated as calm water
+            return wave is not None or (details is not None and details.get('irregular_wave') is not None)
         if result.kind=='mechanical_development':
             env=self._saved_environment(self.window._replay_project or self.window._project)
             return env is not None and len(env['components'])>0

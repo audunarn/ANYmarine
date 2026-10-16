@@ -256,3 +256,28 @@ def test_slow_drift_needs_anyhydro_0_2_2(tmp_path, monkeypatch, installed):
         import_rigid_hydro_inputs(project, ds_path, k_path, _options(project, wave=_wave(_realization())))
     with pytest.raises(HydroUnavailableError, match="0.2.2"):
         import_rigid_hydro_inputs(project, ds_path, k_path, _options(project, wave=_wave(_realization(), "geometric")))
+
+
+def test_consumers_report_an_irregular_sea(tmp_path, capsys):
+    """Review round 1: the CLI does not recommend references, the incident-wave display names the irregular sea."""
+    from anymarine import cli
+    from anymarine.services import ServiceError
+    source_dir, root = tmp_path / "source", tmp_path / "project"
+    source_dir.mkdir()
+    project = _project()
+    ds_path, k_path, _ = _drift_source(source_dir, project)
+    ApplicationService(root).save(project, root=root)
+    options_path = tmp_path / "options.json"
+    options_path.write_text(json.dumps(_options(project, n_steps=401, wave=_wave(_realization(), "geometric"))),
+                            encoding="utf-8")
+    assert cli.main(["import-rigid-hydro", "--project", str(root), "--dataset", str(ds_path),
+                     "--kernel", str(k_path), "--options", str(options_path)]) == 0
+    out = capsys.readouterr().out
+    assert "rigid-references" not in out and "irregular sea" in out
+    service = ApplicationService(root)
+    reopened = service.load(root)
+    record = service.run_linear_local(reopened)
+    details, wave = service.result_recorded_wave(reopened, record)
+    assert wave is None and details["irregular_wave"]["slow_drift"]["method"] == "geometric"
+    with pytest.raises(ServiceError, match="irregular sea"):
+        service.result_incident_wave(reopened, record)

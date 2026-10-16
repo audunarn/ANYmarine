@@ -609,6 +609,9 @@ class ApplicationService:
         from .wave_match import RegularIncidentWave, incident_request
 
         details, wave = self.result_recorded_wave(project, result)
+        if wave is None and details is not None and details.get("irregular_wave") is not None:
+            raise ServiceError("this linear result was forced by an irregular sea; the incident-wave display shows "
+                               "regular waves only")
         if wave is None:
             raise ServiceError("this linear result was not forced by an incident wave")
         provenance = None if project is None else project.hydro_provenance
