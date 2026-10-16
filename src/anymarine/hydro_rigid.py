@@ -172,7 +172,7 @@ def _waterline_segments(vertices, triangles, tol):
             if len(cut) == 2 and float(np.linalg.norm(cut[1] - cut[0])) > tol:
                 segments.append(cut)
     for (i, j), count in below_count.items():
-        if count % 2 == 1:
+        if count % 2 == 1 and float(np.linalg.norm(vertices[j][:2] - vertices[i][:2])) > tol:
             segments.append([vertices[i][:2], vertices[j][:2]])
     return np.asarray(segments, dtype=np.float64).reshape(-1, 2, 2)
 
@@ -207,13 +207,18 @@ def require_lid_inside_waterline(lid_vertices, lid_triangles, segments, body_id,
     refused (a sliver could otherwise lie entirely inside the tolerance band), and every vertex must lie inside the
     region or within ``tol`` of the waterline. Raises HydroLidGeometryError."""
     segments = np.asarray(segments, dtype=np.float64).reshape(-1, 2, 2)
+    # zero-length segments bound nothing (they would read as chords through a face)
+    segments = segments[np.linalg.norm(segments[:, 1] - segments[:, 0], axis=1) > tol]
     if segments.shape[0] < 3:
         raise HydroLidGeometryError(f"the hull of {body_id!r} has no closed waterline at z = 0 to bound its lid")
     xy = np.asarray(lid_vertices, dtype=np.float64)[:, :2]
-    a, d = segments[:, 0], segments[:, 1] - segments[:, 0]
     seg_lo, seg_hi = segments.min(axis=1), segments.max(axis=1)
     for index, tri in enumerate(np.asarray(lid_triangles).tolist()):
-        p = xy[tri]
+        # every test in coordinates relative to the face (no cancellation at large world offsets)
+        origin = xy[tri[0]].copy()
+        p = xy[tri] - origin
+        rel = segments - origin
+        a, d = rel[:, 0], rel[:, 1] - rel[:, 0]
         area2 = (p[1, 0] - p[0, 0]) * (p[2, 1] - p[0, 1]) - (p[1, 1] - p[0, 1]) * (p[2, 0] - p[0, 0])
         perimeter = sum(float(np.linalg.norm(p[(k + 1) % 3] - p[k])) for k in range(3))
         if not abs(area2) / perimeter > LID_MIN_INRADIUS_FACTOR * tol:
@@ -221,7 +226,7 @@ def require_lid_inside_waterline(lid_vertices, lid_triangles, segments, body_id,
                                         f"{abs(area2) / perimeter:.3g} m) that cannot be resolved against the hull "
                                         "waterline; sliver lid faces are refused")
         for vertex in p:
-            if not _point_in_region(vertex, segments) and _distance_to_segments(vertex, segments) > tol:
+            if not _point_in_region(vertex, rel) and _distance_to_segments(vertex, rel) > tol:
                 raise HydroLidGeometryError(f"numerical lid face {index} of body {body_id!r} has a vertex outside "
                                             "the hull waterplane")
         orient = 1.0 if area2 > 0 else -1.0
@@ -233,7 +238,7 @@ def require_lid_inside_waterline(lid_vertices, lid_triangles, segments, body_id,
             normals.append(n)
             offsets.append(float(n @ p[k]))
         normals, offsets = np.array(normals), np.array(offsets)
-        lo, hi = p.min(axis=0) - tol, p.max(axis=0) + tol
+        lo, hi = xy[tri].min(axis=0) - tol, xy[tri].max(axis=0) + tol
         near = np.flatnonzero(np.all(seg_hi >= lo, axis=1) & np.all(seg_lo <= hi, axis=1))
         if near.size:
             fa = a[near] @ normals.T - offsets                        # (m, 3) at t = 0
@@ -255,7 +260,7 @@ def require_lid_inside_waterline(lid_vertices, lid_triangles, segments, body_id,
                 if np.any(np.min(mid @ normals.T - offsets, axis=1) > tol):
                     raise HydroLidGeometryError(f"numerical lid face {index} of body {body_id!r} covers part of the "
                                                 "hull waterline (it extends outside the waterplane or over a hole)")
-        if not _point_in_region(p.mean(axis=0), segments):
+        if not _point_in_region(p.mean(axis=0), rel):
             raise HydroLidGeometryError(f"numerical lid face {index} of body {body_id!r} lies outside the hull "
                                         "waterplane (the lid must cover only the interior of the waterline)")
 

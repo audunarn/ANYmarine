@@ -277,3 +277,23 @@ def test_vertex_outside_the_waterline_is_refused():
     with pytest.raises(HydroLidGeometryError):
         require_lid_inside_waterline(face, [[0, 2, 1]], region, "square", 1e-9)
 
+
+# ---------------------------------------------------------------------------------------------- review round 4
+
+def test_zero_length_waterline_segments_bound_nothing():
+    from anymarine.hydro_rigid import require_lid_inside_waterline
+    region = np.array(_ring([(-1, -1), (1, -1), (1, 1), (-1, 1)]) + [[(0, 0), (0, 0)]], float)
+    face = np.array([[-0.5, -0.5, 0], [0, 0.5, 0], [0.5, -0.5, 0]], float)
+    require_lid_inside_waterline(face, [[0, 1, 2]], region, "square", 1e-9)
+
+
+def test_containment_is_translation_invariant_at_large_offsets():
+    """Review round 4: coincident lid and waterline triangles far from the origin are admitted."""
+    from anymarine.hydro_rigid import require_lid_inside_waterline
+    local = np.array([(0.0, 0.0), (0.25, 12.0), (10.0, 1.0 / 3.0)])
+    for offset in (0.0, 1e6, 1e10):
+        tri = local + offset
+        region = np.array(_ring([tuple(v) for v in tri]), float)
+        face = np.c_[tri, np.zeros(3)]
+        require_lid_inside_waterline(face, [[0, 1, 2]], region, "far", 1.2e-8)
+
