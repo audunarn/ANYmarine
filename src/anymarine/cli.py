@@ -104,6 +104,28 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
 
+    import_rigid = sub.add_parser(
+        "import-rigid-hydro",
+        help="import an ANYhydro dataset/kernel pair as six-DOF (rigid_subset_v1) linear inputs",
+    )
+    import_rigid.add_argument("--project", required=True, help="project directory")
+    import_rigid.add_argument("--dataset", required=True, help="ANYhydro dataset NetCDF file (hydrostatic contract attached)")
+    import_rigid.add_argument("--kernel", required=True, help="ANYhydro Bartlett-tapered radiation kernel NetCDF file")
+    import_rigid.add_argument(
+        "--options",
+        required=True,
+        help=(
+            "JSON file with the explicit rigid import options (dofs per body, length_scale, criteria, n_steps, "
+            "gravity; optional wave, external_matrices, execution_limits, q0, v0)"
+        ),
+    )
+    rigid_refs = sub.add_parser(
+        "rigid-references",
+        help="frequency-domain references (solver steady state and dataset RAO) of a six-DOF hydro import",
+    )
+    rigid_refs.add_argument("--project", required=True, help="project directory")
+    rigid_refs.add_argument("--output", help="write the references JSON here (default: print to stdout)")
+
     import_derived = sub.add_parser(
         "import-derived-hydro",
         help="import an ANYhydro raw/derived/kernel triple as stored linear inputs",
@@ -421,6 +443,62 @@ def _cmd_import_hydro(args) -> int:
     )
     print(f"stored linear inputs: dt={inputs.dt} n_steps={inputs.n_steps} frames")
     print("run with: anymarine run-linear --project <dir>")
+    return 0
+
+
+def _read_options(path):
+    try:
+        options = json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        print(f"error: cannot read import options {path}: {error}", file=sys.stderr)
+        return None
+    if not isinstance(options, dict):
+        print(f"error: import options {path} must be a JSON object", file=sys.stderr)
+        return None
+    return options
+
+
+def _cmd_import_rigid_hydro(args) -> int:
+    service = ApplicationService()
+    project = service.load(args.project)
+    options = _read_options(args.options)
+    if options is None:
+        return 2
+    project = service.import_rigid_hydro_inputs(project, args.dataset, args.kernel, options)
+    service.save(project)
+    provenance = project.hydro_provenance
+    inputs = project.linear_inputs
+    details = inputs.provenance.details
+    print(f"imported six-DOF ANYhydro inputs into project '{project.name}' ({inputs.layout})")
+    print(f"input_hash={provenance.linear_input_hash}")
+    print(f"dataset content hash: {provenance.dataset_content_hash}")
+    print(f"kernel content hash: {provenance.kernel_content_hash}")
+    print(f"DOFs ({inputs.ndof}): {' '.join(inputs.labels)}")
+    print(f"normalised full-block gate: max impedance error {details['max_impedance_rel_error']:.6g}")
+    print(
+        "source: ANYhydro hydrodynamic dataset (development source, unqualified; "
+        "not a qualified marine analysis)"
+    )
+    print(f"stored linear inputs: dt={inputs.dt} n_steps={inputs.n_steps} frames")
+    print("run with: anymarine run-linear --project <dir>; references: anymarine rigid-references --project <dir>")
+    return 0
+
+
+def _cmd_rigid_references(args) -> int:
+    service = ApplicationService()
+    project = service.load(args.project)
+    references = service.rigid_frequency_references(project)
+    text = json.dumps(references, indent=2, sort_keys=True)
+    if args.output:
+        try:
+            Path(args.output).write_text(text + "\n", encoding="utf-8")
+        except OSError as error:
+            print(f"error: cannot write {args.output}: {error}", file=sys.stderr)
+            return 2
+        print(f"wrote frequency-domain references to {args.output}")
+    else:
+        print(text)
+    print(f"discrete vs continuous (normalised): {references['normalised_max_difference']:.4g}", file=sys.stderr)
     return 0
 
 
@@ -908,6 +986,8 @@ def main(argv: list[str] | None = None) -> int:
         "run-equilibrium": _cmd_run_native,
         "import-hydro": _cmd_import_hydro,
         "import-derived-hydro": _cmd_import_derived_hydro,
+        "import-rigid-hydro": _cmd_import_rigid_hydro,
+        "rigid-references": _cmd_rigid_references,
         "list-results": _cmd_list_results,
         "validate": _cmd_validate,
         "prepare-assessment": _cmd_prepare_assessment,
