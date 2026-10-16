@@ -112,7 +112,7 @@ def test_lid_beyond_the_hull_waterplane_is_refused(tmp_path):
         positions=((-12.0, -6.0, 0.0), (12.0, -6.0, 0.0), (12.0, 6.0, 0.0), (-12.0, 6.0, 0.0)),
         triangles=((0, 2, 1), (0, 3, 2))))
     project = _project((big,))
-    with pytest.raises(HydroLidGeometryError, match="outside the hull waterplane"):
+    with pytest.raises(HydroLidGeometryError, match="outside the (hull )?waterplane"):
         import_rigid_hydro_inputs(project, *_source(tmp_path, project)[:2], _options(project))
 
 
@@ -204,3 +204,57 @@ def test_waterline_of_an_open_wet_hull_cut_at_z0():
     ends = sorted(tuple(point) for point in np.round(segments.reshape(-1, 2), 12).tolist())
     assert ends == sorted([(-1.0, -1.0), (1.0, -1.0), (1.0, -1.0), (1.0, 1.0), (1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0),
                            (-1.0, -1.0)])
+
+
+# ---------------------------------------------------------------------------------------------- review round 2
+
+def test_a_hole_whose_vertices_lie_on_the_lid_edges_is_refused():
+    """Review round 2 exact case: a triangular hole with every vertex on the lid face's boundary."""
+    from anymarine.hydro_rigid import require_lid_inside_waterline
+    region = np.array(_ring([(-1, -1), (11, -1), (11, 11), (-1, 11)]) + _ring([(0, 0), (5, 0), (0, 5)]), float)
+    face = np.array([[0, 0, 0], [0, 10, 0], [10, 0, 0]], float)
+    with pytest.raises(HydroLidGeometryError, match="over a hole"):
+        require_lid_inside_waterline(face, [[0, 1, 2]], region, "hole", 1e-9)
+
+
+def _box(lo, hi, top_on_plane=True):
+    """Closed axis-aligned box mesh (outward normals), 12 triangles."""
+    (x0, y0, z0), (x1, y1, z1) = lo, hi
+    v = np.array([[x0, y0, z0], [x1, y0, z0], [x1, y1, z0], [x0, y1, z0],
+                  [x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]], float)
+    tris = [[0, 2, 1], [0, 3, 2], [4, 5, 6], [4, 6, 7], [0, 1, 5], [0, 5, 4], [1, 2, 6], [1, 6, 5],
+            [2, 3, 7], [2, 7, 6], [3, 0, 4], [3, 4, 7]]
+    return v, np.array(tris)
+
+
+def test_closed_hull_with_its_top_face_on_the_plane_keeps_its_waterline():
+    """Review round 2: wet side walls meet a coplanar top face on z = 0; the top's diagonal is not waterline."""
+    from anymarine.hydro_rigid import _waterline_segments, require_lid_inside_waterline
+    v, tris = _box((-1, -1, -1), (1, 1, 0))
+    segments = _waterline_segments(v, tris, 1e-9)
+    assert segments.shape == (4, 2, 2)
+    lid = np.array([[-1, -1, 0], [1, -1, 0], [1, 1, 0], [-1, 1, 0]], float)
+    require_lid_inside_waterline(lid, [[0, 2, 1], [0, 3, 2]], segments, "box", 1e-9)
+
+
+def test_moonpool_rim_on_the_plane_is_a_waterline_hole():
+    """Review round 2: an inner wall whose wet and dry triangles meet on a ring exactly at z = 0 bounds a hole."""
+    from anymarine.hydro_rigid import _waterline_segments, require_lid_inside_waterline
+    # inner moonpool wall x, y in [-1, 1]: wet part z in [-2, 0], dry part z in [0, 1], rim vertices on z = 0
+    rim = [(-1, -1), (1, -1), (1, 1), (-1, 1)]
+    v = [(x, y, -2.0) for x, y in rim] + [(x, y, 0.0) for x, y in rim] + [(x, y, 1.0) for x, y in rim]
+    tris = []
+    for k in range(4):
+        n = (k + 1) % 4
+        tris += [[k, n, 4 + n], [k, 4 + n, 4 + k], [4 + k, 4 + n, 8 + n], [4 + k, 8 + n, 8 + k]]
+    hull_v = np.array(v, float)
+    inner = _waterline_segments(hull_v, np.array(tris), 1e-9)
+    assert inner.shape == (4, 2, 2)                                   # the rim ring survives (wet/dry edge pairs)
+    outer = np.array(_ring([(-5, -5), (5, -5), (5, 5), (-5, 5)]), float)
+    region = np.concatenate([outer, inner])
+    across = np.array([[-5, -5, 0], [5, -5, 0], [5, 5, 0], [-5, 5, 0]], float)
+    with pytest.raises(HydroLidGeometryError):
+        require_lid_inside_waterline(across, [[0, 2, 1], [0, 3, 2]], region, "moonpool", 1e-9)
+    ring_face = np.array([[-5, -5, 0], [5, -5, 0], [5, -2, 0]], float)
+    require_lid_inside_waterline(ring_face, [[0, 2, 1]], region, "moonpool", 1e-9)
+
