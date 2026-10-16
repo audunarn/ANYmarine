@@ -28,6 +28,7 @@ import datetime as _datetime
 import hashlib
 import json
 import math
+import re
 import tempfile
 from pathlib import Path
 from typing import Mapping
@@ -222,10 +223,10 @@ def _rigid_anyhydro():
     """The installed ANYhydro, refused (typed) when older than MIN_ANYHYDRO_VERSION."""
     anyhydro = _import_anyhydro()
     raw = str(getattr(anyhydro, "__version__", ""))
-    try:
-        version = tuple(int(part) for part in raw.split("+")[0].split(".")[:3])
-    except ValueError:
-        version = ()
+    # final releases only (PEP 440 release segment X.Y.Z, optional +local): pre-, post- and dev releases and
+    # malformed strings are refused rather than guessed (0.2.1.dev0 precedes 0.2.1)
+    match = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)(\+[A-Za-z0-9]+(?:\.[A-Za-z0-9]+)*)?", raw)
+    version = tuple(int(part) for part in match.groups()[:3]) if match else ()
     if len(version) != 3 or version < MIN_ANYHYDRO_VERSION:
         required = ".".join(str(v) for v in MIN_ANYHYDRO_VERSION)
         raise HydroUnavailableError(f"the six-DOF hydro import needs anyhydro >= {required}; the installed anyhydro is "

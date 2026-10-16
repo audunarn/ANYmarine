@@ -462,7 +462,8 @@ def test_skewed_kernel_samples_are_refused(tmp_path):
         import_rigid_hydro_inputs(project, *skewed_source[:2], _options(project))
 
 
-@pytest.mark.parametrize("installed", ["0.2.0", "0.1.9", "", "dev"])
+@pytest.mark.parametrize("installed", ["0.2.0", "0.1.9", "", "dev", "0.2.1.dev0", "0.2.1rc1", "0.2.1.garbage",
+                                       "0.2.1.post1", "0.2"])
 def test_an_older_anyhydro_is_a_typed_refusal(tmp_path, monkeypatch, installed):
     """The six-DOF route needs anyhydro >= 0.2.1; an older installation is refused with a typed error, not an
     ImportError from a missing ANYhydro feature."""
@@ -472,4 +473,11 @@ def test_an_older_anyhydro_is_a_typed_refusal(tmp_path, monkeypatch, installed):
     monkeypatch.setattr(anyhydro, "__version__", installed)
     with pytest.raises(HydroUnavailableError, match="anyhydro >= 0.2.1"):
         import_rigid_hydro_inputs(project, ds_path, k_path, _options(project))
+
+
+@pytest.mark.parametrize("installed", ["0.2.1", "0.2.1+local", "0.2.1+local.7", "0.2.9", "0.3.0"])
+def test_final_anyhydro_releases_at_or_above_the_minimum_are_accepted(monkeypatch, installed):
+    from anymarine.hydro_rigid import _rigid_anyhydro
+    monkeypatch.setattr(anyhydro, "__version__", installed)
+    assert _rigid_anyhydro() is anyhydro
 
