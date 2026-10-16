@@ -528,8 +528,9 @@ def rigid_frequency_references(inputs: LinearDevelopmentInputs, provenance, data
         return _rigid_frequency_references(anyhydro, inputs, provenance, dataset_path)
     except HydroImportError:
         raise
-    except fd.LinearFdError as error:
-        raise HydroAdmissionError(f"the frequency-domain references are not admissible: {error}") from error
+    except (fd.LinearFdError, np.linalg.LinAlgError) as error:
+        raise HydroAdmissionError(f"the frequency-domain references are not admissible (e.g. an undamped mode at "
+                                  f"exact resonance makes the impedance singular): {error}") from error
     except anyhydro.HydroError as error:
         raise HydroAdmissionError(f"the ANYhydro source was refused: {error}") from error
     except OSError as error:
@@ -553,12 +554,15 @@ def _rigid_frequency_references(anyhydro, inputs, provenance, dataset_path) -> d
     amplitude, phase = float(wave["amplitude"]), float(wave["phase"])
     keys = [str(k) for k in dataset["influenced_dof"].values]
     labels = list(inputs.labels)
+    # dataset keys from the run's bindings (body ids may contain ':'; never parsed back out of labels)
+    run_keys = [f"{binding.body_id}::{dof}" for binding in inputs.bindings for dof in binding.dofs]
+    kinds = [dof for binding in inputs.bindings for dof in binding.dofs]
+    if run_keys != list(provenance.dof_keys) or len(run_keys) != len(labels):
+        raise HydroAdmissionError("the run DOFs differ from the hydro provenance DOF keys")
     try:
-        index = [keys.index(label.replace(":", "::", 1)) for label in labels]
+        index = [keys.index(key) for key in run_keys]
     except ValueError as error:
         raise HydroAdmissionError(f"a run DOF is not in the dataset: {error}") from error
-    if [key.replace("::", ":", 1) for key in provenance.dof_keys] != labels:
-        raise HydroAdmissionError("the run DOF labels differ from the hydro provenance DOF keys")
     omegas = np.asarray(dataset["omega"].values, dtype=np.float64)
     headings = np.asarray(dataset["wave_direction"].values, dtype=np.float64)
     o, h = np.flatnonzero(omegas == omega), np.flatnonzero(headings == heading)
@@ -566,7 +570,7 @@ def _rigid_frequency_references(anyhydro, inputs, provenance, dataset_path) -> d
         raise HydroAdmissionError("the provenance wave is not an exact dataset grid value")
     sel = np.ix_(index, index)
     length_scale = _positive(bundle["options"]["length_scale"], "length_scale")
-    S = np.diag([1.0 if label.split(":")[1] in _TRANSLATIONS else 1.0 / length_scale for label in labels])
+    S = np.diag([1.0 if kind in _TRANSLATIONS else 1.0 / length_scale for kind in kinds])
     A_w = fd.symmetrise("A(w)", np.asarray(dataset["added_mass"].values[o[0]], dtype=np.float64)[sel], S)
     B_w = fd.symmetrise("B(w)", np.asarray(dataset["radiation_damping"].values[o[0]], dtype=np.float64)[sel], S)
     F = (amplitude * np.exp(1j * phase)
@@ -577,8 +581,10 @@ def _rigid_frequency_references(anyhydro, inputs, provenance, dataset_path) -> d
     X = fd.continuous_reference(M_dry, A_w.symmetric, B_w.symmetric, C, K, omega, F)
     X_d = fd.discrete_reference(M_dry, np.asarray(inputs.added_mass_infinite, dtype=np.float64), C, K,
                                 np.asarray(inputs.radiation_kernel, dtype=np.float64), float(inputs.dt), omega, F)
-    peak = float(np.max(np.abs(S @ X)))
-    difference = float(np.max(np.abs(S @ (X - X_d)))) / peak if peak > 0 else 0.0
+    # motions in normalised coordinates: q = S q_hat, so q_hat = S^-1 q (rotations times L)
+    S_inv = np.diag(1.0 / np.diag(S))
+    peak = float(np.max(np.abs(S_inv @ X)))
+    difference = float(np.max(np.abs(S_inv @ (X - X_d)))) / peak if peak > 0 else 0.0
 
     def pairs(z):
         return [[float(v.real), float(v.imag)] for v in z]
