@@ -258,3 +258,22 @@ def test_moonpool_rim_on_the_plane_is_a_waterline_hole():
     ring_face = np.array([[-5, -5, 0], [5, -5, 0], [5, -2, 0]], float)
     require_lid_inside_waterline(ring_face, [[0, 2, 1]], region, "moonpool", 1e-9)
 
+
+# ---------------------------------------------------------------------------------------------- review round 3
+
+def test_a_sliver_lid_face_reaching_far_outside_is_refused(tmp_path):
+    """Review round 3 exact case: a 1e-8 m wide face with its centroid inside reaches about 994 m past the hull."""
+    sliver = dataclasses.replace(_body("vessel"), hydro_lid=BodyMesh(
+        positions=((0.0, 0.0, 0.0), (-1000.0, 0.0, 0.0), (1000.0, 1e-8, 0.0)), triangles=((0, 1, 2),)))
+    project = _project((sliver,))
+    with pytest.raises(HydroLidGeometryError, match="sliver|outside"):
+        import_rigid_hydro_inputs(project, *_source(tmp_path, project)[:2], _options(project))
+
+
+def test_vertex_outside_the_waterline_is_refused():
+    from anymarine.hydro_rigid import require_lid_inside_waterline
+    region = np.array(_ring([(0, 0), (4, 0), (4, 4), (0, 4)]), float)
+    face = np.array([[1, 1, 0], [3, 1, 0], [2, 4.5, 0]], float)
+    with pytest.raises(HydroLidGeometryError):
+        require_lid_inside_waterline(face, [[0, 2, 1]], region, "square", 1e-9)
+
