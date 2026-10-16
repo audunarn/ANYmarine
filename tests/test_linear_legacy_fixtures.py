@@ -131,3 +131,46 @@ def test_hydro_imported_projects_load_verify_and_resave_byte_identically(tmp_pat
     assert sorted(p.relative_to(target) for p in target.rglob("*") if p.is_file()) == frozen_files
     for relative in frozen_files:
         assert (target / relative).read_bytes() == (source / relative).read_bytes(), relative
+
+
+@pytest.mark.parametrize("label", ["raw", "derived"])
+def test_legacy_hydro_imports_rerun_bit_identically_from_the_frozen_sources(tmp_path, label):
+    """ADR-015 L6-3 M-e: the six-DOF import work (M-a..M-d) leaves the legacy raw and derived imports unchanged -
+    re-importing the frozen sources with the frozen options reproduces the frozen input hash and provenance."""
+    pytest.importorskip("anyhydro")
+    import test_derived_import as td
+    import test_hydro_bridge as tb
+    from anymarine.persistence import resolve_sidecar
+    from anymarine.services import ApplicationService
+
+    module = tb if label == "raw" else td
+    frozen = _load("hydro_projects.json")[label]
+    stored = FIXTURES / f"{label}_hydro_project"
+    provenance = frozen["provenance"]
+    sources = tmp_path / "sources"
+    sources.mkdir()
+    dataset = sources / "dataset.nc"
+    kernel = sources / "kernel.nc"
+    dataset.write_bytes(resolve_sidecar(stored, provenance["dataset_sidecar"]).read_bytes())
+    kernel.write_bytes(resolve_sidecar(stored, provenance["kernel_sidecar"]).read_bytes())
+    root = tmp_path / "project"
+    service = ApplicationService(root)
+    project = ApplicationService(stored).load(stored)
+    service.save(dataclasses.replace(project, linear_inputs=None, hydro_provenance=None, results=()), root=root)
+    base = dataclasses.replace(project, linear_inputs=None, hydro_provenance=None, results=())
+    if label == "raw":
+        new = service.import_hydro_inputs(base, dataset, kernel, module._base_options())
+    else:
+        operators = sources / "operators.npz"
+        operators.write_bytes(resolve_sidecar(stored, provenance["derived_bundle"]["operators_sidecar"]).read_bytes())
+        new = service.import_derived_hydro_inputs(base, dataset, operators, kernel, module._base_options())
+    assert linear_input_hash(new.linear_inputs) == frozen["input_hash"]
+    volatile = {"dataset_source_path", "kernel_source_path", "created_utc"}
+    got = {k: v for k, v in _canonical(new.hydro_provenance.to_dict()).items() if k not in volatile}
+    want = {k: v for k, v in provenance.items() if k not in volatile}
+    if label == "derived":
+        got["derived_bundle"].pop("operators_source_path")
+        want = dict(want, derived_bundle={k: v for k, v in want["derived_bundle"].items()
+                                          if k != "operators_source_path"})
+    assert "rigid_bundle" not in got
+    assert got == want

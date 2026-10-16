@@ -94,7 +94,8 @@ def _blocks(body):
     return a_inf, C, K, baseline, (xb, yb, zb)
 
 
-def _source(tmp_path, project, *, permutation=None, explicit_b0=None, dataset_lid=False, provenance_g=G, tag="s"):
+def _source(tmp_path, project, *, permutation=None, explicit_b0=None, dataset_lid=False, provenance_g=G, tag="s",
+            contract=True):
     bodies = project.bodies
     n = 6 * len(bodies)
     a_inf, C, K = np.zeros((n, n)), np.zeros((n, n)), np.zeros((n, n))
@@ -142,11 +143,12 @@ def _source(tmp_path, project, *, permutation=None, explicit_b0=None, dataset_li
     provenance = {"source": "analytic box"}
     if provenance_g is not None:
         provenance.update(rho=RHO, gravity=provenance_g)
-    contract = HydrostaticContract(
+    hydrostatic = HydrostaticContract(
         role="BUOYANCY_ONLY", force_basis="PHYSICAL_WRENCH", rate_map="spatial_increments_exp_chart_v1",
         stiffness_derivative="INCREMENTAL_ABOUT_EQUILIBRIUM", bodies=tuple(b.body_id for b in bodies),
         baseline_wrench=baselines, provenance=provenance, full_source=None)
-    ds = attach_hydrostatic_contract(ds, contract)
+    if contract:
+        ds = attach_hydrostatic_contract(ds, hydrostatic)
     low = dict(low_tail_policy="linear_to_zero_extension", extension_name="linear_to_zero")
     if explicit_b0 is not None:
         low = dict(low_tail_policy="explicit_zero_sample", zero_frequency_damping=explicit_b0)
@@ -396,3 +398,12 @@ def test_gate_and_wave_option_failures_are_typed(tmp_path):
         wave[key] = bad
         with pytest.raises(HydroOptionsError, match=key):
             import_rigid_hydro_inputs(project, ds_path, k_path, _options(project, wave=wave))
+
+
+def test_a_source_without_hydrostatic_contract_is_refused(tmp_path):
+    """M-e: no restoring is composed from a dataset whose hydrostatic semantics are undeclared (ADR-004)."""
+    project = _project()
+    ds_path, k_path, _, _ = _source(tmp_path, project, contract=False)
+    with pytest.raises(HydroAdmissionError, match="ANYhydro source was refused|hydrostatic"):
+        import_rigid_hydro_inputs(project, ds_path, k_path, _options(project))
+
