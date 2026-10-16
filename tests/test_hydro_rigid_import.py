@@ -109,7 +109,13 @@ def _source(tmp_path, project, *, permutation=None, explicit_b0=None, dataset_li
         cbs.append(np.asarray(body.reference_position) + np.array(cb))
         mesh = _independent_world_mesh(body)
         lid = None
-        if dataset_lid:
+        if body.hydro_lid is not None:                      # the project's own lid, built independently
+            lid_vertices = np.asarray(body.hydro_lid.positions, float) + np.asarray(body.reference_position, float)
+            lid_faces = np.asarray(body.hydro_lid.triangles, dtype=np.int32)
+            lid = anyhydro.HydroPanelMesh(vertices=lid_vertices, faces=lid_faces,
+                                          face_sizes=np.full(len(lid_faces), 3, np.uint8), body_id=body.body_id,
+                                          outward_normals_verified=False, source_geometry_refs=("lid",), mesh_hash="")
+        elif dataset_lid:
             lid_vertices = np.array([[-6, -3, 0], [6, -3, 0], [6, 3, 0], [-6, 3, 0]], float)
             lid_vertices += np.asarray(body.reference_position, float)
             lid = anyhydro.HydroPanelMesh(vertices=lid_vertices, faces=np.array([[0, 1, 2, 3]]),

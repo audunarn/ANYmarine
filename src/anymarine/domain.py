@@ -1191,9 +1191,10 @@ class HydroBridgeProvenance:
                 None if item is None else _hash_digest(item, "hydro lid mesh hash")
                 for item in self.lid_mesh_hashes
             )
-            if len(lid_hashes) != 2:
+            if len(lid_hashes) != len(body_ids) or (rigid and all(item is None for item in lid_hashes)):
                 raise ValueError(
-                    "hydro provenance lid_mesh_hashes must contain exactly 2 entries"
+                    f"hydro provenance lid_mesh_hashes must contain exactly {len(body_ids)} entries"
+                    + (" and at least one lid (omitted when lidless)" if rigid else "")
                 )
             object.__setattr__(self, "lid_mesh_hashes", lid_hashes)
         if self.derived_bundle is not None:
@@ -1254,9 +1255,9 @@ class HydroBridgeProvenance:
                                  f"{LINEAR_LAYOUT_RIGID!r}")
             if not isinstance(bundle["format"], str) or not isinstance(bundle["options"], Mapping):
                 raise ValueError("hydro rigid bundle format must be a string and options a JSON object")
-            if (self.surge_link_stiffness != 0.0 or self.lid_mesh_hashes is not None
-                    or self.derived_bundle is not None or self.auxiliary_lid_policy is not None):
-                raise ValueError("a rigid hydro provenance carries no surge link, lid, auxiliary lid or derived route")
+            if (self.surge_link_stiffness != 0.0 or self.derived_bundle is not None
+                    or self.auxiliary_lid_policy is not None):
+                raise ValueError("a rigid hydro provenance carries no surge link, auxiliary lid or derived route")
             object.__setattr__(self, "rigid_bundle", bundle)
 
     def to_dict(self) -> dict:

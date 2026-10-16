@@ -39,8 +39,8 @@ from . import linear_fd as fd
 from .domain import (HYDRO_ROUTE_RIGID, LINEAR_LAYOUT_RIGID, LINEAR_SOURCE_HYDRO, RIGID_DOFS, ExternalMatrixRecord,
                      LinearDevelopmentInputs, LinearExecutionLimits, LinearProvenance, ProjectModel)
 from .hashing import equilibrium_hash
-from .hydro import (HydroAdmissionError, HydroGeometryError, HydroImportError, HydroOptionsError, HydroUnavailableError,
-                    _import_anyhydro,
+from .hydro import (_LID_DEGENERATE_TOLERANCE, _LID_PLANE_TOLERANCE, HydroAdmissionError, HydroGeometryError,
+                    HydroImportError, HydroLidGeometryError, HydroOptionsError, HydroUnavailableError, _import_anyhydro,
                     _read_raw_source, _require_global_source_axes, _sha256_file)
 from .linear import linear_input_hash, rigid_binding, rigid_dry_mass
 
@@ -145,6 +145,33 @@ def _world_mesh(anyhydro, body):
                                    source_geometry_refs=("anymarine-body-mesh+reference-pose",), mesh_hash="")
 
 
+def _world_lid(anyhydro, body):
+    """Expected world-space numerical lid at the reference pose (ADR-015 L6-4a): R0 x_lid + r0, every vertex on the
+    equilibrium waterplane z = 0, nondegenerate faces with DOWN normals (the backend lid convention). The geometry is
+    proven, never re-fitted or flipped. Only the free-surface lid policy is admitted for rigid imports."""
+    if body.hydro_lid_policy != "free_surface_v1":
+        raise HydroLidGeometryError(f"body {body.body_id!r}: the auxiliary lid policy {body.hydro_lid_policy!r} is not "
+                                    "admitted by the rigid import")
+    R0 = np.asarray(body.reference_orientation, dtype=np.float64)
+    vertices = np.asarray(body.hydro_lid.positions, dtype=np.float64) @ R0.T + np.asarray(body.reference_position)
+    triangles = np.asarray(body.hydro_lid.triangles, dtype=np.int32)
+    off_plane = np.flatnonzero(np.abs(vertices[:, 2]) > _LID_PLANE_TOLERANCE)
+    if off_plane.size:
+        raise HydroLidGeometryError(f"numerical lid vertex {int(off_plane[0])} of body {body.body_id!r} lies at world z="
+                                    f"{float(vertices[off_plane[0], 2])!r}, off the equilibrium waterplane z = 0")
+    for index, (i, j, k) in enumerate(triangles.tolist()):
+        normal = np.cross(vertices[j] - vertices[i], vertices[k] - vertices[i])
+        if float(np.linalg.norm(normal)) <= _LID_DEGENERATE_TOLERANCE:
+            raise HydroLidGeometryError(f"numerical lid face {index} of body {body.body_id!r} is degenerate")
+        if not float(normal[2]) < 0.0:
+            raise HydroLidGeometryError(f"numerical lid face {index} of body {body.body_id!r} does not point DOWN (the "
+                                        "backend lid convention); lids are never flipped")
+    return anyhydro.HydroPanelMesh(vertices=vertices, faces=triangles,
+                                   face_sizes=np.full(triangles.shape[0], 3, dtype=np.uint8), body_id=body.body_id,
+                                   outward_normals_verified=False,
+                                   source_geometry_refs=("anymarine-body-lid+reference-pose",), mesh_hash="")
+
+
 def _json_attr(dataset, name):
     value = dataset.attrs.get(name)
     return json.loads(value) if isinstance(value, str) else (dict(value) if value is not None else None)
@@ -164,9 +191,17 @@ def _prove_geometry(anyhydro, project, dataset):
         if entry["mesh_hash"] != _world_mesh(anyhydro, body).mesh_hash:
             raise HydroGeometryError(f"dataset mesh of {body.body_id!r} is not the project's world-space hull at the "
                                      "reference pose")
-        if body.hydro_lid is not None or entry.get("lid_mesh_hash") is not None:
-            raise HydroGeometryError("numerical lids are not admitted by the rigid import yet (neither on the project "
-                                     "nor on the dataset side)")
+        declared = entry.get("lid_mesh_hash")
+        if body.hydro_lid is None:
+            if declared is not None:
+                raise HydroGeometryError(f"the dataset carries a numerical lid for {body.body_id!r} but the project body "
+                                         "has none (lid on one side only)")
+        elif declared is None:
+            raise HydroGeometryError(f"the project body {body.body_id!r} has a numerical lid but the dataset was solved "
+                                     "without one (lid on one side only)")
+        elif declared != _world_lid(anyhydro, body).mesh_hash:
+            raise HydroGeometryError(f"dataset lid of {body.body_id!r} is not the project's world-space lid at the "
+                                     "reference pose")
     _require_global_source_axes(anyhydro, dataset)
 
 
@@ -503,6 +538,8 @@ def _import_rigid(anyhydro, project: ProjectModel, dataset_path, kernel_path, op
         "body_ids": [body.body_id for body in bodies],
         "dof_keys": [f"{b.body_id}::{d}" for b in bindings for d in b.dofs],
         "mesh_hashes": [_world_mesh(anyhydro, body).mesh_hash for body in bodies],
+        **({"lid_mesh_hashes": [None if body.hydro_lid is None else _world_lid(anyhydro, body).mesh_hash
+                                for body in bodies]} if any(body.hydro_lid is not None for body in bodies) else {}),
         "a_inf_source": str(dataset["added_mass_infinite"].attrs["source"]),
         "phasor_convention": str(dataset.attrs["phasor_convention"]),
         "source_qualification_status": str(dataset.attrs["qualification_status"]),
