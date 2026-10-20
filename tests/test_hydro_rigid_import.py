@@ -101,7 +101,8 @@ def _blocks(body):
 
 
 def _source(tmp_path, project, *, permutation=None, explicit_b0=None, dataset_lid=False, provenance_g=G, tag="s",
-            contract=True, stiffness_skew=0.0, a_inf_skew=0.0, damping_skew=0.0, symmetry_tol=1e-6, extend=None):
+            contract=True, stiffness_skew=0.0, a_inf_skew=0.0, damping_skew=0.0, symmetry_tol=1e-6, extend=None,
+            damping_noise=0.0, passivity_tol=1e-6):
     bodies = project.bodies
     n = 6 * len(bodies)
     a_inf, C, K = np.zeros((n, n)), np.zeros((n, n)), np.zeros((n, n))
@@ -136,6 +137,14 @@ def _source(tmp_path, project, *, permutation=None, explicit_b0=None, dataset_li
     added = np.array([a_inf - C / (LAM ** 2 + w ** 2) for w in OMEGAS])
     damping = np.array([C * LAM / (LAM ** 2 + w ** 2) + damping_skew * skew_unit * LAM / (LAM ** 2 + w ** 2)
                         for w in OMEGAS])
+    if damping_noise:                   # F2b: the first sample's smallest eigenvalue becomes -damping_noise x its norm,
+        S = np.diag([1.0 if k % 6 < 3 else 1.0 / 12.0 for k in range(n)])  # in the import's normalised axes (L = 12)
+        Bn = S @ damping[0] @ S
+        lam, vec = np.linalg.eigh(Bn)
+        v = vec[:, :1]
+        Bn = Bn - (lam[0] + damping_noise * np.linalg.norm(Bn, 2)) * (v @ v.T)
+        Si = np.linalg.inv(S)
+        damping[0] = Si @ (0.5 * (Bn + Bn.T)) @ Si
     excitation = np.array([[[2e5 * (1 + 0.1 * i) * np.exp(1j * (0.2 * i + 0.05 * o)) for i in range(n)]]
                            for o, _ in enumerate(OMEGAS)])
     hydro_bodies = tuple(anyhydro.HydroBody(body_id=b.body_id, name=b.name, mesh=mesh, lid_mesh=lid,
@@ -173,7 +182,7 @@ def _source(tmp_path, project, *, permutation=None, explicit_b0=None, dataset_li
     low = dict(low_tail_policy="linear_to_zero_extension", extension_name="linear_to_zero")
     if explicit_b0 is not None:
         low = dict(low_tail_policy="explicit_zero_sample", zero_frequency_damping=explicit_b0)
-    settings = anyhydro.RadiationSettings(dt=DT, n_time=N_TIME, symmetry_tol=symmetry_tol, passivity_tol=1e-6, time_window=H,
+    settings = anyhydro.RadiationSettings(dt=DT, n_time=N_TIME, symmetry_tol=symmetry_tol, passivity_tol=passivity_tol, time_window=H,
                                           time_window_shape="bartlett", quadrature_method="piecewise_linear_exact",
                                           execution_limits=anyhydro.RadiationExecutionLimits(max_time_samples=N_TIME),
                                           **low)

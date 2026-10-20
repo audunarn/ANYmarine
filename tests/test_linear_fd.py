@@ -139,19 +139,23 @@ def test_damping_noise_floor_admits_near_zero_samples_only_down_to_the_declared_
     sample of the set, not its own norm; it is recorded; a non-passive part above the fraction is still refused."""
     I = np.eye(2)
     assert fd.structural_admission(I, I, I, 0 * I, [I, 0 * I, 2 * I], I) == {}          # clean: nothing recorded
-    near_zero = np.diag([1e-6, -1e-12])          # -1e-12 of the scale 2: far below its own round-off floor
-    record = fd.structural_admission(I, I, I, 0 * I, [2 * I, near_zero], I)
-    assert record["fraction"] == fd.DAMPING_NOISE_FRACTION and record["scale"] == pytest.approx(2.0)
-    assert [r[0] for r in record["samples"]] == [1] and record["samples"][0][1] == pytest.approx(-0.5e-12)
-    with pytest.raises(fd.LinearFdError, match="B sample 1"):                          # -1e-6 x scale: refused
-        fd.structural_admission(I, I, I, 0 * I, [2 * I, np.diag([1e-6, -2e-6])], I)
-    with pytest.raises(fd.LinearFdError, match="B sample 0"):                          # alone: no larger sample
-        fd.structural_admission(I, I, I, 0 * I, [near_zero], I)
+    noisy = np.diag([1e-6, -1e-16])              # -1e-10 of its own norm: below 64 eps, above the 1e-8 floor
+    record = fd.structural_admission(I, I, I, 0 * I, [2 * I, noisy], I)
+    assert record["fraction"] == fd.DAMPING_NOISE_FRACTION and record["basis"] == "own_sample_norm_normalised"
+    index, ratio, own = record["samples"][0]
+    assert index == 1 and ratio == pytest.approx(-1e-10) and own == pytest.approx(1e-6)
+    with pytest.raises(fd.LinearFdError, match="B sample 1"):                          # -1e-7 of its own norm
+        fd.structural_admission(I, I, I, 0 * I, [2 * I, np.diag([1e-6, -1e-13])], I)
+    with pytest.raises(fd.LinearFdError, match="B sample 1"):                          # review round 1: a huge sample
+        fd.structural_admission(I, I, I, 0 * I, [np.diag([1e12, 0.0]), np.diag([1e6, -1e3])], I)   # masks nothing
     with pytest.raises(fd.LinearFdError, match="C is not"):                            # C keeps its own floor
         fd.structural_admission(I, I, I, np.diag([1.0, -1e-12]), [2 * I], I)
-    S = np.diag([1.0, 0.1])                                                             # judged in normalised axes
-    record = fd.structural_admission(I, I, I, 0 * I, [np.diag([1.0, 100.0]), np.diag([1e-6, -1e-10])], S)
-    assert record["samples"][0][1] == pytest.approx(-1e-12)
+    S = np.diag([1.0, 0.1])                       # normalised axes: own norm 1 (raw 100), ratio -1e-10 admitted
+    record = fd.structural_admission(I, I, I, 0 * I, [np.diag([1.0, 100.0]), np.diag([1.0, -1e-8])], S)
+    index, ratio, own = record["samples"][0]
+    assert index == 1 and own == pytest.approx(1.0) and ratio == pytest.approx(-1e-10)
+    with pytest.raises(fd.LinearFdError, match="B sample 0"):                          # -1e-8 of the normalised 1:
+        fd.structural_admission(I, I, I, 0 * I, [np.diag([1.0, -1e-4])], S)            # -1e-6 of own norm, refused
 
 
 # ---------------------------------------------------------------------------------------------- A3 fitting/settling

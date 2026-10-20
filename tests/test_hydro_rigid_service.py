@@ -82,6 +82,31 @@ def test_multi_body_project_with_unsorted_ids_reopens(tmp_path):
     assert linear_input_hash(reopened.linear_inputs) == imported.hydro_provenance.linear_input_hash
 
 
+def test_noise_admitted_import_records_and_reverifies(tmp_path):
+    """F2b review round 1: an import whose near-zero damping sample needs the BEM noise floor records it in the
+    details; the project saves, reopens and re-verifies; a non-passive part above the floor is refused."""
+    from anymarine.hydro import HydroAdmissionError
+    from anymarine.linear_fd import DAMPING_NOISE_FRACTION
+    source_dir, root = tmp_path / "source", tmp_path / "project"
+    source_dir.mkdir()
+    project = _project((_body("vessel", cb_offset=(1.0, -0.5)),))
+    ds_path, k_path, _, _ = _source(source_dir, project, damping_noise=1e-10, passivity_tol=1e3)
+    service = ApplicationService(root)
+    service.save(project, root=root)
+    imported = service.import_rigid_hydro_inputs(project, ds_path, k_path, _options(project, n_steps=401))
+    record = dict(imported.linear_inputs.provenance.details)["damping_noise_admitted"]
+    assert record["fraction"] == DAMPING_NOISE_FRACTION and [s[0] for s in record["samples"]] == [0]
+    assert record["samples"][0][1] == pytest.approx(-1e-10, rel=1e-3)
+    service.save(imported)
+    reopened = ApplicationService(root).load(root)
+    assert linear_input_hash(reopened.linear_inputs) == imported.hydro_provenance.linear_input_hash
+    bad_dir = tmp_path / "bad"
+    bad_dir.mkdir()
+    bad_ds, bad_k, _, _ = _source(bad_dir, project, damping_noise=1e-6, passivity_tol=1e6)
+    with pytest.raises((HydroAdmissionError, ServiceError), match="B sample 0"):
+        service.import_rigid_hydro_inputs(project, bad_ds, bad_k, _options(project, n_steps=401))
+
+
 def test_save_as_copies_the_sources_and_reopens_without_the_originals(tmp_path):
     import shutil
     service, root, project, sources = _imported(tmp_path)

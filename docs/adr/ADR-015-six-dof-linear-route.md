@@ -147,12 +147,13 @@ folder); `L6-0-inventory.md` is the raw search behind it.
   (iv) passivity of the stored memory by construction: (a) every dataset damping sample B_s(w_i) positive
        semi-definite (eigenvalues >= -64 eps ||B||), including any supplied zero-frequency matrix B(0) (ANYhydro's
        explicit_zero_sample accepts a supplied matrix, not necessarily zero) and every generated tail endpoint;
-       amendment 2026-10-20 (owner, slice F2b): a near-zero sample whose smallest eigenvalue lies below that
-       round-off floor is admitted down to -eta_B x max_i ||B_s(w_i)|| (normalised, eta_B = 1e-8), the BEM noise of
-       near-zero damping at the ends of the band (measured on the B3y barge U0: -3e-13 retained, -1e-10 full 6x6);
-       every sample so admitted is recorded in the import details (damping_noise_admitted); below the floor the
-       system is refused. Argument (stated, not proved): a negative part bounded by eta_B of the largest damping is
-       negligible against the positive damping the same mode receives over the band; (b) the kernel is produced by ANYhydro with
+       amendment 2026-10-20 (owner, slice F2b, per-sample basis after review round 1): a sample whose smallest
+       eigenvalue lies below that round-off floor is admitted down to -eta_B x ||B_s(w_i)|| of the SAME sample
+       (normalised, eta_B = 1e-8): BEM noise of near-zero damping (measured on the B3y barge U0, smallest eigenvalue /
+       own norm: -7.4e-12 retained surge/heave/pitch, -1.2e-9 full 6x6); every sample so admitted is recorded in the
+       import details (damping_noise_admitted); below the floor the system is refused. Assurance is qualified for
+       admitted samples: they are positive semi-definite only up to a negative part of at most eta_B of their own
+       norm, and the interpolation argument in (b) holds up to that bound; (b) the kernel is produced by ANYhydro with
        quadrature_method = piecewise_linear_exact (a componentwise-linear interpolant of positive semi-definite
        samples is positive semi-definite at every w), low tail linear_to_zero_extension or explicit zero, high tail
        truncate (a power-law tail is refused unless it is a positive scalar multiple of a positive semi-definite
