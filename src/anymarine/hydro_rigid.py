@@ -598,7 +598,7 @@ def _import_rigid(anyhydro, project: ProjectModel, dataset_path, kernel_path, op
     B = 0.5 * (B + np.transpose(B, (0, 2, 1)))
     M_dry = rigid_dry_mass(bindings)
     try:
-        fd.structural_admission(M_dry, A_s.symmetric, K_total, C_ext, B, S)
+        damping_noise = fd.structural_admission(M_dry, A_s.symmetric, K_total, C_ext, B, S)
     except fd.LinearFdError as error:
         raise HydroAdmissionError(f"structural admission failed (ADR-015 section 8): {error}") from error
 
@@ -642,6 +642,8 @@ def _import_rigid(anyhydro, project: ProjectModel, dataset_path, kernel_path, op
         "hydrostatic_contract": contract.to_json(), "gravity": g, "kernel_settings": kernel.settings.to_dict(),
         "wave": wave_selection,
         **({"irregular_wave": irregular_selection} if irregular_selection is not None else {}),
+        # only when the BEM noise floor admitted a near-zero damping sample (ADR-015 section 8 (iv)(a))
+        **({"damping_noise_admitted": damping_noise} if damping_noise else {}),
     }
     limits = opt.get("execution_limits")
     try:

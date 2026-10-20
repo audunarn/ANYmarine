@@ -223,6 +223,7 @@ def test_six_dof_import_on_the_reference_axis(tmp_path):
     assert details["equilibrium_residuals"]["vessel"]["force"] <= 1e-9 * W
     assert details["skew_ratios"]["kernel_max"] <= 1e-12
     assert json.loads(json.dumps(details))["format"] == "anymarine-rigid-hydro-import-v1"
+    assert "damping_noise_admitted" not in details          # F2b: a clean source records nothing (identical details)
     assert np.any(np.asarray(inputs.forces))
 
 

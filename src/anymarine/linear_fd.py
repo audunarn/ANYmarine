@@ -23,6 +23,9 @@ import numpy as np
 EPS = float(np.finfo(float).eps)
 SKEW_BOUND = 1.0e-2
 PSD_ROUNDOFF = 64.0
+#: ADR-015 section 8 (iv)(a), owner decision 2026-10-20: BEM noise in near-zero damping samples is admitted down to
+#: -DAMPING_NOISE_FRACTION x the largest damping sample norm of the set (normalised); below it a sample is refused
+DAMPING_NOISE_FRACTION = 1.0e-8
 
 
 class LinearFdError(ValueError):
@@ -136,7 +139,9 @@ def symmetrise(name: str, matrix, scale) -> Symmetrised:
     return Symmetrised(symmetric=0.5 * (X + X.T), skew_ratio=ratio)
 
 
-def _is_psd(name, matrix, scale, *, strict=False):
+def _is_psd(name, matrix, scale, *, strict=False, noise_floor=0.0):
+    """Raise unless PD (strict) or PSD up to round-off; returns the smallest eigenvalue when the round-off floor alone
+    would refuse but the declared noise floor (<= 0, normalised) admits it, else None."""
     Xn = scale.T @ matrix @ scale
     Xn = 0.5 * (Xn + Xn.T)
     if strict:
@@ -147,20 +152,34 @@ def _is_psd(name, matrix, scale, *, strict=False):
         return
     eig = np.linalg.eigvalsh(Xn)
     floor = -PSD_ROUNDOFF * EPS * max(float(np.linalg.norm(Xn, 2)), 1e-300)
-    if eig.min() < floor:
+    if eig.min() >= floor:
+        return None
+    if eig.min() < min(floor, noise_floor):
         raise LinearFdError(f"{name} is not positive semi-definite (smallest eigenvalue {eig.min():.3e})")
+    return float(eig.min())
 
 
-def structural_admission(mass_dry, added_mass_infinite, stiffness_total, damping, damping_samples, scale) -> None:
+def structural_admission(mass_dry, added_mass_infinite, stiffness_total, damping, damping_samples, scale) -> dict:
     """ADR-015 section 8 structural admission on symmetrised operators (normalised): (i) M_eff PD, (ii) K_total PD,
-    (iii) C PSD, (iv)(a) every damping sample B(w_i) PSD. Raises LinearFdError on the first failure."""
+    (iii) C PSD, (iv)(a) every damping sample B(w_i) PSD up to round-off or, for near-zero samples, the declared BEM
+    noise floor -DAMPING_NOISE_FRACTION x max_i ||B^(w_i)||. Raises LinearFdError on the first failure.
+
+    Returns the samples the noise floor admitted (empty when the round-off rule alone suffices): {"fraction",
+    "scale", "samples": [[index, smallest eigenvalue / scale], ...]}, all normalised."""
     S = np.asarray(scale, dtype=float)
     _is_psd("M_eff = M_dry + A_inf", _square("mass_dry", mass_dry) + _square("A_inf", added_mass_infinite), S,
             strict=True)
     _is_psd("K_total", _square("stiffness_total", stiffness_total), S, strict=True)
     _is_psd("C", _square("damping", damping), S)
-    for index, sample in enumerate(np.asarray(damping_samples, dtype=float)):
-        _is_psd(f"B sample {index}", sample, S)
+    samples = np.asarray(damping_samples, dtype=float)
+    norms = [float(np.linalg.norm(0.5 * (S.T @ b @ S + (S.T @ b @ S).T), 2)) for b in samples]
+    scale_max = max(norms, default=0.0)
+    admitted = []
+    for index, sample in enumerate(samples):
+        smallest = _is_psd(f"B sample {index}", sample, S, noise_floor=-DAMPING_NOISE_FRACTION * scale_max)
+        if smallest is not None:
+            admitted.append([index, smallest / scale_max])
+    return {"fraction": DAMPING_NOISE_FRACTION, "scale": scale_max, "samples": admitted} if admitted else {}
 
 
 # ---------------------------------------------------------------------------------------------- fitting
