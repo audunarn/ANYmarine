@@ -135,8 +135,8 @@ def test_structural_admission_refusals():
 
 
 def test_damping_noise_floor_admits_near_zero_samples_only_down_to_the_declared_fraction():
-    """F2b (ADR-015 section 8 (iv)(a) amendment): a near-zero sample's BEM noise is judged against the largest
-    sample of the set, not its own norm; it is recorded; a non-passive part above the fraction is still refused."""
+    """F2b (ADR-015 section 8 (iv)(a) amendment): a sample's BEM noise is judged against its OWN normalised
+    norm (owner, review round 1); it is recorded; a non-passive part above the fraction is still refused."""
     I = np.eye(2)
     assert fd.structural_admission(I, I, I, 0 * I, [I, 0 * I, 2 * I], I) == {}          # clean: nothing recorded
     noisy = np.diag([1e-6, -1e-16])              # -1e-10 of its own norm: below 64 eps, above the 1e-8 floor
