@@ -287,3 +287,67 @@ def test_collect_allow_empty_accepts_only_pytest_no_tests_status(monkeypatch):
     monkeypatch.setattr(dev_checks.subprocess, "run", lambda *a, **k: Broken())
     with pytest.raises(SystemExit):
         dev_checks.collect("slow", allow_empty=True)
+
+
+# --- fix round 2: marker ownership, empty fast tier, cleanup errors ------------------------------------------------
+_HEADER = "anymarine tools/dev_checks.py workdir token\n"
+
+
+def _foreign_with_marker(tmp_path, content):
+    d = tmp_path / "foreign"
+    d.mkdir()
+    (d / "precious.txt").write_text("x", encoding="utf-8")
+    if content is not None:
+        (d / dev_checks.WORKDIR_MARKER).write_text(content, encoding="utf-8")
+    return d
+
+
+@pytest.mark.parametrize("content", ["", "created by tools/dev_checks.py", _HEADER + "nothex\n"])
+def test_workdir_refuses_a_foreign_dir_with_a_marker_named_file_of_wrong_content(tmp_path, content):
+    d = _foreign_with_marker(tmp_path, content)
+    with pytest.raises(SystemExit):
+        dev_checks.prepare_workdir(d)
+    assert (d / "precious.txt").exists()
+
+
+def test_workdir_refuses_a_symlink_marker(tmp_path):
+    d = _foreign_with_marker(tmp_path, None)
+    good = tmp_path / "good"
+    good.write_text(_HEADER + "0" * 32 + "\n", encoding="utf-8")
+    try:
+        (d / dev_checks.WORKDIR_MARKER).symlink_to(good)
+    except (OSError, NotImplementedError):
+        pytest.skip("cannot create a symlink here")
+    with pytest.raises(SystemExit):
+        dev_checks.prepare_workdir(d)
+    assert (d / "precious.txt").exists()
+
+
+def test_workdir_marker_is_a_random_token_per_directory(tmp_path):
+    dev_checks.prepare_workdir(tmp_path / "a")
+    dev_checks.prepare_workdir(tmp_path / "b")
+    ta = (tmp_path / "a" / dev_checks.WORKDIR_MARKER).read_text(encoding="utf-8")
+    tb = (tmp_path / "b" / dev_checks.WORKDIR_MARKER).read_text(encoding="utf-8")
+    assert ta != tb and ta.startswith(_HEADER)
+
+
+def test_workdir_cleanup_error_is_reported_and_dir_not_reused(monkeypatch, tmp_path):
+    work = tmp_path / "w"
+    dev_checks.prepare_workdir(work)
+    (work / "stale.xml").write_text("old", encoding="utf-8")
+    def boom(path, *a, **k):
+        if k.get("ignore_errors"):
+            return                      # old behaviour: error swallowed, directory left in place
+        raise PermissionError("locked")
+    monkeypatch.setattr(dev_checks.shutil, "rmtree", boom)
+    with pytest.raises(SystemExit) as exc:
+        dev_checks.prepare_workdir(work)
+    assert "cannot clean" in str(exc.value)
+    assert (work / "stale.xml").exists()
+
+
+def test_verify_rejects_an_empty_fast_tier(monkeypatch):
+    ids = ["tests/a.py::t1"]
+    _fake_collect(monkeypatch, {None: ids, "slow": ids, "not slow": []})
+    with pytest.raises(SystemExit):
+        dev_checks.verify()

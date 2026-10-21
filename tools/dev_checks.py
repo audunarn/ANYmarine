@@ -19,6 +19,9 @@ import argparse
 import json
 import math
 import os
+import re
+import secrets
+import stat
 import shutil
 import subprocess
 import sys
@@ -117,10 +120,25 @@ def make_jobs(ids: list[str], table: dict, jobs: int) -> list[dict]:
 
 
 WORKDIR_MARKER = ".anymarine-dev-checks-workdir"
+MARKER_HEADER = "anymarine tools/dev_checks.py workdir token\n"
 
 
 def _is_link(path: Path) -> bool:
     return path.is_symlink() or bool(getattr(os.path, "isjunction", lambda p: False)(path))
+
+
+def _marker_ok(path: Path) -> bool:
+    """The marker is a regular file (not a link) holding the fixed header and a 32-hex-digit token written at creation."""
+    marker = path / WORKDIR_MARKER
+    try:
+        info = os.lstat(marker)
+        if not stat.S_ISREG(info.st_mode) or info.st_size > 256:
+            return False
+        text = marker.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return False
+    token = text[len(MARKER_HEADER):].strip()
+    return text.startswith(MARKER_HEADER) and re.fullmatch(r"[0-9a-f]{32}", token) is not None
 
 
 def prepare_workdir(path: Path) -> Path:
@@ -138,11 +156,16 @@ def prepare_workdir(path: Path) -> Path:
         if not path.is_dir():
             sys.exit(f"refusing --workdir {path}: not a directory")
         if any(path.iterdir()):
-            if not (path / WORKDIR_MARKER).is_file():
-                sys.exit(f"refusing --workdir {path}: not empty and not created by this runner (no {WORKDIR_MARKER})")
-            shutil.rmtree(path, ignore_errors=True)
+            if not _marker_ok(path):
+                sys.exit(f"refusing --workdir {path}: not empty and not created by this runner (no valid {WORKDIR_MARKER})")
+            try:
+                shutil.rmtree(path)
+            except OSError as exc:
+                sys.exit(f"cannot clean --workdir {path}: {exc}; remove it by hand")
+            if path.exists():
+                sys.exit(f"cannot clean --workdir {path}: it still exists after deletion; remove it by hand")
     (path / "tmp").mkdir(parents=True, exist_ok=True)
-    (path / WORKDIR_MARKER).write_text("created by tools/dev_checks.py", encoding="utf-8")
+    (path / WORKDIR_MARKER).write_text(MARKER_HEADER + secrets.token_hex(16) + "\n", encoding="utf-8")
     return path
 
 
@@ -261,7 +284,8 @@ def shard_of(ids: list[str], table: dict, spec: str) -> list[str]:
 
 def verify() -> int:
     full = set(collect(None))
-    slow, fast = (set(collect(m, allow_empty=True)) for m in ("slow", "not slow"))   # an empty tier can be a valid partition
+    slow = set(collect("slow", allow_empty=True))   # only an empty slow tier can be a valid partition
+    fast = set(collect("not slow"))
     table = ci_tiers.load_table()
     expected_slow = {node for node in full if ci_tiers.is_slow(table, node)}
     problems = []

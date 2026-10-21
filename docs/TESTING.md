@@ -20,6 +20,7 @@ py -3.14 tools/dev_checks.py --tier full     # every test; about 6 min here (one
   (needs a clean run, or `--expect-failures FILE` naming the ids that fail on this machine; a test outside
   that list that fails still fails the run).
 - Options: `--jobs N`, `--shard k/N`, `--timeout S`, `--keep`, `--workdir DIR`, `--write-failures FILE`.
+- Limit: `--workdir` deletion checks path and marker but is not race-free against a concurrent writer of the same path.
 - The ANYmarine GitHub CI runs six headless files (`.github/workflows/ci.yml`, under a minute); this tooling is
   for the local full suite.
 - Known limit: a timeout kills the job's whole process tree. On Windows a process that a finished job left running
