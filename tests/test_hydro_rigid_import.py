@@ -102,7 +102,7 @@ def _blocks(body):
 
 def _source(tmp_path, project, *, permutation=None, explicit_b0=None, dataset_lid=False, provenance_g=G, tag="s",
             contract=True, stiffness_skew=0.0, a_inf_skew=0.0, damping_skew=0.0, symmetry_tol=1e-6, extend=None,
-            damping_noise=0.0, passivity_tol=1e-6):
+            damping_noise=0.0, passivity_tol=1e-6, kernel_options=None):
     bodies = project.bodies
     n = 6 * len(bodies)
     a_inf, C, K = np.zeros((n, n)), np.zeros((n, n)), np.zeros((n, n))
@@ -185,7 +185,7 @@ def _source(tmp_path, project, *, permutation=None, explicit_b0=None, dataset_li
     settings = anyhydro.RadiationSettings(dt=DT, n_time=N_TIME, symmetry_tol=symmetry_tol, passivity_tol=passivity_tol, time_window=H,
                                           time_window_shape="bartlett", quadrature_method="piecewise_linear_exact",
                                           execution_limits=anyhydro.RadiationExecutionLimits(max_time_samples=N_TIME),
-                                          **low)
+                                          **low, **(kernel_options or {}))
     kernel = anyhydro.radiation_kernel_from_dataset(ds, settings)
     dataset_path, kernel_path = tmp_path / f"{tag}-ds.nc", tmp_path / f"{tag}-kernel.nc"
     anyhydro.save_hydro_dataset(ds, dataset_path)
