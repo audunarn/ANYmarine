@@ -137,6 +137,8 @@ folder); `L6-0-inventory.md` is the raw search behind it.
   (-W c_z I + (W/2)(c e_z^T + e_z c^T)). The effect of the dropped skew parts is quantified in the frequency domain:
   dataset RAOs with and without the skew parts are both computed and their per-channel difference is reported as a
   stated modelling approximation; validation (reference b) is judged against the symmetrised model.
+  The producer may pre-symmetrise a kernel with the removed skew recorded and hashed; the importer bound still
+  applies per sample to what it receives.
 - Stability: structural admission (owner decision 2026-10-15) on the symmetrised operators, in normalised
   coordinates, before any judged run; any failure FAILS every stable-response case of that system:
   (i) M_eff = M_dry + A_inf_s positive definite (Cholesky succeeds; the solver already requires this);
