@@ -147,3 +147,143 @@ def test_a_child_holding_the_output_pipe_does_not_hold_up_a_finished_job(tmp_pat
     status, out = dev_checks.run_with_timeout([sys.executable, "-c", code], cwd=tmp_path,
                                               env=dict(__import__("os").environ), timeout=20)
     assert status == 0 and "done" in out and time.time() - started < 15   # Windows: the leftover child is not killed (known limit)
+
+
+# --- fix round: workdir safety, process-group kill, guard input, empty slow tier ----------------------------------
+import os  # noqa: E402
+
+
+def _run_main_with_workdir(monkeypatch, workdir):
+    monkeypatch.setattr(dev_checks, "collect", lambda marker, **kw: ["tests/test_a.py::test_only"])
+    calls = []
+    monkeypatch.setattr(dev_checks.shutil, "rmtree", lambda *a, **k: calls.append(a[0]))
+    with pytest.raises(SystemExit):
+        dev_checks.main(["--tier", "full", "--workdir", str(workdir)])
+    return calls
+
+
+def test_workdir_refuses_repo_root_ancestors_home_and_fs_root(monkeypatch, tmp_path):
+    for bad in (dev_checks.ROOT, dev_checks.ROOT.parent, Path(dev_checks.ROOT.anchor), Path.home()):
+        assert _run_main_with_workdir(monkeypatch, bad) == [], bad
+
+
+def test_workdir_refuses_a_foreign_nonempty_dir_and_keeps_its_files(tmp_path):
+    foreign = tmp_path / "mine"
+    foreign.mkdir()
+    (foreign / "precious.txt").write_text("x", encoding="utf-8")
+    with pytest.raises(SystemExit):
+        dev_checks.prepare_workdir(foreign)
+    assert (foreign / "precious.txt").exists()
+
+
+def test_workdir_own_dir_is_recreated_and_fresh_dir_is_used(tmp_path):
+    work = tmp_path / "w"
+    dev_checks.prepare_workdir(work)                      # fresh: created with a marker
+    (work / "job000.xml").write_text("old", encoding="utf-8")
+    dev_checks.prepare_workdir(work)                      # own (marker present): emptied and recreated
+    assert (work / "tmp").is_dir() and not (work / "job000.xml").exists()
+    empty = tmp_path / "e"
+    empty.mkdir()
+    dev_checks.prepare_workdir(empty)                     # existing empty dir is fine
+
+
+def test_workdir_refuses_a_link_and_does_not_touch_its_target(tmp_path):
+    target = tmp_path / "target"
+    target.mkdir()
+    (target / "keep.txt").write_text("x", encoding="utf-8")
+    link = tmp_path / "link"
+    if os.name == "nt":
+        import subprocess
+        made = subprocess.run(["cmd", "/c", "mklink", "/J", str(link), str(target)], capture_output=True).returncode == 0
+    else:
+        link.symlink_to(target, target_is_directory=True)
+        made = True
+    if not made:
+        pytest.skip("cannot create a link here")
+    with pytest.raises(SystemExit):
+        dev_checks.prepare_workdir(link)
+    assert (target / "keep.txt").exists()
+
+
+def test_kill_tree_signals_the_group_captured_at_start_even_after_the_parent_is_reaped(monkeypatch):
+    import signal
+    class Gone:
+        pid = 4321
+        def kill(self):
+            raise AssertionError("must signal the group, not only the parent")
+    seen = []
+    def getpgid(pid):
+        raise ProcessLookupError
+    monkeypatch.setattr(dev_checks.os, "name", "posix")
+    monkeypatch.setattr(dev_checks.os, "getpgid", getpgid, raising=False)
+    monkeypatch.setattr(dev_checks.os, "killpg", lambda pg, sig: seen.append(pg), raising=False)
+    monkeypatch.setattr(signal, "SIGKILL", 9, raising=False)
+    dev_checks._kill_tree(Gone())
+    assert seen == [4321]
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX process groups")
+def test_a_descendant_of_a_finished_job_is_killed(tmp_path):
+    pid_file = tmp_path / "child.pid"
+    code = (f"import subprocess,sys; p=subprocess.Popen([sys.executable,'-c','import time; time.sleep(60)']);"
+            f"open(r'{pid_file}','w').write(str(p.pid))")
+    status, _ = dev_checks.run_with_timeout([sys.executable, "-c", code], cwd=tmp_path, env=dict(os.environ), timeout=20)
+    assert status == 0
+    import time
+    pid = int(pid_file.read_text())
+    for _ in range(20):
+        if not dev_checks.pid_alive(pid):
+            break
+        time.sleep(0.25)
+    assert not dev_checks.pid_alive(pid)
+
+
+_CASE = '<testsuite><testcase classname="{c}" name="{n}" time="{t}"/></testsuite>'
+
+
+def test_guard_rejects_unmapped_cases(tmp_path, capsys):
+    xml = tmp_path / "a.xml"
+    xml.write_text(_CASE.format(c="unmapped.module", n="test_slow", t=99), encoding="utf-8")
+    assert ci_tiers.main(["guard", str(xml)]) != 0
+    assert "could not be mapped" in capsys.readouterr().err
+
+
+def test_guard_and_update_reject_empty_input(tmp_path, capsys):
+    assert ci_tiers.main(["guard", str(tmp_path)]) != 0
+    assert "no JUnit" in capsys.readouterr().err
+    assert ci_tiers.main(["update", str(tmp_path), "--out", str(tmp_path / "t.json")]) != 0
+    assert not (tmp_path / "t.json").exists()
+
+
+def _fake_collect(monkeypatch, tiers):
+    def collect(marker, allow_empty=False):
+        ids = tiers[marker]
+        if not ids and not allow_empty:
+            sys.exit("collection failed")
+        return ids
+    monkeypatch.setattr(dev_checks, "collect", collect)
+    monkeypatch.setattr(dev_checks.ci_tiers, "load_table", lambda *a: {"slow_files": [], "tests": {}})
+
+
+def test_verify_accepts_an_empty_slow_tier(monkeypatch):
+    ids = ["tests/a.py::t1", "tests/a.py::t2"]
+    _fake_collect(monkeypatch, {None: ids, "slow": [], "not slow": ids})
+    assert dev_checks.verify() == 0
+
+
+def test_verify_rejects_an_empty_full_tier(monkeypatch):
+    _fake_collect(monkeypatch, {None: [], "slow": [], "not slow": []})
+    with pytest.raises(SystemExit):
+        dev_checks.verify()
+
+
+def test_collect_allow_empty_accepts_only_pytest_no_tests_status(monkeypatch):
+    class NoTests:
+        returncode, stdout, stderr = 5, "no tests collected\n", ""
+    class Broken:
+        returncode, stdout, stderr = 2, "", "boom"
+    monkeypatch.setattr(dev_checks.subprocess, "run", lambda *a, **k: NoTests())
+    assert dev_checks.collect("slow", allow_empty=True) == []
+    monkeypatch.setattr(dev_checks.subprocess, "run", lambda *a, **k: Broken())
+    with pytest.raises(SystemExit):
+        dev_checks.collect("slow", allow_empty=True)

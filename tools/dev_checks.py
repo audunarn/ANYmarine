@@ -50,8 +50,9 @@ def _env() -> dict[str, str]:
     return env
 
 
-def collect(marker: str | None) -> list[str]:
-    """Node ids pytest selects (``marker`` is a ``-m`` expression); the collection must succeed."""
+def collect(marker: str | None, allow_empty: bool = False) -> list[str]:
+    """Node ids pytest selects (``marker`` is a ``-m`` expression); the collection must succeed.
+    ``allow_empty`` accepts pytest's "no tests collected" status (5) with no ids -- only for a constituent tier in --verify."""
     cmd = [*RUN_PREFIX, "--collect-only", *COLLECT_ARGS]
     if marker:
         cmd += ["-m", marker]
@@ -59,6 +60,8 @@ def collect(marker: str | None) -> list[str]:
     env.pop(IDS_FILE_ENV, None)
     proc = subprocess.run(cmd, cwd=ROOT, env=env, capture_output=True, text=True)
     ids = [line.strip() for line in proc.stdout.splitlines() if "::" in line and not line.startswith(("ERROR", " "))]
+    if allow_empty and proc.returncode == 5 and not ids:
+        return []
     if proc.returncode != 0 or not ids:   # an empty selection never counts as success
         sys.exit(f"collection failed (exit {proc.returncode}):\n{proc.stdout[-1500:]}\n{proc.stderr[-800:]}")
     return ids
@@ -113,6 +116,36 @@ def make_jobs(ids: list[str], table: dict, jobs: int) -> list[dict]:
     return sorted(result, key=lambda u: -u["est"])
 
 
+WORKDIR_MARKER = ".anymarine-dev-checks-workdir"
+
+
+def _is_link(path: Path) -> bool:
+    return path.is_symlink() or bool(getattr(os.path, "isjunction", lambda p: False)(path))
+
+
+def prepare_workdir(path: Path) -> Path:
+    """Return a fresh, empty work directory; delete an existing one only if this runner created it (marker file).
+    Refuses the repository root and its ancestors, the filesystem root, the home directory, links/junctions and any
+    other non-empty directory."""
+    path = Path(os.path.abspath(path))
+    if _is_link(path):
+        sys.exit(f"refusing --workdir {path}: it is a symlink or junction")
+    real = path.resolve()
+    protected = [ROOT, *ROOT.parents, Path.home().resolve(), Path(real.anchor)]
+    if any(real == p or real in p.parents for p in protected):
+        sys.exit(f"refusing --workdir {path}: it is the repository root, an ancestor, the filesystem root or the home directory")
+    if path.exists():
+        if not path.is_dir():
+            sys.exit(f"refusing --workdir {path}: not a directory")
+        if any(path.iterdir()):
+            if not (path / WORKDIR_MARKER).is_file():
+                sys.exit(f"refusing --workdir {path}: not empty and not created by this runner (no {WORKDIR_MARKER})")
+            shutil.rmtree(path, ignore_errors=True)
+    (path / "tmp").mkdir(parents=True, exist_ok=True)
+    (path / WORKDIR_MARKER).write_text("created by tools/dev_checks.py", encoding="utf-8")
+    return path
+
+
 def pid_alive(pid: int) -> bool:
     if os.name == "nt":
         out = subprocess.run(["tasklist", "/FI", f"PID eq {pid}", "/NH"], capture_output=True, text=True).stdout
@@ -130,7 +163,9 @@ def _kill_tree(proc: subprocess.Popen) -> None:
     else:
         import signal
         try:
-            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            os.killpg(proc.pid, signal.SIGKILL)   # start_new_session: the group id is the child's pid, valid after it is reaped
+        except ProcessLookupError:
+            pass                                   # the whole group is already gone
         except OSError:
             proc.kill()
 
@@ -225,7 +260,8 @@ def shard_of(ids: list[str], table: dict, spec: str) -> list[str]:
 
 
 def verify() -> int:
-    full, slow, fast = (set(collect(m)) for m in (None, "slow", "not slow"))
+    full = set(collect(None))
+    slow, fast = (set(collect(m, allow_empty=True)) for m in ("slow", "not slow"))   # an empty tier can be a valid partition
     table = ci_tiers.load_table()
     expected_slow = {node for node in full if ci_tiers.is_slow(table, node)}
     problems = []
@@ -285,9 +321,7 @@ def main(argv: list[str] | None = None) -> int:
                 args.write_failures.exists() and os.path.samefile(args.write_failures, args.expect_failures))):
             sys.exit("--write-failures and --expect-failures name the same file: the baseline would be overwritten")
         known = {line for line in args.expect_failures.read_text(encoding="utf-8").splitlines() if line}
-    workdir = args.workdir.resolve()
-    shutil.rmtree(workdir, ignore_errors=True)
-    (workdir / "tmp").mkdir(parents=True)
+    workdir = prepare_workdir(args.workdir)
     jobs = make_jobs(expected, table, args.jobs)
     print(f"{args.tier} tier{' shard ' + args.shard if args.shard else ''}: {len(expected)} tests in {len(jobs)} job(s), "
           f"{min(args.jobs, len(jobs))} at a time; estimate {sum(j['est'] for j in jobs):.0f} s of work", flush=True)
