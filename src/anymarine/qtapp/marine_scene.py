@@ -142,6 +142,7 @@ class MarineScene:
         self._timer = None
         self._watcher = None
         self._watched: list = []
+        self._gone = None
         self._clock0 = time.monotonic()
         self._clock = time.monotonic            # injectable for tests
 
@@ -470,16 +471,27 @@ class MarineScene:
             self._watched = targets
             import weakref
             ref = weakref.ref(self)
+            vref = weakref.ref(viewer)
 
             def gone(*_):
                 scene = ref()
-                if scene is not None:
+                # a stale callback (old viewer, deferred deletion after a renderer swap) must not clear the new one
+                if scene is not None and scene.viewer is not None and scene.viewer is vref():
                     scene._on_viewer_destroyed()
             viewer.destroyed.connect(gone)
+            self._gone = (vref, gone)
         except Exception as error:
             self.diagnostics.append(f"ocean viewer watcher unavailable: {type(error).__name__}: {error}")
 
     def _unwatch(self) -> None:
+        gone, self._gone = self._gone, None
+        if gone is not None:
+            try:
+                target = gone[0]()
+                if target is not None:
+                    target.destroyed.disconnect(gone[1])
+            except Exception:
+                pass
         watcher, self._watcher = self._watcher, None
         targets, self._watched = self._watched, []
         for target in targets:
@@ -511,6 +523,7 @@ class MarineScene:
         self.viewer = None
         self._watcher = None
         self._watched = []
+        self._gone = None
 
     def shutdown(self) -> None:
         """Release the timer and the viewer hooks (scene teardown)."""

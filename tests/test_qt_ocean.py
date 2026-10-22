@@ -528,3 +528,32 @@ def test_waterline_follows_hull_transform_on_refresh_and_on_redraw(scene_env):
     hull.set_transform(lift)
     assert scene.refresh_waterline() is True
     assert scene._records[id(scene.handle)]["extras"] == [] and len(_water_entries(viewer)) == 1
+
+
+@requires_qt
+def test_renderer_swap_deferred_deletion_of_old_viewer_keeps_new_viewer(qapp, monkeypatch):
+    from PySide6.QtCore import QCoreApplication, QEvent
+    from any3dview import MeshArrays, create_viewer
+    from any3dview.qt import QtViewerHostAdapter
+    scene, old, hull = _own_env(qapp, monkeypatch)
+    pos, tri = _box()
+    new = create_viewer(None, "software", host=QtViewerHostAdapter())
+    new.resize(320, 200)
+    new.show()
+    qapp.processEvents()
+    hull2 = new.add_mesh_arrays(MeshArrays(positions=pos, triangles=tri), color="#c0703a")
+    old.deleteLater()                                   # what the old renderer's destroy() schedules
+    handle = scene.build(new, [hull2])
+    scene.adopt(new, handle)                            # candidate adopted before the deferred delete runs
+    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+    qapp.processEvents()
+    assert scene.viewer is new
+    assert scene.handle is handle and handle is not None
+    assert _timer_active(scene)
+    assert scene.tick() is not None and scene.viewer is new
+    # the new viewer's own destruction still clears the scene
+    import shiboken6
+    shiboken6.delete(new)
+    qapp.processEvents()
+    assert scene.viewer is None and not _timer_active(scene)
+    scene.shutdown()

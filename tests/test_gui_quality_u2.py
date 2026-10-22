@@ -182,3 +182,26 @@ def test_time_series_plot_draws_title_axis_labels_and_caption():
     blank = empty.grab().toImage()
     assert _ink(blank, int(w * ratio * 0.6), int((h - 14) * ratio), int(w * ratio), int(h * ratio)) == 0   # no caption without a series
     assert not blank.isNull()
+
+
+def test_nice_ticks_ordinary_ranges_are_unchanged():
+    from anymarine.qtapp.rao_panel import _nice_ticks
+    assert _nice_ticks(0, 1, 5) == [0.0, 0.5, 1.0]
+    assert _nice_ticks(-1, 1, 4) == [-1.0, 0.0, 1.0]
+    assert _nice_ticks(0.1, 0.7, 5) == [0.0, 0.2, 0.4, 0.6]
+    assert _nice_ticks(0, 360, 5) == [0.0, 100.0, 200.0, 300.0, 400.0]
+    assert _nice_ticks(1e9, 5e9, 4) == [0.0, 2e9, 4e9, 6e9]
+
+
+def test_nice_ticks_survive_tiny_and_huge_magnitudes():
+    from anymarine.qtapp.rao_panel import _nice_ticks
+    for lo, hi in ((1e-13, 4e-13), (2e-20, 9e-20), (1e-8, 3e-8)):
+        ticks = _nice_ticks(lo, hi, 4)
+        assert len(set(ticks)) == len(ticks) >= 3, (lo, hi, ticks)
+        labels = [f"{v:.4g}" for v in ticks]
+        assert len(set(labels)) == len(labels) and "0" not in labels[1:], labels
+        assert ticks == sorted(ticks) and ticks[0] <= lo and ticks[-1] >= hi - (hi - lo)
+    ticks = _nice_ticks(1e-13, 4e-13, 4)
+    assert any(t > 0 for t in ticks) and all(abs(t) < 1e-12 for t in ticks)
+    big = _nice_ticks(1e9, 5e9, 4)
+    assert len(set(f"{v:.4g}" for v in big)) == len(big)

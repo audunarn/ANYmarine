@@ -140,9 +140,11 @@ def _nice_ticks(lo, hi, count=5):
     power = 10.0 ** math.floor(math.log10(raw))
     step = next(m * power for m in (1.0, 2.0, 5.0, 10.0) if m * power >= raw)
     first = math.floor(lo / step) * step
+    # 12 decimals for ordinary ranges (unchanged); more when the step itself is below 1e-10
+    decimals = max(12, 3 - int(math.floor(math.log10(step))))
     ticks, value = [], first
     while value <= hi + 0.5 * step and len(ticks) < 50:
-        ticks.append(round(value, 12))
+        ticks.append(round(value, decimals))
         value += step
     return ticks
 
