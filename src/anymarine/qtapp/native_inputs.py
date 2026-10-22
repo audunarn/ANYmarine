@@ -1,6 +1,6 @@
 """Qt model/view editor for explicitly declared native mechanical inputs."""
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QStandardItem, QStandardItemModel
+from PySide6.QtGui import QBrush, QColor, QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import (QDialog, QDialogButtonBox, QDoubleSpinBox,
     QFormLayout, QHBoxLayout, QLabel, QMessageBox, QPushButton, QSpinBox,
     QTreeView, QVBoxLayout)
@@ -84,7 +84,10 @@ class NativeInputsDialog(QDialog):
         self.tree = QTreeView(self)
         self.tree.setModel(self.model)
         self.tree.setAlternatingRowColors(True)
+        self.tree.setTextElideMode(Qt.TextElideMode.ElideMiddle)
         layout.addWidget(self.tree)
+        self._building = False
+        self.model.itemChanged.connect(self._validate_cell)
         authoring = QHBoxLayout()
         self._create_morison_button = QPushButton('Create Morison members…', self)
         self._create_morison_button.clicked.connect(self._create_morison)
@@ -100,6 +103,8 @@ class NativeInputsDialog(QDialog):
         authoring.addWidget(self._remove_member_button)
         layout.addLayout(authoring)
         self._build_tree()
+        self.tree.selectionModel().currentChanged.connect(self._sync_member_buttons)
+        self._sync_member_buttons()
 
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self.accept)
@@ -174,6 +179,7 @@ class NativeInputsDialog(QDialog):
 
     def _build_tree(self):
         """Rebuild the model and editable leaves from the working data copy."""
+        self._building = True
         self.model.clear()
         self.model.setHorizontalHeaderLabels(['Engineering input', 'Declared value'])
         self._leaves = []
@@ -209,12 +215,43 @@ class NativeInputsDialog(QDialog):
         for key, value in self._data.items():
             add(self.model.invisibleRootItem(), key, value, [key])
         self.tree.expandToDepth(1)
-        self.tree.setColumnWidth(0, 640)
+        self.tree.resizeColumnToContents(0)
+        self.tree.setColumnWidth(0, min(max(self.tree.columnWidth(0) + 16, 240), 640))
+        self._building = False
         has_morison = 'morison' in self._data
         self._create_morison_button.setVisible(not has_morison)
         self._add_member_button.setVisible(has_morison)
         self._edit_member_button.setVisible(has_morison)
         self._remove_member_button.setVisible(has_morison)
+        if hasattr(self.tree, 'selectionModel') and self.tree.selectionModel() is not None:
+            self._sync_member_buttons()
+
+    def _sync_member_buttons(self, *args):
+        """Edit/Remove need a selected Morison member row."""
+        selected = self._selected_member_index() is not None
+        for button in (self._edit_member_button, self._remove_member_button):
+            button.setEnabled(selected)
+            button.setToolTip('' if selected else 'Select a Morison member row first')
+
+    def _validate_cell(self, item):
+        """Inline check of a numeric cell: a value that does not parse is marked red with the reason."""
+        if self._building:
+            return
+        for cell, path, kind in self._leaves:
+            if cell is item and kind in (int, float):
+                text = item.text().strip()
+                try:
+                    kind(text)
+                    message = ''
+                except ValueError:
+                    message = f'Not a valid {"integer" if kind is int else "number"}: {text!r}'
+                self._building = True
+                try:
+                    item.setBackground(QBrush(QColor('#fde2e0')) if message else QBrush())
+                    item.setToolTip(message)
+                finally:
+                    self._building = False
+                return
 
     def _selected_member_index(self):
         index = self.tree.currentIndex()

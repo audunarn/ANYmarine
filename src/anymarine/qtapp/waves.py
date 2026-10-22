@@ -9,6 +9,21 @@ from ..hashing import input_hash
 
 #: Saved incident fields whose time is the replayed result's time.
 REPLAY_WAVE_KINDS=('mechanical_incident','linear_regular_incident')
+DEFAULT_NOTE=('Fixed captured body poses; waves are previewed around them. '
+    'Development preview — unqualified. Hover for the method details.')
+NOTE_DETAIL=('Linear (Airy) waves without wave stretching, bodies held at their captured poses. '
+    'The disturbed view adds the calculated fixed-body diffraction; body-motion radiation is not included. '
+    'Coarse development preview — unqualified.')
+_MISSING_PACKAGE=('Mechanical waves need the {name} package, which is not installed.')
+
+def friendly_error(error):
+    """(sentence, detail) for a status line: never a raw exception string for a missing package."""
+    if isinstance(error,ImportError):
+        name=getattr(error,'name',None) or 'required'
+        if name.split('.')[0]=='anyloads':return _MISSING_PACKAGE.format(name='anyloads'),str(error)
+        return f'This needs the {name} package, which is not installed.',str(error)
+    return str(error),''
+
 MATCHED_NOTE=('Saved incident waves that drove the shown result, at the replay time: Play moves bodies and waves together. '
     'Undisturbed incident field; diffraction and radiation are not drawn. Development preview — unqualified.')
 
@@ -21,6 +36,7 @@ class WavesPanel(QWidget):
     @handle.setter
     def handle(self,value):
         self._handle=value
+        self._sync_buttons()
         changed=getattr(self.window,'_on_wave_layer_changed',None)
         if changed is not None:changed()
 
@@ -28,7 +44,7 @@ class WavesPanel(QWidget):
         super().__init__(window)
         self.window=window
         self.field=None;self._handle=None;self.saved_poses=None;self.saved_view=None
-        self.job_id=None;self.time=0.;self.mechanical_environment=None
+        self._job_id=None;self.time=0.;self.mechanical_environment=None
         layout=QVBoxLayout(self)
         self.mode=QComboBox()
         self.mode.addItems(['Off','Incident waves (without disturbance)','Incident + body disturbance','Saved incident waves (matched to result)',
@@ -37,6 +53,9 @@ class WavesPanel(QWidget):
         for i in range(4,8):self.mode.model().item(i).setEnabled(False)
         self.mode.setMinimumContentsLength(14)
         self.mode.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self.mode.setToolTip('Which wave field to show in the 3D view')
+        source_label=QLabel('Wave source');source_label.setBuddy(self.mode)
+        layout.addWidget(source_label)
         layout.addWidget(self.mode)
         form=QFormLayout();self.regular_form=form
         self.amplitude=self._spin(.01,2.,.3,.05)
@@ -65,20 +84,20 @@ class WavesPanel(QWidget):
         self.compute.setProperty('primary',True)
         self.compute.clicked.connect(self.calculate)
         layout.addWidget(self.compute)
-        self.play=QPushButton('Pause waves')
+        self.play=QPushButton('Play waves')
         self.play.clicked.connect(self.toggle_play)
         self.cancel_button=QPushButton('Cancel wave calculation')
         self.cancel_button.clicked.connect(self.cancel)
         secondary=QHBoxLayout();secondary.addWidget(self.play);secondary.addWidget(self.cancel_button)
         layout.addLayout(secondary)
+        self._sync_buttons()
         self.status=QLabel('Choose Incident waves, or calculate body disturbance.')
         self.status.setWordWrap(True)
         layout.addWidget(self.status)
         self.elevation_legend=QLabel('Surface elevation [m]');self.elevation_legend.setProperty('role','hint')
         self.elevation_legend.setWordWrap(True);layout.addWidget(self.elevation_legend)
-        self.note=QLabel('Fixed captured body poses; linear Airy waves, no wave stretching. '
-                    'Disturbed view adds calculated diffraction. Body-motion radiation is not included. '
-                    'Coarse development preview — unqualified.')
+        self.note=QLabel(DEFAULT_NOTE)
+        self.note.setToolTip(NOTE_DETAIL)
         self.note.setWordWrap(True)
         self.note.setProperty('role','hint')
         layout.addWidget(self.note)
@@ -89,6 +108,25 @@ class WavesPanel(QWidget):
         self.mode.currentIndexChanged.connect(self.set_mode)
         window._job_manager.wave_ready.connect(self.field_ready)
         window._job_manager.state_changed.connect(self.job_state)
+
+    def _fail(self,error):
+        text,detail=friendly_error(error)
+        self.status.setText(text);self.status.setToolTip(detail)
+
+    @property
+    def job_id(self):
+        return self._job_id
+
+    @job_id.setter
+    def job_id(self,value):
+        self._job_id=value
+        self._sync_buttons()
+
+    def _sync_buttons(self):
+        play=getattr(self,'play',None)
+        if play is None:return
+        play.setEnabled(self.handle is not None)
+        self.cancel_button.setEnabled(self._job_id is not None)
 
     @staticmethod
     def _spin(low,high,value,step):
@@ -187,17 +225,18 @@ class WavesPanel(QWidget):
     def reset(self,*args):
         self.cancel()
         self.hide_layer()
-        self.field=None;self.job_id=None;self.mechanical_environment=None
+        self.field=None;self.job_id=None;self.mechanical_environment=None;self.status.setToolTip('')
         self.mode.blockSignals(True);self.mode.setCurrentIndex(0);self.mode.blockSignals(False)
         self.mode.model().item(2).setEnabled(False)
         for i in range(4,8):self.mode.model().item(i).setEnabled(False)
         self._stored_controls(False)
-        self.note.setText('Fixed captured body poses; linear Airy waves, no wave stretching. Disturbed view adds calculated diffraction; body-motion radiation is not included. Development preview — unqualified.')
+        self.note.setText(DEFAULT_NOTE);self.note.setToolTip(NOTE_DETAIL)
         self.compute.setEnabled(True)
         for control in (self.amplitude,self.omega,self.heading,self.depth):control.setEnabled(True)
         self.status.setText('Wave inputs changed; choose Incident waves or calculate disturbance.')
 
     def set_mode(self,index):
+        self.status.setToolTip('')
         result=self.window._current_result
         if index and result is not None and result.kind=='equilibrium_development':
             self.reset()
@@ -216,7 +255,7 @@ class WavesPanel(QWidget):
                 self.compute.setEnabled(False);self.freeze();self.stored_parameters_changed()
                 self.status.setText(f'Stored HAMS {self._stored_component()} — {len(record.surface_indices)} surface samples, {len(record.fields.points)-len(record.surface_indices)} submerged pressure samples retained; unqualified')
                 self.note.setText('Saved HAMS point responses at producing geometry. No interpolation or reconstructed wave surface. Bodies remain at equilibrium; radiation uses the selected prescribed displacement in the saved target frame, not a solved trajectory. Dynamic pressure is not drawn as elevation. Development, unqualified.')
-            except Exception as error:self.reset();self.status.setText(str(error))
+            except Exception as error:self.reset();self._fail(error)
             return
         if index==0:
             self.compute.setEnabled(True)
@@ -227,7 +266,7 @@ class WavesPanel(QWidget):
             for i in range(4,8):self.mode.model().item(i).setEnabled(False)
             self._stored_controls(False)
             self.compute.setEnabled(True)
-            self.note.setText('Fixed captured body poses; linear Airy waves, no wave stretching. Disturbed view adds calculated diffraction; body-motion radiation is not included. Development preview — unqualified.')
+            self.note.setText(DEFAULT_NOTE);self.note.setToolTip(NOTE_DETAIL)
         if index==3:
             self.cancel();self.job_id=None
             try:
@@ -273,7 +312,7 @@ class WavesPanel(QWidget):
                 self.note.setText(MATCHED_NOTE if result is not None else
                     'Saved incident waves on their own clock; bodies keep their captured poses. No body disturbance. Development preview — unqualified.')
             except Exception as error:
-                self.reset();self.status.setText(str(error))
+                self.reset();self._fail(error)
             return
         self.compute.setEnabled(True)
         if self.follows_replay:
@@ -293,7 +332,7 @@ class WavesPanel(QWidget):
             self.status.setText('Fixed-body diffraction preview' if index==2 else 'Incident waves — no body disturbance')
         except Exception as error:
             self.reset()
-            self.status.setText(str(error))
+            self._fail(error)
 
     def positions(self):
         if self.field['kind']=='stored_hams_points':return self.field['replay'].positions(self._stored_component(),self.time,**self._stored_selection())
@@ -379,7 +418,7 @@ class WavesPanel(QWidget):
             self.compute.setEnabled(False)
             self.status.setText('Calculating fixed-body diffraction in a child process…')
         except Exception as error:
-            self.status.setText(str(error))
+            self._fail(error)
 
     def cancel(self):
         if self.job_id is not None:
@@ -405,7 +444,7 @@ class WavesPanel(QWidget):
             self.mode.blockSignals(True);self.mode.setCurrentIndex(2);self.mode.blockSignals(False)
             self.set_mode(2)
         except Exception as error:
-            self.status.setText(str(error))
+            self._fail(error)
 
     def renderer_changed(self):
         self.handle=None  # the old viewer released its layer with its context

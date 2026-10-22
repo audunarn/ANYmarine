@@ -17,7 +17,7 @@ from pathlib import Path
 
 from PySide6.QtCore import QPointF, QProcess, QRectF, QProcessEnvironment, Qt, Signal
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen
-from PySide6.QtWidgets import (QButtonGroup, QComboBox, QFileDialog, QGridLayout, QHBoxLayout, QLabel,
+from PySide6.QtWidgets import (QButtonGroup, QComboBox, QFileDialog, QGridLayout, QStackedLayout, QHBoxLayout, QLabel,
                                QPushButton, QRadioButton, QTabWidget, QTableWidget,
                                QTableWidgetItem, QVBoxLayout, QWidget)
 
@@ -199,8 +199,8 @@ class RaoAxes(QWidget):
             painter.setPen(QPen(QColor('#d5dce5')))
             painter.drawRect(int(x0), int(y0), int(x1 - x0), int(y1 - y0))
             painter.setPen(QColor('#8592a3'))
-            painter.drawText(QRectF(x0, y0, x1 - x0, y1 - y0), int(Qt.AlignmentFlag.AlignCenter),
-                             'no data for this selection')
+            painter.drawText(QRectF(x0 + 4, y0, max(x1 - x0 - 8, 1), y1 - y0),
+                             int(Qt.AlignmentFlag.AlignCenter | Qt.TextFlag.TextWordWrap), 'no data for this selection')
             return
         painter.setPen(QPen(QColor('#000000')))
         painter.drawRect(int(x0), int(y0), int(x1 - x0), int(y1 - y0))
@@ -363,8 +363,20 @@ class RaoPanel(QWidget):
         self.tabs = QTabWidget()
         layout.addWidget(self.tabs, 1)
         # Graphs: OrcaWave-style RAO grid; frequency (FD table), time (TD runs) or both.
+        graphs_page = QWidget()
+        graphs_page_layout = QVBoxLayout(graphs_page)
+        graphs_page_layout.setContentsMargins(0, 0, 0, 0)
+        # Without a case there is nothing to select: one clear card replaces the selector grid and empty plots.
+        self.graphs_empty = QLabel('No RAO case yet. Use "Register case..." to start, or "Open results..." for finished results.')
+        self.graphs_empty.setObjectName('EmptyState')
+        self.graphs_empty.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        self.graphs_empty.setWordWrap(True)
         graphs = QWidget()
         graphs_layout = QVBoxLayout(graphs)
+        self.graphs_stack = QStackedLayout()
+        self.graphs_stack.addWidget(self.graphs_empty)
+        self.graphs_stack.addWidget(graphs)
+        graphs_page_layout.addLayout(self.graphs_stack)
         controls = QGridLayout()
         self.owner = QComboBox()
         self.quantity = QComboBox()
@@ -385,6 +397,7 @@ class RaoPanel(QWidget):
             combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
         graphs_layout.addLayout(controls)
         options = QHBoxLayout()
+        options.addWidget(QLabel('Data'))
         self.source_group, self.display_group = QButtonGroup(self), QButtonGroup(self)
         self.source_buttons = {}
         for key, text in (('frequency', 'Frequency'), ('time', 'Time'), ('compare', 'Compare')):
@@ -395,6 +408,7 @@ class RaoPanel(QWidget):
         options.addStretch(1)
         graphs_layout.addLayout(options)
         display = QHBoxLayout()
+        display.addWidget(QLabel('Part'))
         self.display_buttons = {}
         for key, text in (('amplitude', 'Amplitude'), ('phase', 'Phase')):
             button = QRadioButton(text)
@@ -406,7 +420,7 @@ class RaoPanel(QWidget):
         graphs_layout.addLayout(display)
         self.grid = RaoGrid()
         graphs_layout.addWidget(self.grid, 1)
-        self.tabs.addTab(graphs, 'Graphs')
+        self.tabs.addTab(graphs_page, 'Graphs')
         # Details: one exact table entry, its contribution forces, and the report checks.
         details = QWidget()
         details_layout = QVBoxLayout(details)
@@ -700,6 +714,7 @@ class RaoPanel(QWidget):
     def refresh_graphs(self):
         from .. import rao_view
         self.contribution.setEnabled(self.quantity.currentData() == 'force')
+        self.graphs_stack.setCurrentIndex(0 if self.table is None else 1)
         selection = self.graph_selection()
         if self.table is None or selection['owner'] is None or selection['heading'] is None or (
                 selection['quantity'] == 'force' and selection['contribution'] is None):

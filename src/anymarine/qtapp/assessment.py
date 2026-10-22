@@ -12,6 +12,7 @@ stale labeling when the current project no longer matches the submission.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Optional
 
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt, Signal
@@ -25,6 +26,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QListWidget,
     QPushButton,
     QTableView,
     QVBoxLayout,
@@ -32,6 +34,51 @@ from PySide6.QtWidgets import (
 )
 
 CHECK_COLUMNS = ("Check", "Value", "Limit", "Unit", "Status", "Detail")
+
+_PATH_MIN_WIDTH = 320
+EMPTY_ASSESSMENT_TEXT = (
+    "No assessment yet. Three steps:\n"
+    "1. Register case - load the engineering case specification.\n"
+    "2. Assess - check a stored result against the case.\n"
+    "3. Reopen snapshot - reproduce a saved assessment later."
+)
+
+
+def find_snapshots(root, max_depth: int = 2) -> list[str]:
+    """Assessment snapshot directories under ``root`` (a pair has pair.json, a single has cases/ and reports/).
+
+    Looks at most ``max_depth`` levels below ``root`` and does not descend into a snapshot.
+    """
+    found: list[str] = []
+    base = Path(root)
+
+    def scan(directory: Path, depth: int) -> None:
+        try:
+            entries = sorted(p for p in directory.iterdir() if p.is_dir())
+        except OSError:
+            return
+        for entry in entries:
+            if (entry / "pair.json").is_file() or ((entry / "cases").is_dir() and (entry / "reports").is_dir()):
+                found.append(str(entry))
+            elif depth < max_depth:
+                scan(entry, depth + 1)
+
+    if base.is_dir():
+        scan(base, 1)
+    return found
+
+
+def _wide(edit: QLineEdit, placeholder: str) -> QLineEdit:
+    edit.setMinimumWidth(_PATH_MIN_WIDTH)
+    edit.setPlaceholderText(placeholder)
+    return edit
+
+
+def _ok_button(buttons: QDialogButtonBox, text: str):
+    ok = buttons.button(QDialogButtonBox.StandardButton.Ok)
+    ok.setText(text)
+    return ok
+
 
 SCOPE_NOTE = (
     "Developmental assessment only — unqualified; never a qualified marine "
@@ -140,7 +187,11 @@ class AssessmentPanel(QWidget):
         self._member_role = ""
 
         layout = QVBoxLayout(self)
-        self._verdict_label = QLabel("no assessment evidence yet")
+        self._verdict_label = QLabel("No assessment yet")
+        self._empty_card = QLabel(EMPTY_ASSESSMENT_TEXT)
+        self._empty_card.setObjectName("EmptyState")
+        self._empty_card.setWordWrap(True)
+        self._empty_card.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
         self._scope_label = QLabel(SCOPE_NOTE)
         self._scope_label.setWordWrap(True)
         self._identity_label = QLabel("")
@@ -153,11 +204,13 @@ class AssessmentPanel(QWidget):
         self._table.setModel(self._model)
         self._table.horizontalHeader().setStretchLastSection(True)
         self._table.setMinimumHeight(160)
+        self._table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self._table.setVisible(False)
 
         buttons = QGridLayout()
         self._register_button = QPushButton("Register case…")
         self._assess_button = QPushButton("Assess selected result…")
-        self._assess_button.setProperty("primary", True)
+        self._set_primary(self._register_button)
         self._pair_button = QPushButton("Assess coarse/fine pair…")
         self._reopen_button = QPushButton("Reopen snapshot…")
         self._register_button.clicked.connect(self.register_case_requested.emit)
@@ -179,12 +232,20 @@ class AssessmentPanel(QWidget):
         self._member_combo.hide()
 
         layout.addWidget(self._verdict_label)
+        layout.addWidget(self._empty_card, 1)
         layout.addWidget(self._scope_label)
         layout.addWidget(self._identity_label)
         layout.addWidget(self._status_label)
         layout.addWidget(self._table)
         layout.addLayout(buttons)
         layout.addWidget(self._member_combo)
+
+    def _set_primary(self, primary: QPushButton) -> None:
+        """One primary button: Register case while empty (step one), Assess once evidence is shown."""
+        for button in (self._register_button, self._assess_button):
+            button.setProperty("primary", button is primary)
+            button.style().unpolish(button)
+            button.style().polish(button)
 
     # ------------------------------------------------------------ payload
 
@@ -207,6 +268,9 @@ class AssessmentPanel(QWidget):
         """
 
         self._payload = dict(payload)
+        self._empty_card.setVisible(False)
+        self._table.setVisible(True)
+        self._set_primary(self._assess_button)
         kind = str(payload.get("kind"))
         verdict = payload.get("verdict")
         if verdict == "pass":
@@ -270,7 +334,7 @@ class RegisterCaseDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Register assessment case")
         form = QFormLayout(self)
-        self._spec_edit = QLineEdit()
+        self._spec_edit = _wide(QLineEdit(), "path to the case specification .json")
         spec_browse = QPushButton("Browse…")
         spec_browse.clicked.connect(self._browse_spec)
         spec_row = QHBoxLayout()
@@ -279,14 +343,21 @@ class RegisterCaseDialog(QDialog):
         spec_host = QWidget()
         spec_host.setLayout(spec_row)
         form.addRow("Case specification (JSON)", spec_host)
-        self._target_edit = QLineEdit()
+        self._target_edit = _wide(QLineEdit(), "new file to create, e.g. case-001.json")
         form.addRow("Case artifact target (new file)", self._target_edit)
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
+        self._ok = _ok_button(buttons, "Register case")
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         form.addRow(buttons)
+        self._spec_edit.textChanged.connect(self._validate)
+        self._target_edit.textChanged.connect(self._validate)
+        self._validate()
+
+    def _validate(self, *args) -> None:
+        self._ok.setEnabled(bool(self.spec_path() and self.target_path()))
 
     def _browse_spec(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
@@ -309,7 +380,7 @@ class AssessSingleDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Assess selected result")
         form = QFormLayout(self)
-        self._case_edit = QLineEdit()
+        self._case_edit = _wide(QLineEdit(), "path to the registered case .json")
         case_browse = QPushButton("Browse…")
         case_browse.clicked.connect(self._browse_case)
         case_row = QHBoxLayout()
@@ -319,19 +390,28 @@ class AssessSingleDialog(QDialog):
         case_host.setLayout(case_row)
         form.addRow("Registered case artifact", case_host)
         self._result_combo = QComboBox()
+        self._result_combo.setPlaceholderText("no stored results")
         self._result_combo.addItems([str(r) for r in result_ids])
+        if self._result_combo.count():
+            self._result_combo.setCurrentIndex(0)  # a placeholder would otherwise leave nothing selected
         if current_result_id:
             self._result_combo.setCurrentText(str(current_result_id))
         form.addRow("Stored result", self._result_combo)
-        self._snapshot_edit = QLineEdit()
-        self._snapshot_edit.setPlaceholderText("optional — exclusive new directory")
+        self._snapshot_edit = _wide(QLineEdit(), "optional: new folder to save the assessment in")
         form.addRow("Assessment snapshot target", self._snapshot_edit)
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
+        self._ok = _ok_button(buttons, "Assess result")
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         form.addRow(buttons)
+        self._case_edit.textChanged.connect(self._validate)
+        self._result_combo.currentTextChanged.connect(self._validate)
+        self._validate()
+
+    def _validate(self, *args) -> None:
+        self._ok.setEnabled(bool(self.case_path() and self.result_id()))
 
     def _browse_case(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
@@ -353,13 +433,15 @@ class AssessSingleDialog(QDialog):
 class PairMemberWidget(QWidget):
     """One explicit pair member: project root, stored result, case artifact."""
 
+    changed = Signal()
+
     def __init__(self, role: str, result_loader, parent=None):
         super().__init__(parent)
         self._role = role
         self._loader = result_loader
         form = QFormLayout(self)
         form.setContentsMargins(0, 0, 0, 0)
-        self._root_edit = QLineEdit()
+        self._root_edit = _wide(QLineEdit(), "project folder of this member")
         root_browse = QPushButton("Browse…")
         root_browse.clicked.connect(self._browse_root)
         root_row = QHBoxLayout()
@@ -369,8 +451,9 @@ class PairMemberWidget(QWidget):
         root_host.setLayout(root_row)
         form.addRow("Project root", root_host)
         self._result_combo = QComboBox()
+        self._result_combo.setPlaceholderText("choose a project root first")
         form.addRow("Stored result", self._result_combo)
-        self._case_edit = QLineEdit()
+        self._case_edit = _wide(QLineEdit(), "path to the registered case .json")
         case_browse = QPushButton("Browse…")
         case_browse.clicked.connect(self._browse_case)
         case_row = QHBoxLayout()
@@ -382,6 +465,12 @@ class PairMemberWidget(QWidget):
         self._message = QLabel("")
         self._message.setWordWrap(True)
         form.addRow(self._message)
+        self._root_edit.textChanged.connect(lambda *_: self.changed.emit())
+        self._case_edit.textChanged.connect(lambda *_: self.changed.emit())
+        self._result_combo.currentTextChanged.connect(lambda *_: self.changed.emit())
+
+    def is_complete(self) -> bool:
+        return bool(self.project_root() and self.result_id() and self.case_path())
 
     def _browse_root(self) -> None:
         path = QFileDialog.getExistingDirectory(
@@ -412,6 +501,8 @@ class PairMemberWidget(QWidget):
             self._message.setText(f"cannot load project: {error}")
             return
         self._result_combo.addItems([str(r) for r in result_ids])
+        if self._result_combo.count():
+            self._result_combo.setCurrentIndex(0)
 
     def project_root(self) -> str:
         return self._root_edit.text().strip()
@@ -437,16 +528,23 @@ class PairDialog(QDialog):
         layout.addWidget(QLabel("Fine member"))
         layout.addWidget(self._fine)
         form = QFormLayout()
-        self._out_edit = QLineEdit()
-        self._out_edit.setPlaceholderText("exclusive new directory")
+        self._out_edit = _wide(QLineEdit(), "new folder to save the paired assessment in")
         form.addRow("Paired snapshot target", self._out_edit)
         layout.addLayout(form)
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
+        self._ok = _ok_button(buttons, "Assess pair")
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
+        self._coarse.changed.connect(self._validate)
+        self._fine.changed.connect(self._validate)
+        self._out_edit.textChanged.connect(self._validate)
+        self._validate()
+
+    def _validate(self, *args) -> None:
+        self._ok.setEnabled(self._coarse.is_complete() and self._fine.is_complete() and bool(self.out_root()))
 
     def coarse(self) -> PairMemberWidget:
         return self._coarse
@@ -461,11 +559,24 @@ class PairDialog(QDialog):
 class ReopenSnapshotDialog(QDialog):
     """Reopen a single or paired assessment snapshot for child reproduction."""
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, project_root=None):
         super().__init__(parent)
         self.setWindowTitle("Reopen assessment snapshot")
         form = QFormLayout(self)
-        self._root_edit = QLineEdit()
+        self._root_edit = _wide(QLineEdit(), "snapshot folder")
+        if project_root is None:
+            project_root = getattr(parent, "_project_root", None)
+        self._snapshots = QListWidget()
+        self._snapshots.setMinimumHeight(90)
+        if project_root is not None:
+            for path in find_snapshots(project_root):
+                self._snapshots.addItem(path)
+        if self._snapshots.count():
+            form.addRow("Snapshots in this project", self._snapshots)
+            self._root_edit.setPlaceholderText("snapshot folder (choose one above or browse)")
+            self._snapshots.currentTextChanged.connect(lambda text: text and self._root_edit.setText(text))
+        else:
+            self._snapshots.hide()
         browse = QPushButton("Browse…")
         browse.clicked.connect(self._browse)
         row = QHBoxLayout()
@@ -477,9 +588,12 @@ class ReopenSnapshotDialog(QDialog):
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
+        self._ok = _ok_button(buttons, "Reopen snapshot")
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         form.addRow(buttons)
+        self._root_edit.textChanged.connect(lambda *_: self._ok.setEnabled(bool(self.snapshot_root())))
+        self._ok.setEnabled(False)
 
     def _browse(self) -> None:
         path = QFileDialog.getExistingDirectory(self, "Assessment snapshot root")

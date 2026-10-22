@@ -14,9 +14,11 @@ from typing import Any, Optional
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, QObject, Qt
 from PySide6.QtWidgets import (
     QDialog,
+    QHeaderView,
     QLabel,
     QPlainTextEdit,
     QTableView,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -128,13 +130,33 @@ class DevelopmentStatusDialog(QDialog):
         self._table.setModel(self._model)
         self._table.setEditTriggers(QTableView.EditTrigger.NoEditTriggers)
         self._table.setSelectionMode(QTableView.SelectionMode.NoSelection)
-        self._table.horizontalHeader().setStretchLastSection(True)
-        layout.addWidget(self._table)
+        header = self._table.horizontalHeader()
+        header.setStretchLastSection(True)
+        # Area and Status are short: fit them. Feature and Menu path get a fixed readable width; Note takes the rest.
+        for column, width in ((1, 230), (3, 210)):
+            header.setSectionResizeMode(column, QHeaderView.ResizeMode.Interactive)
+            self._table.setColumnWidth(column, width)
+        for column in (0, 2):
+            header.setSectionResizeMode(column, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(len(_COLUMNS) - 1, QHeaderView.ResizeMode.Stretch)
+        self._table.verticalHeader().setVisible(False)
+        self._table.setWordWrap(True)
+        self._table.setTextElideMode(Qt.TextElideMode.ElideNone)
+        layout.addWidget(self._table, 1)
 
+        # Technical detail stays available but collapsed: the summary above is the plain-language lead.
+        self._details_toggle = QToolButton(self)
+        self._details_toggle.setText("Technical details (hydrodynamic evidence)")
+        self._details_toggle.setCheckable(True)
+        self._details_toggle.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self._details_toggle.setArrowType(Qt.ArrowType.RightArrow)
+        layout.addWidget(self._details_toggle)
         self._hydro_text = QPlainTextEdit(self)
         self._hydro_text.setReadOnly(True)
         self._hydro_text.setPlainText(_hydrodynamic_status_text(status))
-        layout.addWidget(self._hydro_text)
+        self._hydro_text.setVisible(False)
+        self._details_toggle.toggled.connect(self._toggle_details)
+        layout.addWidget(self._hydro_text, 1)
 
         provenance = status["provenance"]
         provenance_label = QLabel(
@@ -145,4 +167,16 @@ class DevelopmentStatusDialog(QDialog):
         provenance_label.setWordWrap(True)
         layout.addWidget(provenance_label)
 
-        self.resize(860, 620)
+        self.resize(860, 560)
+
+    def showEvent(self, event) -> None:  # noqa: N802
+        super().showEvent(event)
+        self._table.resizeRowsToContents()
+
+    def resizeEvent(self, event) -> None:  # noqa: N802
+        super().resizeEvent(event)
+        self._table.resizeRowsToContents()
+
+    def _toggle_details(self, shown: bool) -> None:
+        self._hydro_text.setVisible(shown)
+        self._details_toggle.setArrowType(Qt.ArrowType.DownArrow if shown else Qt.ArrowType.RightArrow)

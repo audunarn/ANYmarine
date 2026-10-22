@@ -19,7 +19,7 @@ PANEL_BG = "#ffffff"
 SUBTLE_BG = "#f6f8fb"
 BORDER = "#dbe2ea"
 TEXT = "#1f2b3d"
-MUTED = "#6b7889"
+MUTED = "#5a6778"  # >= 4.5:1 on APP_BG, SUBTLE_BG, PANEL_BG, mode-bar hover (tests/test_gui_quality_u2.py)
 ACCENT = "#1d63b8"
 ACCENT_HOVER = "#164f96"
 ACCENT_SOFT = "#e6f0fb"

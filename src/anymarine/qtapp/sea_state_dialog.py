@@ -17,15 +17,25 @@ class SeaStateDialog(QDialog):
         self.period=QDoubleSpinBox();self.period.setDecimals(3);self.period.setRange(1.,30.)
         self.period.setValue(spectrum['peak_period'])
         self.seed=QSpinBox();self.seed.setRange(0,2147483647);self.seed.setValue(data['seed'])
-        layout.addRow('Significant wave height [m]',self.height)
-        layout.addRow('Peak period [s]',self.period)
+        self._initial=(self.height.value(),self.period.value(),self.seed.value())
+        layout.addRow('Significant wave height [m] (0 to 2)',self.height)
+        layout.addRow('Peak period [s] (1 to 30)',self.period)
         layout.addRow('Random phase seed',self.seed)
-        note=QLabel('Creates a new saved realization for excitation, Morison kinematics and incident visualization. '
-            'Development bins: 0.7, 1.1 and 1.6 rad/s; propagation 0° and 90°. '
+        note=QLabel('Creates a new saved sea state for the load, Morison and wave-view calculations. '
+            'Development preview: three frequencies and two wave directions.')
+        note.setToolTip('Development bins: 0.7, 1.1 and 1.6 rad/s; propagation 0° and 90°. '
             'Finite bins are normalized to wave height; continuous-spectrum accuracy is unqualified.')
         note.setWordWrap(True);layout.addRow(note)
-        buttons=QDialogButtonBox(QDialogButtonBox.StandardButton.Ok|QDialogButtonBox.StandardButton.Cancel)
+        buttons=QDialogButtonBox(QDialogButtonBox.StandardButton.Ok|QDialogButtonBox.StandardButton.Cancel
+            |QDialogButtonBox.StandardButton.RestoreDefaults)
+        buttons.button(QDialogButtonBox.StandardButton.RestoreDefaults).setText('Reset')
+        buttons.button(QDialogButtonBox.StandardButton.RestoreDefaults).setToolTip('Restore the values the dialog opened with')
+        buttons.button(QDialogButtonBox.StandardButton.RestoreDefaults).clicked.connect(self.reset)
+        ok=buttons.button(QDialogButtonBox.StandardButton.Ok);ok.setDefault(True);ok.setFocus()
         buttons.accepted.connect(self.accept);buttons.rejected.connect(self.reject);layout.addRow(buttons)
+
+    def reset(self):
+        self.height.setValue(self._initial[0]);self.period.setValue(self._initial[1]);self.seed.setValue(self._initial[2])
 
     def parameters(self):
         return dict(significant_height=self.height.value(),peak_period=self.period.value(),seed=self.seed.value())
