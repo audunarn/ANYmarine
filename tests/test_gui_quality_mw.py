@@ -444,3 +444,80 @@ def test_f11_plot_title_follows_the_readable_channel_name(qapp, window):
     assert not any(bid in window._channel_combo.currentText() for bid in ids)
     raw = window._channel_combo.currentData()
     assert raw in window._current_result.channels and window._plot._label == raw      # the stored id stays the data
+
+
+# ---- review fixes on M1+M2 (Codex findings) --------------------------------------------------------------------
+
+_UUID_A = "f3879aaf-4300-4b6b-b18f-2c15584e2dd8"
+_UUID_B = "cad3c9b9-4c64-43db-a13e-6e4a1d742b86"
+
+
+def test_title_parts_removes_ids_only_as_whole_tokens():
+    from anymarine.qtapp.mainwindow import _ChannelCombo as C
+    assert C.title_parts("equilibrium/moment_residual Nm", {"m": "Body M"}) == ("Equilibrium / moment residual", "Nm")
+    assert C.title_parts("m/moment_residual Nm", {"m": "Body M"}) == ("Moment residual (Body M)", "Nm")
+    assert C.title_parts("heave:m", {"m": "Body M"}) == ("Heave (Body M)", "")
+    assert C.title_parts("force Nm", {"N": "X", "m": "Y"}) == ("Force", "Nm")     # the unit suffix is never edited
+
+
+def test_title_parts_overlapping_ids_prefer_longest_and_attribute_correctly():
+    from anymarine.qtapp.mainwindow import _ChannelCombo as C
+    names = {"a": "Body A", "ab": "Body AB"}
+    assert C.title_parts("heave:ab", names) == ("Heave (Body AB)", "")
+    assert C.title_parts("heave:a", names) == ("Heave (Body A)", "")
+    assert C.title_parts("ab/surge_abc", names) == ("Surge abc (Body AB)", "")
+    assert C.title_parts("a:ab/tension N", names) == ("Tension (Body A, Body AB)", "N")
+
+
+def test_title_parts_bundled_example_titles_unchanged():
+    from anymarine.qtapp.mainwindow import _ChannelCombo as C
+    n = {_UUID_A: "Body A", _UUID_B: "Body B"}
+    expected = {
+        f"heave:{_UUID_B}": ("Heave (Body B)", ""), f"surge:{_UUID_A}": ("Surge (Body A)", ""),
+        f"Heave:{_UUID_A}": ("Heave (Body A)", ""), f"{_UUID_A}/surge": ("Surge (Body A)", ""),
+        f"{_UUID_B}/force_x N": ("Force x (Body B)", "N"),
+        f"equilibrium/{_UUID_A}/moment_residual Nm": ("Equilibrium / moment residual (Body A)", "Nm"),
+    }
+    for raw, want in expected.items():
+        assert C.title_parts(raw, n) == want, raw
+
+
+def _detached(window, qapp):
+    """A window with no current project but a detached snapshot replay, as when a snapshot is reopened."""
+    window.load_example()
+    project, result = window._project, window._current_result
+    window._set_project(project)
+    window._project = None
+    window._replay_project = None
+    window._current_result = None
+    window._refresh_welcome()
+    window._refresh_action_states()
+    _pump(qapp)
+    return project, result
+
+
+def _calc(window):
+    return next(a for a in window._toolbar.actions() if a.text() == "Calculate waves")
+
+
+def test_calculate_waves_follows_the_effective_replay_project(qapp, window):
+    project, result = _detached(window, qapp)
+    assert window._project is None and not _calc(window).isEnabled()
+    window._set_snapshot_replay(project, result, "replayed")
+    _pump(qapp)
+    assert window._project is None and window._replay_project is not None
+    assert _calc(window).isEnabled()                       # WavesPanel.request() accepts the replay project
+    window._set_result(None)                               # leaving replay with no project
+    assert window._replay_project is None and not _calc(window).isEnabled()
+
+
+def test_welcome_treats_a_detached_replay_as_content(qapp, window):
+    project, result = _detached(window, qapp)
+    assert window._welcome.isVisibleTo(window._viewport) and window._tree_placeholder.isVisibleTo(window._tree)
+    window._set_snapshot_replay(project, result, "replayed")
+    _pump(qapp)
+    assert not window._welcome.isVisibleTo(window._viewport)
+    assert not window._tree_placeholder.isVisibleTo(window._tree)
+    window._set_result(None)                               # clears the replay; no project -> empty state again
+    _pump(qapp)
+    assert window._welcome.isVisibleTo(window._viewport) and window._tree_placeholder.isVisibleTo(window._tree)

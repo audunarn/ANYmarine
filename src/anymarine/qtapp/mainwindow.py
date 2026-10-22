@@ -143,13 +143,24 @@ class _ChannelCombo(QComboBox):
     @staticmethod
     def title_parts(raw: str, body_names: Optional[dict] = None) -> tuple[str, str]:
         """(title, unit) for a stored channel id; body ids become body names (display only)."""
+        import re
         from .plot import channel_title
-        text, found = str(raw), []
-        for body_id, name in (body_names or {}).items():
-            if body_id and body_id in text:
-                text = text.replace(f":{body_id}", "").replace(f"/{body_id}", "").replace(body_id, "")
-                found.append(name)
-        text = text.replace("//", "/").strip(":/ ")
+        text, found, suffix = str(raw), [], ""
+        unit_now = channel_title(text)[1]
+        if unit_now and text.endswith(" " + unit_now):       # the unit suffix is never edited
+            text, suffix = text[:-len(unit_now) - 1], " " + unit_now
+        ids = sorted((i for i in (body_names or {}) if i), key=len, reverse=True)
+        if ids:
+            # a body id is removed only as a whole identifier token (delimited by start/end or : / _ space);
+            # longest id first so overlapping ids attribute each channel to the right body
+            pattern = re.compile(r"[:/]?(?<![^:/_ ])(?:%s)(?![^:/_ ])" % "|".join(re.escape(i) for i in ids))
+            hit = set()
+            def _drop(match):
+                hit.add(match.group(0).lstrip(":/"))
+                return ""
+            text = pattern.sub(_drop, text)
+            found = [name for body_id, name in (body_names or {}).items() if body_id in hit]
+        text = (text.replace("//", "/").strip(":/ ") + suffix).strip(":/ ")
         title, unit = channel_title(text)
         if found:
             title = f"{title} ({', '.join(found)})"
@@ -408,7 +419,7 @@ class MainWindow(QMainWindow):
         self._tree_placeholder.setGeometry(8, 14, max(60, viewport.width() - 16), 90)
 
     def _refresh_welcome(self) -> None:
-        empty = self._project is None
+        empty = self._project is None and self._replay_project is None
         self._welcome.setVisible(empty)
         self._tree_placeholder.setVisible(empty)
         if empty:
@@ -444,6 +455,7 @@ class MainWindow(QMainWindow):
         project = self._project
         facts = {
             'project': project is not None,
+            'effective': project is not None or self._replay_project is not None,   # as WavesPanel.request()
             'native': project is not None and project.native_inputs is not None,
             'sea': (project is not None and project.native_inputs is not None
                     and project.native_inputs.wave_realization is not None),
@@ -855,7 +867,7 @@ class MainWindow(QMainWindow):
         calc = QAction('Calculate waves', self)
         calc.triggered.connect(lambda: self._waves.compute.click())
         add(calc, 'waves', 'Calculate the body disturbance for the current wave inputs', text_beside=True)
-        self._action_rule(calc, 'project', self._NEEDS_PROJECT)
+        self._action_rule(calc, 'effective', self._NEEDS_PROJECT)
         add(self._actions['run'], 'run', self._actions['run'].text().replace('&', ''), text_beside=True)
         add(self._actions['cancel'], 'stop', 'Cancel all jobs', text_beside=True)
         bar.addSeparator()
@@ -2705,6 +2717,8 @@ class MainWindow(QMainWindow):
         self.viewer.clear(keep_canvas=True)
         self._sync_viewer_bodies(project)
         self._set_result(result, status=status)
+        self._refresh_welcome()
+        self._refresh_action_states()
 
     # ----------------------------------------------------------------- replay
 
@@ -2712,6 +2726,7 @@ class MainWindow(QMainWindow):
         try:
             self._set_result_body(result, status)
         finally:
+            self._refresh_welcome()            # a detached replay counts as content; clearing it may restore the empty state
             self._refresh_action_states()
 
     def _set_result_body(self, result: Optional[ResultRecord], status: Optional[str] = None) -> None:
