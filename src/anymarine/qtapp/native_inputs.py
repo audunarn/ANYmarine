@@ -103,8 +103,6 @@ class NativeInputsDialog(QDialog):
         authoring.addWidget(self._remove_member_button)
         layout.addLayout(authoring)
         self._build_tree()
-        self.tree.selectionModel().currentChanged.connect(self._sync_member_buttons)
-        self._sync_member_buttons()
 
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self.accept)
@@ -223,15 +221,6 @@ class NativeInputsDialog(QDialog):
         self._add_member_button.setVisible(has_morison)
         self._edit_member_button.setVisible(has_morison)
         self._remove_member_button.setVisible(has_morison)
-        if hasattr(self.tree, 'selectionModel') and self.tree.selectionModel() is not None:
-            self._sync_member_buttons()
-
-    def _sync_member_buttons(self, *args):
-        """Edit/Remove need a selected Morison member row."""
-        selected = self._selected_member_index() is not None
-        for button in (self._edit_member_button, self._remove_member_button):
-            button.setEnabled(selected)
-            button.setToolTip('' if selected else 'Select a Morison member row first')
 
     def _validate_cell(self, item):
         """Inline check of a numeric cell: a value that does not parse is marked red with the reason."""

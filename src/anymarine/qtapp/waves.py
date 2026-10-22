@@ -36,7 +36,6 @@ class WavesPanel(QWidget):
     @handle.setter
     def handle(self,value):
         self._handle=value
-        self._sync_buttons()
         changed=getattr(self.window,'_on_wave_layer_changed',None)
         if changed is not None:changed()
 
@@ -44,7 +43,7 @@ class WavesPanel(QWidget):
         super().__init__(window)
         self.window=window
         self.field=None;self._handle=None;self.saved_poses=None;self.saved_view=None
-        self._job_id=None;self.time=0.;self.mechanical_environment=None
+        self.job_id=None;self.time=0.;self.mechanical_environment=None
         layout=QVBoxLayout(self)
         self.mode=QComboBox()
         self.mode.addItems(['Off','Incident waves (without disturbance)','Incident + body disturbance','Saved incident waves (matched to result)',
@@ -90,7 +89,6 @@ class WavesPanel(QWidget):
         self.cancel_button.clicked.connect(self.cancel)
         secondary=QHBoxLayout();secondary.addWidget(self.play);secondary.addWidget(self.cancel_button)
         layout.addLayout(secondary)
-        self._sync_buttons()
         self.status=QLabel('Choose Incident waves, or calculate body disturbance.')
         self.status.setWordWrap(True)
         layout.addWidget(self.status)
@@ -112,21 +110,6 @@ class WavesPanel(QWidget):
     def _fail(self,error):
         text,detail=friendly_error(error)
         self.status.setText(text);self.status.setToolTip(detail)
-
-    @property
-    def job_id(self):
-        return self._job_id
-
-    @job_id.setter
-    def job_id(self,value):
-        self._job_id=value
-        self._sync_buttons()
-
-    def _sync_buttons(self):
-        play=getattr(self,'play',None)
-        if play is None:return
-        play.setEnabled(self.handle is not None)
-        self.cancel_button.setEnabled(self._job_id is not None)
 
     @staticmethod
     def _spin(low,high,value,step):

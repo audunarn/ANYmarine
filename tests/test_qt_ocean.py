@@ -321,23 +321,6 @@ def test_forced_failure_falls_back_to_static_plane(scene_env):
 
 
 @requires_qt
-def test_animation_failure_stops_motion_and_records_diagnostic(scene_env):
-    scene, viewer, hull, qapp = scene_env
-    original = viewer.add_mesh_arrays
-
-    def broken(mesh, **kwargs):
-        raise RuntimeError("gpu lost")
-
-    scene._clock = lambda: scene._clock0 + 4.0
-    old = scene.handle
-    viewer.add_mesh_arrays = broken
-    assert scene.tick() is False
-    viewer.add_mesh_arrays = original
-    assert scene.handle is old and not old.removed and scene.mode == "still" and scene._timer is None
-    assert any("gpu lost" in d for d in scene.diagnostics)
-
-
-@requires_qt
 def test_motion_toggle_persists(qapp, monkeypatch, tmp_path):
     from PySide6 import QtCore
     real = QtCore.QSettings
@@ -352,3 +335,196 @@ def test_motion_toggle_persists(qapp, monkeypatch, tmp_path):
     monkeypatch.delenv(ocean.ENV_VAR)
     ocean.store_motion(True)
     assert ocean.read_mode() == "animated"
+
+
+# ------------------------------------------------------------------------------------------ review round 1 (Codex)
+def _water_entries(viewer):
+    from anymarine.qtapp.marine_scene import TAG
+    return [e for e in viewer._entries.values() if TAG in e["tags"] and not e["handle"].removed]
+
+
+def _timer_active(scene) -> bool:
+    return scene._timer is not None and scene._timer.isActive()
+
+
+def _assert_static_restored(scene, viewer, hull):
+    from anymarine.qtapp.marine_scene import model_extent, water_mesh
+    expected = water_mesh(*model_extent([hull]), grid=True)
+    assert scene.handle is not None and not scene.handle.removed
+    assert np.array_equal(np.asarray(scene.handle.mesh.positions), np.asarray(expected.positions))
+    assert viewer._entries[id(scene.handle)]["appearance"]["face_colors"] is None
+    water = _water_entries(viewer)
+    assert len(water) == 1 and water[0]["handle"] is scene.handle      # no ocean surface, no waterline left
+    assert scene._records == {} and not _timer_active(scene) and not scene.animating()
+
+
+def _failing_tick(scene, viewer, hull, how, monkeypatch):
+    from any3dview.retained import MeshHandle
+    scene._clock = lambda: scene._clock0 + 4.0
+    old = scene.handle
+    poisoned: set = set()
+    real_set_visible, real_remove = MeshHandle.set_visible, MeshHandle.remove
+    original_add = viewer.add_mesh_arrays
+    if how == "colours":
+        def bad(*a, **k):
+            raise RuntimeError("colour boom")
+        monkeypatch.setattr(ocean, "face_colours", bad)
+    elif how == "add":
+        def wrapped(mesh, **kwargs):
+            if kwargs.get("face_colors") is not None:
+                raise RuntimeError("gpu lost")
+            return original_add(mesh, **kwargs)
+        monkeypatch.setattr(viewer, "add_mesh_arrays", wrapped)
+    elif how == "set_visible":          # the NEW surface is created, then set_visible fails
+        def wrapped(mesh, **kwargs):
+            handle = original_add(mesh, **kwargs)
+            if kwargs.get("face_colors") is not None:
+                poisoned.add(id(handle))
+            return handle
+        monkeypatch.setattr(viewer, "add_mesh_arrays", wrapped)
+
+        def set_visible(self, visible):
+            if id(self) in poisoned:
+                raise RuntimeError("set_visible boom")
+            return real_set_visible(self, visible)
+        monkeypatch.setattr(MeshHandle, "set_visible", set_visible)
+    else:                               # the OLD surface cannot be removed
+        def remove(self):
+            if self is old and not poisoned:
+                poisoned.add(1)           # transient failure: the first attempt only
+                raise RuntimeError("remove boom")
+            return real_remove(self)
+        monkeypatch.setattr(MeshHandle, "remove", remove)
+    return scene.tick()                 # must never raise
+
+
+@requires_qt
+@pytest.mark.parametrize("how", ["colours", "set_visible", "add", "remove_old"])
+def test_animation_failure_anywhere_restores_static_plane_and_does_not_repeat(scene_env, how, monkeypatch):
+    scene, viewer, hull, qapp = scene_env
+    assert _failing_tick(scene, viewer, hull, how, monkeypatch) is False
+    monkeypatch.undo()
+    assert scene.diagnostics and any("animation" in d for d in scene.diagnostics)
+    _assert_static_restored(scene, viewer, hull)
+    # no repeat on later ticks / timer events
+    scene._clock = lambda: scene._clock0 + 40.0
+    before = len(scene.diagnostics)
+    count = {"n": 0}
+    original = viewer.add_mesh_arrays
+
+    def counting(mesh, **kwargs):
+        count["n"] += 1
+        return original(mesh, **kwargs)
+    viewer.add_mesh_arrays = counting
+    for _ in range(3):
+        assert scene.tick() is False
+    viewer.add_mesh_arrays = original
+    assert count["n"] == 0 and len(scene.diagnostics) == before and scene.updates == 0
+    scene.sync([hull])                              # a later rebuild stays on the static plane
+    _assert_static_restored(scene, viewer, hull)
+
+
+@requires_qt
+def test_timer_is_inactive_while_hidden_minimised_closed_and_destroyed(qapp, scene_env):
+    scene, viewer, hull, _ = scene_env
+    assert _timer_active(scene)
+    viewer.hide()
+    qapp.processEvents()
+    assert not _timer_active(scene)
+    viewer.show()
+    qapp.processEvents()
+    assert _timer_active(scene)
+    viewer.showMinimized()
+    qapp.processEvents()
+    assert not _timer_active(scene)
+    viewer.showNormal()
+    qapp.processEvents()
+    assert _timer_active(scene)
+
+
+def _own_env(qapp, monkeypatch):
+    from any3dview import MeshArrays, create_viewer
+    from any3dview.qt import QtViewerHostAdapter
+    from anymarine.qtapp.marine_scene import MarineScene
+    monkeypatch.delenv(ocean.ENV_VAR, raising=False)
+    viewer = create_viewer(None, "software", host=QtViewerHostAdapter())
+    viewer.resize(320, 200)
+    viewer.show()
+    qapp.processEvents()
+    pos, tri = _box()
+    hull = viewer.add_mesh_arrays(MeshArrays(positions=pos, triangles=tri), color="#c0703a")
+    scene = MarineScene()
+    scene.apply(viewer)
+    scene.mode_override = "animated"
+    scene.sync([hull])
+    return scene, viewer, hull
+
+
+@requires_qt
+def test_timer_is_inactive_after_viewer_close(qapp, monkeypatch):
+    scene, viewer, hull = _own_env(qapp, monkeypatch)
+    assert _timer_active(scene)
+    viewer.close()
+    qapp.processEvents()
+    assert not _timer_active(scene)
+    scene.shutdown()
+
+
+@requires_qt
+def test_timer_stops_when_viewer_is_destroyed_and_after_shutdown(qapp, monkeypatch):
+    import shiboken6
+    from any3dview import MeshArrays, create_viewer
+    from any3dview.qt import QtViewerHostAdapter
+    scene, viewer, hull = _own_env(qapp, monkeypatch)
+    pos, tri = _box()
+    assert _timer_active(scene)
+    shiboken6.delete(viewer)
+    qapp.processEvents()
+    assert not _timer_active(scene)
+    assert scene.tick() is False                      # a dead viewer is not touched
+    # explicit teardown also releases the timer
+    viewer2 = create_viewer(None, "software", host=QtViewerHostAdapter())
+    viewer2.show()
+    qapp.processEvents()
+    hull2 = viewer2.add_mesh_arrays(MeshArrays(positions=pos, triangles=tri), color="#c0703a")
+    scene.apply(viewer2)
+    scene.sync([hull2])
+    assert _timer_active(scene)
+    scene.shutdown()
+    assert scene._timer is None and scene.handle is None
+    viewer2.close()
+
+
+def _waterline_positions(scene):
+    return np.asarray(scene._records[id(scene.handle)]["extras"][0].mesh.positions)
+
+
+@requires_qt
+def test_waterline_follows_hull_transform_on_refresh_and_on_redraw(scene_env):
+    scene, viewer, hull, qapp = scene_env
+    before = _waterline_positions(scene).copy()
+    move = np.eye(4)
+    move[0, 3] = 3.0
+    hull.set_transform(move)
+    assert scene.refresh_waterline() is True
+    after = _waterline_positions(scene)
+    expected = np.asarray(ocean.waterline_mesh([hull]).positions)
+    assert np.allclose(np.sort(after, axis=0), np.sort(expected, axis=0)) and np.all(after[:, 2] == 0.0)
+    assert not np.allclose(after[:, 0].mean(), before[:, 0].mean())
+    assert scene.refresh_waterline() is False                       # unchanged: nothing rebuilt
+    assert len(_water_entries(viewer)) == 2                         # surface + one waterline, no leak
+    # without any explicit call: the next painted frame brings the line along
+    move[0, 3] = -2.0
+    hull.set_transform(move)
+    viewer.redraw()
+    viewer.grab()
+    qapp.processEvents()
+    expected = np.asarray(ocean.waterline_mesh([hull]).positions)
+    assert np.allclose(np.sort(_waterline_positions(scene), axis=0), np.sort(expected, axis=0))
+    assert len(_water_entries(viewer)) == 2
+    # hull rises out of the water: the line disappears
+    lift = np.eye(4)
+    lift[2, 3] = 5.0
+    hull.set_transform(lift)
+    assert scene.refresh_waterline() is True
+    assert scene._records[id(scene.handle)]["extras"] == [] and len(_water_entries(viewer)) == 1

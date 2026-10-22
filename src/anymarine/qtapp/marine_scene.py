@@ -86,6 +86,46 @@ def water_mesh(low: np.ndarray, high: np.ndarray, *, grid: bool) -> MeshArrays:
     return MeshArrays(positions=positions, triangles=triangles, lines=lines)
 
 
+def _signature(handles: Iterable[object]) -> tuple:
+    """Cheap fingerprint of what the waterline depends on: handle identity, visibility, transform."""
+    out = []
+    for handle in handles:
+        if handle is None:
+            continue
+        try:
+            transform = np.ascontiguousarray(handle.transform, dtype=np.float64).tobytes()
+        except Exception:
+            transform = b""
+        out.append((id(handle), bool(getattr(handle, "removed", False)), bool(getattr(handle, "visible", True)), transform))
+    return tuple(out)
+
+
+def _make_watcher(scene):
+    """A QObject event filter that reports show/hide/minimise/close/paint of the viewer to ``scene``."""
+    import weakref
+    from PySide6.QtCore import QEvent, QObject
+    ref = weakref.ref(scene)
+    lifecycle = {QEvent.Type.Show, QEvent.Type.Hide, QEvent.Type.Close, QEvent.Type.WindowStateChange,
+                 QEvent.Type.ParentChange}
+
+    class _Watcher(QObject):
+        def eventFilter(self, obj, event):   # noqa: N802 (Qt API)
+            target = ref()
+            if target is None:
+                return False
+            try:
+                kind = event.type()
+                if kind in lifecycle:
+                    target._on_viewer_event(kind == QEvent.Type.ParentChange)
+                elif kind == QEvent.Type.Paint:
+                    target._on_viewer_paint()
+            except Exception as error:   # a filter must never break painting
+                target.diagnostics.append(f"ocean viewer watcher: {type(error).__name__}: {error}")
+            return False
+
+    return _Watcher()
+
+
 class MarineScene:
     """Owns the water handle (and its waterline companion) in the current viewer."""
 
@@ -100,6 +140,8 @@ class MarineScene:
         self.mode_override: Optional[str] = None   # tests / callers; otherwise ocean.read_mode()
         self._records: dict[int, dict] = {}   # id(handle) -> {handle, layout, extras, colours}
         self._timer = None
+        self._watcher = None
+        self._watched: list = []
         self._clock0 = time.monotonic()
         self._clock = time.monotonic            # injectable for tests
 
@@ -110,11 +152,13 @@ class MarineScene:
 
     def apply(self, viewer) -> None:
         """Adopt ``viewer`` (the initial renderer): background, no plane yet."""
+        self._unwatch()
         self.viewer = viewer
         self.handle = None
         self._records.clear()
         self._stop_timer()
         viewer.set_background(BACKGROUND)
+        self._watch(viewer)
 
     # ------------------------------------------------------------------ build
     def build(self, viewer, model_handles: Iterable[object]):
@@ -170,14 +214,19 @@ class MarineScene:
                     except Exception:
                         pass
             raise
-        self._records[id(handle)] = {"handle": handle, "layout": layout, "extras": extras, "colours": tuple(colours)}
+        self._records[id(handle)] = {"handle": handle, "layout": layout, "extras": extras, "colours": tuple(colours),
+                                    "handles": handles, "sig": _signature(handles)}
         return handle
 
     # ------------------------------------------------------------------ lifecycle
     def adopt(self, viewer, handle) -> None:
         """Take over a viewer prepared by :meth:`build` (the previous viewer is already gone)."""
+        if viewer is not self.viewer:
+            self._unwatch()
         self.viewer = viewer
         self.handle = handle
+        if not self._watched:
+            self._watch(viewer)
         self._records = {key: rec for key, rec in self._records.items() if rec["handle"] is handle}
         self._show(not self.suppressed)
         self._update_timer()
@@ -189,7 +238,10 @@ class MarineScene:
     def _show(self, visible: bool) -> None:
         for part in self._parts():
             if not part.removed:
-                part.set_visible(visible)
+                try:
+                    part.set_visible(visible)
+                except Exception as error:     # called from window handlers: never let a viewer error escape
+                    self.diagnostics.append(f"ocean visibility change failed: {type(error).__name__}: {error}")
 
     def _drop(self) -> None:
         handle, self.handle = self.handle, None
@@ -203,7 +255,10 @@ class MarineScene:
         self._records.clear()
         self._stop_timer()
         if handle is not None and not handle.removed:
-            handle.remove()
+            try:
+                handle.remove()
+            except Exception:
+                pass
 
     def sync(self, model_handles: Iterable[object]) -> None:
         """Rebuild the plane around the model in the current viewer; no model, no plane."""
@@ -268,6 +323,9 @@ class MarineScene:
         """The timer exists only while an animated, visible, unsuppressed plane exists."""
         wanted = (self.mode == "animated" and self._plane_live() and bool(self.handle.visible)
                   and not self.suppressed)
+        if wanted:
+            visible, minimised = self._viewer_state()
+            wanted = visible and not minimised
         if not wanted:
             self._stop_timer()
             return
@@ -296,27 +354,171 @@ class MarineScene:
 
         ANY3dView applies face colours only when a mesh is added, so a step replaces the surface handle
         (new one first, then the old one is removed). Nothing happens when the gate is closed or when
-        the quantised colours did not change.
+        the quantised colours did not change. The whole replacement is guarded: any failure restores the
+        static plane (``_animation_failed``) and stops the animation for good.
         """
         if not self.animating():
             return False
-        rec = self._records[id(self.handle)]
-        colours = tuple(ocean.to_hex(ocean.face_colours(rec["layout"], self._elapsed(), motion=True)))
-        if colours == rec["colours"]:
+        self.refresh_waterline()
+        if not self._plane_live():
             return False
+        rec = self._records[id(self.handle)]
+        new = None
         old = self.handle
         try:
+            colours = tuple(ocean.to_hex(ocean.face_colours(rec["layout"], self._elapsed(), motion=True)))
+            if colours == rec["colours"]:
+                return False
             new = self._add_surface(self.viewer, rec["layout"], colours)
+            new.set_visible(not self.suppressed)
+            self._records.pop(id(old), None)
+            self._records[id(new)] = {**rec, "handle": new, "colours": colours}
+            self.handle = new
+            new = None
+            if not old.removed:
+                old.remove()
         except Exception as error:
-            self.diagnostics.append(f"ocean animation stopped: {type(error).__name__}: {error}")
-            self.mode_override = "still"
-            self._update_timer()
+            self._animation_failed(error, new, old)
             return False
-        new.set_visible(not self.suppressed)
-        self._records.pop(id(old), None)
-        self._records[id(new)] = {**rec, "handle": new, "colours": colours}
-        self.handle = new
-        if not old.removed:
-            old.remove()
         self.updates += 1
         return True
+
+    def _animation_failed(self, error: BaseException, *leftovers) -> None:
+        """Record the failure, drop every ocean part (also a half-built one) and restore the static plane."""
+        self.diagnostics.append(f"ocean animation stopped, static plane restored: {type(error).__name__}: {error}")
+        self.mode_override = "static"
+        handles = ()
+        parts = [*leftovers, self.handle]
+        for rec in self._records.values():
+            handles = rec.get("handles", handles)
+            parts.extend((rec["handle"], *rec["extras"]))
+        self._stop_timer()
+        self._records.clear()
+        self.handle = None
+        for part in parts:
+            if part is not None and not part.removed:
+                try:
+                    part.remove()
+                except Exception:
+                    pass
+        viewer = self.viewer
+        try:
+            extent = model_extent(handles)
+            if viewer is not None and extent is not None:
+                self.handle = self._build_static(viewer, extent)
+                self._show(not self.suppressed)
+                viewer.redraw()
+        except Exception as again:
+            self.handle = None
+            self.diagnostics.append(f"static plane unavailable after animation failure: {type(again).__name__}: {again}")
+
+    # ------------------------------------------------------------------ waterline follows the hulls
+    def refresh_waterline(self) -> bool:
+        """Rebuild the waterline when a model transform/visibility changed (replay moves hulls with
+        ``set_transform`` without telling the scene). Returns True when the line was replaced."""
+        if not self._plane_live():
+            return False
+        rec = self._records[id(self.handle)]
+        sig = _signature(rec["handles"])
+        if sig == rec["sig"]:
+            return False
+        old = list(rec["extras"])
+        new: list = []
+        try:
+            line_mesh = ocean.waterline_mesh(rec["handles"])
+            if line_mesh is not None:
+                part = self.viewer.add_mesh_arrays(
+                    line_mesh, color=ocean.WATERLINE, line_color=ocean.WATERLINE, line_width=2, lit=False,
+                    pickable=False, tags=TAG)
+                new.append(part)
+                part.set_visible(bool(self.handle.visible) and not self.suppressed)
+        except Exception as error:
+            for part in new:
+                try:
+                    part.remove()
+                except Exception:
+                    pass
+            rec["sig"] = sig          # do not retry every frame
+            self.diagnostics.append(f"ocean waterline refresh failed: {type(error).__name__}: {error}")
+            return False
+        rec["sig"] = sig
+        rec["extras"] = new
+        for part in old:
+            if not part.removed:
+                try:
+                    part.remove()
+                except Exception:
+                    pass
+        self.viewer.redraw()
+        return True
+
+    # ------------------------------------------------------------------ viewer lifecycle watching
+    def _watch(self, viewer) -> None:
+        try:
+            from PySide6.QtCore import QObject
+            from PySide6.QtWidgets import QWidget
+            if not isinstance(viewer, QObject):
+                return
+            self._watcher = _make_watcher(self)
+            targets = [viewer]
+            window = viewer.window()
+            if window is not None and window is not viewer:
+                targets.append(window)
+            targets.extend(child for child in viewer.findChildren(QWidget))
+            for target in targets:
+                target.installEventFilter(self._watcher)
+            self._watched = targets
+            import weakref
+            ref = weakref.ref(self)
+
+            def gone(*_):
+                scene = ref()
+                if scene is not None:
+                    scene._on_viewer_destroyed()
+            viewer.destroyed.connect(gone)
+        except Exception as error:
+            self.diagnostics.append(f"ocean viewer watcher unavailable: {type(error).__name__}: {error}")
+
+    def _unwatch(self) -> None:
+        watcher, self._watcher = self._watcher, None
+        targets, self._watched = self._watched, []
+        for target in targets:
+            try:
+                if watcher is not None:
+                    target.removeEventFilter(watcher)
+            except Exception:
+                pass
+        if watcher is not None:
+            try:
+                watcher.deleteLater()
+            except Exception:
+                pass
+
+    def _on_viewer_event(self, reparented: bool = False) -> None:
+        if reparented and self.viewer is not None:
+            self._unwatch()
+            self._watch(self.viewer)
+        self._update_timer()
+
+    def _on_viewer_paint(self) -> None:
+        if self._plane_live():
+            self.refresh_waterline()
+
+    def _on_viewer_destroyed(self) -> None:
+        self._stop_timer()
+        self.handle = None
+        self._records.clear()
+        self.viewer = None
+        self._watcher = None
+        self._watched = []
+
+    def shutdown(self) -> None:
+        """Release the timer and the viewer hooks (scene teardown)."""
+        self._unwatch()
+        try:
+            if self.viewer is not None:
+                self._drop()
+        except Exception:
+            self.handle = None
+            self._records.clear()
+        self._stop_timer()

@@ -55,38 +55,43 @@ def test_find_snapshots_recognises_single_and_pair_folders(tmp_path):
 
 
 @requires_qt
-def test_workflow_dialogs_enable_their_action_only_when_valid(tmp_path):
+def test_workflow_dialog_buttons_stay_enabled_as_before_with_empty_fields(tmp_path):
+    """Only the labels changed (U2); enablement is the original one, so the buttons are never disabled."""
     from PySide6.QtWidgets import QApplication
     from anymarine.qtapp.assessment import (AssessSingleDialog, PairDialog, RegisterCaseDialog,
                                             ReopenSnapshotDialog)
     QApplication.instance() or QApplication([])
     register = RegisterCaseDialog()
-    assert register._ok.text() == 'Register case' and not register._ok.isEnabled()
-    register._spec_edit.setText('spec.json')
-    assert not register._ok.isEnabled()
-    register._target_edit.setText('case.json')
-    assert register._ok.isEnabled()
+    assert register._ok.text() == 'Register case' and register._ok.isEnabled()
     assess = AssessSingleDialog(['r1'], 'r1')
-    assert assess._ok.text() == 'Assess result' and not assess._ok.isEnabled()
-    assess._case_edit.setText('case.json')
-    assert assess._ok.isEnabled()
-    assert not AssessSingleDialog([], '')._ok.isEnabled()
+    assert assess._ok.text() == 'Assess result' and assess._ok.isEnabled()
+    assert AssessSingleDialog([], '')._ok.isEnabled()
     pair = PairDialog(lambda root: ['r1'])
-    assert pair._ok.text() == 'Assess pair' and not pair._ok.isEnabled()
-    for member in (pair.coarse(), pair.fine()):
-        member._root_edit.setText(str(tmp_path))
-        member.reload_results()
-        member._case_edit.setText('case.json')
-    assert not pair._ok.isEnabled()
-    pair._out_edit.setText(str(tmp_path / 'out'))
-    assert pair._ok.isEnabled()
-    snap = tmp_path / 'snap'
-    (snap / 'cases').mkdir(parents=True)
-    (snap / 'reports').mkdir()
+    assert pair._ok.text() == 'Assess pair' and pair._ok.isEnabled()
     reopen = ReopenSnapshotDialog(project_root=tmp_path)
-    assert not reopen._ok.isEnabled() and reopen._snapshots.count() == 1
-    reopen._snapshots.setCurrentRow(0)
-    assert reopen.snapshot_root() == str(snap) and reopen._ok.isEnabled()
+    assert reopen._ok.text() == 'Reopen snapshot' and reopen._ok.isEnabled()
+
+
+@requires_qt
+def test_native_inputs_and_waves_buttons_are_enabled_as_before():
+    from PySide6.QtWidgets import QApplication, QWidget
+    QApplication.instance() or QApplication([])
+    from anymarine.native_examples import morison_two_body_project
+    from anymarine.qtapp.native_inputs import NativeInputsDialog
+    from anymarine.qtapp.waves import WavesPanel
+    from PySide6.QtCore import QObject, Signal
+
+    class Jobs(QObject):
+        wave_ready = Signal(object, object)
+        state_changed = Signal(object, object)
+    window = QWidget()
+    window._job_manager = Jobs()
+    panel = WavesPanel(window)
+    assert panel.handle is None and panel.job_id is None
+    assert panel.play.isEnabled() and panel.cancel_button.isEnabled()      # as on origin/main
+    dialog = NativeInputsDialog(morison_two_body_project())
+    assert dialog._edit_member_button.isEnabled() and dialog._remove_member_button.isEnabled()
+    dialog.close()
 
 
 @requires_qt
@@ -132,16 +137,48 @@ def test_channel_titles_are_readable_and_units_are_never_guessed():
     assert channel_title('') == ('', '')
 
 
-@requires_qt
-def test_time_series_plot_renders_with_axes_and_keeps_stored_arrays():
+def _plot_image(label='kinetic_energy', abscissa=None, size=(400, 200)):
     from PySide6.QtWidgets import QApplication
     from anymarine.qtapp.plot import TimeSeriesPlot
     QApplication.instance() or QApplication([])
     plot = TimeSeriesPlot()
-    plot.resize(400, 200)
-    plot.set_series('kinetic_energy', [0., 1., 2., 3.], [0., 2., 1., 4.])
+    plot.resize(*size)
+    if abscissa:
+        plot._abscissa = abscissa
+    plot.set_series(label, [0., 1., 2., 3.], [0., 2., 1., 4.])
     plot.set_cursor(2)
     assert plot.series_values() == (0., 2., 1., 4.) and plot.cursor_index() == 2
-    assert not plot.grab().isNull()
-    plot.set_series('', [], [])
-    assert not plot.grab().isNull()
+    return plot, plot.grab().toImage()
+
+
+def _ink(image, x0, y0, x1, y1):
+    """Number of non-background pixels in a rectangle (the plot paints on white)."""
+    count = 0
+    for y in range(max(y0, 0), min(y1, image.height())):
+        for x in range(max(x0, 0), min(x1, image.width())):
+            if (image.pixel(x, y) & 0xFFFFFF) != 0xFFFFFF:
+                count += 1
+    return count
+
+
+@requires_qt
+def test_time_series_plot_draws_title_axis_labels_and_caption():
+    plot, image = _plot_image()
+    w, h = image.width(), image.height()
+    assert (w, h) == (400, 200) or image.devicePixelRatio() > 1
+    w, h = int(w / image.devicePixelRatio()), int(h / image.devicePixelRatio())
+    ratio = image.devicePixelRatio()
+    # each strip is outside the curve/grid area, so ink there can only come from the drawn text
+    title = _ink(image, 0, 0, int(w * ratio), int(8 * ratio) + 12)          # title strip above the frame
+    y_labels = _ink(image, 0, int(40 * ratio), int(26 * ratio), int(h * ratio) - int(50 * ratio))   # y tick labels
+    caption = _ink(image, int(w * ratio * 0.6), int((h - 14) * ratio), int(w * ratio), int(h * ratio))   # axis caption
+    assert title > 20 and y_labels > 20 and caption > 20, (title, y_labels, caption)
+    # the text content matters: another channel/abscissa changes the strips
+    _, other = _plot_image(label='', abscissa='stage')
+    assert _ink(other, 0, 0, int(w * ratio * 0.5), int(8 * ratio) + 12) < title
+    assert image != other
+    empty = _plot_image()[0]
+    empty.set_series('', [], [])
+    blank = empty.grab().toImage()
+    assert _ink(blank, int(w * ratio * 0.6), int((h - 14) * ratio), int(w * ratio), int(h * ratio)) == 0   # no caption without a series
+    assert not blank.isNull()

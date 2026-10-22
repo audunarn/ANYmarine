@@ -352,12 +352,6 @@ class RegisterCaseDialog(QDialog):
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         form.addRow(buttons)
-        self._spec_edit.textChanged.connect(self._validate)
-        self._target_edit.textChanged.connect(self._validate)
-        self._validate()
-
-    def _validate(self, *args) -> None:
-        self._ok.setEnabled(bool(self.spec_path() and self.target_path()))
 
     def _browse_spec(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
@@ -406,12 +400,6 @@ class AssessSingleDialog(QDialog):
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         form.addRow(buttons)
-        self._case_edit.textChanged.connect(self._validate)
-        self._result_combo.currentTextChanged.connect(self._validate)
-        self._validate()
-
-    def _validate(self, *args) -> None:
-        self._ok.setEnabled(bool(self.case_path() and self.result_id()))
 
     def _browse_case(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
@@ -538,13 +526,6 @@ class PairDialog(QDialog):
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
-        self._coarse.changed.connect(self._validate)
-        self._fine.changed.connect(self._validate)
-        self._out_edit.textChanged.connect(self._validate)
-        self._validate()
-
-    def _validate(self, *args) -> None:
-        self._ok.setEnabled(self._coarse.is_complete() and self._fine.is_complete() and bool(self.out_root()))
 
     def coarse(self) -> PairMemberWidget:
         return self._coarse
@@ -592,8 +573,6 @@ class ReopenSnapshotDialog(QDialog):
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         form.addRow(buttons)
-        self._root_edit.textChanged.connect(lambda *_: self._ok.setEnabled(bool(self.snapshot_root())))
-        self._ok.setEnabled(False)
 
     def _browse(self) -> None:
         path = QFileDialog.getExistingDirectory(self, "Assessment snapshot root")
