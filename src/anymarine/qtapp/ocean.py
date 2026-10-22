@@ -222,9 +222,17 @@ def face_colours(layout: OceanLayout, t: float = 0.0, *, motion: bool = True) ->
     return np.clip(out, 0.0, 1.0)
 
 
-def to_hex(rgb: np.ndarray) -> list[str]:
-    values = np.rint(np.clip(rgb, 0.0, 1.0) * 255.0).astype(np.uint8)
+def to_uint8(rgb: np.ndarray) -> np.ndarray:
+    """(faces, 3) uint8 RGB; the one quantisation shared by :func:`to_hex` and the in-place colour update."""
+    return np.rint(np.clip(rgb, 0.0, 1.0) * 255.0).astype(np.uint8)
+
+
+def uint8_to_hex(values: np.ndarray) -> list[str]:
     return ["#%02x%02x%02x" % (r, g, b) for r, g, b in values.tolist()]
+
+
+def to_hex(rgb: np.ndarray) -> list[str]:
+    return uint8_to_hex(to_uint8(rgb))
 
 
 # ------------------------------------------------------------------------------------------------ waterline

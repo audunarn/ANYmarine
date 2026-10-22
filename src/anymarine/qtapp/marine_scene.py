@@ -350,11 +350,16 @@ class MarineScene:
             self._timer.stop()
             self._timer = None
 
+    def _inplace_colours(self) -> bool:
+        """True when the viewer can rewrite per-face colours of an existing mesh (ANY3dView feature query)."""
+        return getattr(getattr(self.viewer, "capabilities", None), "face_color_update", False) is True
+
     def tick(self) -> bool:
         """One animation step; returns True when the surface was redrawn.
 
-        ANY3dView applies face colours only when a mesh is added, so a step replaces the surface handle
-        (new one first, then the old one is removed). Nothing happens when the gate is closed or when
+        With ``capabilities.face_color_update`` the colours are rewritten in place on the same handle;
+        older ANY3dView applies face colours only when a mesh is added, so a step then replaces the surface
+        handle (new one first, then the old one is removed). Nothing happens when the gate is closed or when
         the quantised colours did not change. The whole replacement is guarded: any failure restores the
         static plane (``_animation_failed``) and stops the animation for good.
         """
@@ -367,6 +372,19 @@ class MarineScene:
         new = None
         old = self.handle
         try:
+            if self._inplace_colours():
+                # In-place path (ANY3dView with face_color_update): same handle, only the colour data changes.
+                rgb = ocean.to_uint8(ocean.face_colours(rec["layout"], self._elapsed(), motion=True))
+                previous = rec["colours"]
+                if isinstance(previous, np.ndarray):
+                    if np.array_equal(rgb, previous):
+                        return False
+                elif tuple(ocean.uint8_to_hex(rgb)) == previous:
+                    return False
+                old.update_face_colors(rgb)
+                rec["colours"] = rgb
+                self.updates += 1
+                return True
             colours = tuple(ocean.to_hex(ocean.face_colours(rec["layout"], self._elapsed(), motion=True)))
             if colours == rec["colours"]:
                 return False
