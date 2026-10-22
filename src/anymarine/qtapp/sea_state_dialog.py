@@ -1,4 +1,5 @@
 """Explicit generation of a new saved development sea state."""
+from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import (QDialog,QFormLayout,QDoubleSpinBox,QSpinBox,QLabel,
     QDialogButtonBox)
 from .theme import apply_theme
@@ -31,8 +32,16 @@ class SeaStateDialog(QDialog):
         buttons.button(QDialogButtonBox.StandardButton.RestoreDefaults).setText('Reset')
         buttons.button(QDialogButtonBox.StandardButton.RestoreDefaults).setToolTip('Restore the values the dialog opened with')
         buttons.button(QDialogButtonBox.StandardButton.RestoreDefaults).clicked.connect(self.reset)
-        ok=buttons.button(QDialogButtonBox.StandardButton.Ok);ok.setDefault(True);ok.setFocus()
+        ok=buttons.button(QDialogButtonBox.StandardButton.Ok);ok.setDefault(True)
+        self.height.setFocus()
         buttons.accepted.connect(self.accept);buttons.rejected.connect(self.reject);layout.addRow(buttons)
+
+    def showEvent(self,event):
+        super().showEvent(event)
+        QTimer.singleShot(0,self._focus_first_field)
+
+    def _focus_first_field(self):
+        self.height.setFocus();self.height.selectAll()
 
     def reset(self):
         self.height.setValue(self._initial[0]);self.period.setValue(self._initial[1]);self.seed.setValue(self._initial[2])

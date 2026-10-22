@@ -129,6 +129,32 @@ class _ElidedLabel(QLabel):
                          self.displayed_text())
 
 
+class _ResultLabel(_ElidedLabel):
+    """Elided one-line result description whose tooltip always carries the full text."""
+
+    def setText(self, text):  # noqa: N802
+        super().setText(text)
+        self.setToolTip(text)
+
+
+class _ChannelCombo(QComboBox):
+    """Channel selector: readable titles are shown, the stored channel id is the item data."""
+
+    def set_channels(self, names) -> None:
+        from .plot import channel_title
+        self.clear()
+        for raw in sorted(names):
+            title, unit = channel_title(raw)
+            self.addItem(f"{title} [{unit}]" if unit else title, raw)
+            self.setItemData(self.count() - 1, raw, Qt.ItemDataRole.ToolTipRole)
+
+    def setCurrentText(self, text):  # noqa: N802
+        index = self.findData(text)         # callers that name the stored id still select it
+        if index < 0:
+            index = self.findText(text)
+        if index >= 0:
+            self.setCurrentIndex(index)
+
 
 def _plain_json(value):
     """Plain dict/list copy of a frozen JSON-like mapping (for Body.from_dict)."""
@@ -417,8 +443,7 @@ class MainWindow(QMainWindow):
         self._frame_slider.valueChanged.connect(self._on_slider_moved)
         # Full result status (shown in the Results panel); the bar shows a one-line summary
         # with the full status as its tooltip.
-        self._frame_label = QLabel("no result")
-        self._frame_label.setWordWrap(True)
+        self._frame_label = _ResultLabel("no result")
         self._frame_label.setProperty('role', 'hint')
         self._frame_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         self._transport_label = _ElidedLabel("no result")
@@ -433,10 +458,11 @@ class MainWindow(QMainWindow):
         self._transport = transport
 
         # results: channel time series (a context panel page)
-        self._channel_combo = QComboBox()
+        self._channel_combo = _ChannelCombo()
         self._channel_combo.setMinimumContentsLength(16)
         self._channel_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
-        self._channel_combo.currentTextChanged.connect(self._on_channel_changed)
+        self._channel_combo.currentIndexChanged.connect(
+            lambda _index: self._on_channel_changed(self._channel_combo.currentData() or ''))
         self._plot = TimeSeriesPlot()
 
         # assessment evidence (child-validated payloads; display only)
@@ -514,6 +540,11 @@ class MainWindow(QMainWindow):
             bar.addAction(action)
             self._mode_actions[name] = action
         self._mode_bar = bar
+        mode_menu = QMenu('Mode', self)
+        for action in self._mode_actions.values():
+            mode_menu.addAction(action)
+        self._view_menu.insertMenu(self._view_menu.actions()[0], mode_menu)
+        self._mode_menu = mode_menu
         self._mode = None
         self._context_widths = {}
         self._set_mode('model')
@@ -664,6 +695,7 @@ class MainWindow(QMainWindow):
         new_action = QAction("&New project", self)
         new_action.triggered.connect(self._new_project)
         open_action = QAction("&Open project...", self)
+        open_action.setShortcut("Ctrl+O")
         open_action.triggered.connect(self._open_project)
         save_action = QAction("&Save project", self)
         save_action.setShortcut("Ctrl+S")
@@ -727,6 +759,11 @@ class MainWindow(QMainWindow):
         file_menu.addAction(save_action)
         file_menu.addSeparator()
         file_menu.addMenu(examples_menu)
+        file_menu.addSeparator()
+        exit_action = QAction("E&xit", self)
+        exit_action.setShortcut("Ctrl+Q")
+        exit_action.triggered.connect(self.close)
+        file_menu.addAction(exit_action)
 
         jobs_menu = self._menu_bar.addMenu("&Jobs")
         run_action = QAction("&Run synthetic job", self)
@@ -751,26 +788,30 @@ class MainWindow(QMainWindow):
         edit_native_action.triggered.connect(self._edit_native_inputs)
         run_native_action = QAction('Run native mechanical job...', self)
         run_native_action.triggered.connect(self._run_native_job)
-        jobs_menu.addAction(import_native_action)
-        jobs_menu.addAction(edit_native_action)
         edit_sea_action=QAction('Edit shared sea state...',self)
         edit_sea_action.triggered.connect(self._edit_shared_sea_state)
-        jobs_menu.addAction(edit_sea_action)
-        jobs_menu.addAction(run_native_action)
         run_hams_action = QAction('Run configured HAMS fields…', self)
         run_hams_action.triggered.connect(self._run_hams_job)
-        jobs_menu.addAction(run_hams_action)
         static_action=QAction('Run coupled static equilibrium job',self)
         static_action.triggered.connect(self._run_equilibrium_job)
-        jobs_menu.addAction(static_action)
         adoption_action=QAction('Adopt selected static equilibrium…',self)
         adoption_action.triggered.connect(self._adopt_equilibrium_dialog)
-        jobs_menu.addAction(adoption_action)
-        jobs_menu.addSeparator()
-        jobs_menu.addAction(run_action)
+        run_action.setToolTip('Run the synthetic demonstration job: a deterministic, unqualified replay, not a hydrodynamic result')
+        jobs_menu.setToolTipsVisible(True)
+        # Grouped: runs (linear development job first), inputs and setup, then cancel.
         jobs_menu.addAction(run_linear_action)
+        jobs_menu.addAction(run_action)
+        jobs_menu.addAction(run_native_action)
+        jobs_menu.addAction(run_hams_action)
+        jobs_menu.addAction(static_action)
+        jobs_menu.addSeparator()
         jobs_menu.addAction(import_hydro_action)
         jobs_menu.addAction(import_derived_action)
+        jobs_menu.addAction(import_native_action)
+        jobs_menu.addAction(edit_native_action)
+        jobs_menu.addAction(edit_sea_action)
+        jobs_menu.addAction(adoption_action)
+        jobs_menu.addSeparator()
         jobs_menu.addAction(cancel_action)
 
         assessment_menu = self._menu_bar.addMenu("&Assessment")
@@ -820,6 +861,22 @@ class MainWindow(QMainWindow):
             action.toggled.connect(lambda visible, kind=kind: self._toggle_water(kind, visible))
             view_menu.addAction(action)
             self._water_actions[kind] = action
+        ocean_action = QAction('Animate ocean surface', self)
+        ocean_action.setCheckable(True)
+        ocean_action.setToolTip('Gentle colour ripples on the still-water plane (scenery only; no wave model)')
+        ocean_action.setChecked(self._marine.mode == 'animated')
+        ocean_action.setEnabled(self._marine.mode != 'static')
+        ocean_action.toggled.connect(self._toggle_ocean_motion)
+        view_menu.addAction(ocean_action)
+        self._ocean_motion_action = ocean_action
+        view_menu.addSeparator()
+        standard_menu = view_menu.addMenu('Standard views')
+        for label, azimuth, elevation in (('Isometric', 45.0, 28.0), ('Top', 0.0, 89.0), ('Side', 0.0, 0.0)):
+            view_action = QAction(label, self)
+            view_action.triggered.connect(lambda checked=False, a=azimuth, e=elevation: self._standard_view(a, e))
+            standard_menu.addAction(view_action)
+        self._standard_views_menu = standard_menu
+        self._view_menu = view_menu
         jobs_action = QAction('Jobs and log', self)
         jobs_action.setShortcut('Ctrl+J')
         jobs_action.triggered.connect(lambda: self._set_jobs_drawer(self._jobs_dock.isHidden()))
@@ -833,6 +890,7 @@ class MainWindow(QMainWindow):
         loading.triggered.connect(self._show_loading_help)
         help_menu.addAction(loading)
         development_status_action = QAction('Development status...', self)
+        development_status_action.setShortcut('F1')
         development_status_action.triggered.connect(self._show_development_status)
         help_menu.addAction(development_status_action)
         # Keep Python wrappers alive alongside their Qt menu-bar ownership.
@@ -1223,8 +1281,20 @@ class MainWindow(QMainWindow):
     def _toggle_water(self, kind: str, visible: bool) -> None:
         if kind == 'water':
             self._marine.water_visible = visible
+            self._water_actions['grid'].setEnabled(visible)
+            self._ocean_motion_action.setEnabled(visible and self._marine.mode != 'static')
         else:
             self._marine.grid_visible = visible
+        self._refresh_water()
+        self.viewer.redraw()
+
+    def _toggle_ocean_motion(self, enabled: bool) -> None:
+        from . import ocean
+        try:
+            ocean.store_motion(enabled)
+        except Exception:
+            pass                              # a settings failure must not block the live switch
+        self._marine.mode_override = 'animated' if enabled else 'still'
         self._refresh_water()
         self.viewer.redraw()
 
@@ -2170,7 +2240,7 @@ class MainWindow(QMainWindow):
         return matches[0]
 
     def _reopen_dialog(self) -> None:
-        dialog = ReopenSnapshotDialog(self)
+        dialog = ReopenSnapshotDialog(self, project_root=self._project_root)
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return
         self._do_reopen(dialog.snapshot_root())
@@ -2450,9 +2520,9 @@ class MainWindow(QMainWindow):
         self._frame_slider.setValue(0)
         self._channel_combo.blockSignals(True)
         self._channel_combo.clear()
-        self._channel_combo.addItems(sorted(result.channels))
+        self._channel_combo.set_channels(result.channels)
         self._channel_combo.blockSignals(False)
-        self._on_channel_changed(self._channel_combo.currentText())
+        self._on_channel_changed(self._channel_combo.currentData() or '')
         self._current_frame = 0
         stale = self._service.result_stale(self._project, result) if self._project else False
         self._result_status = (
@@ -2517,8 +2587,9 @@ class MainWindow(QMainWindow):
                 transform = frame_transform(position, orientation)
             handle.set_transform(transform)
         self._member_scene.update(self._handles,None if self._current_result.line_nodes is None else self._current_result.line_nodes[index],result=self._current_result,index=index)
+        self._marine.refresh_waterline()      # the waterline follows the moved hulls without waiting for a paint
         if self._current_result.kind not in ('equilibrium_development','line_equilibrium_development'):self._waves.set_replay_time(self._current_result.times[index])
-        channel = self._channel_combo.currentText()
+        channel = self._channel_combo.currentData()
         if channel:
             self._plot.set_cursor(index)
         if self._current_result.times:
@@ -2654,10 +2725,40 @@ class MainWindow(QMainWindow):
         dialog = DevelopmentStatusDialog(status, self)
         dialog.exec()
 
+    @staticmethod
+    def _component_versions() -> list[tuple[str, str]]:
+        """(distribution, version) for the components ANYmarine runs on; 'not installed' when missing."""
+        from importlib import metadata
+        rows = []
+        for name in ("any3dview", "anyhydro", "anysolver", "anyloads", "numpy", "PySide6"):
+            try:
+                rows.append((name, metadata.version(name)))
+            except Exception:
+                rows.append((name, "not installed"))
+        return rows
+
+    @staticmethod
+    def _application_version() -> str:
+        from importlib import metadata
+        try:
+            return metadata.version("anymarine")
+        except Exception:
+            try:
+                from .. import __version__
+                return str(__version__)
+            except Exception:
+                return "unknown"
+
     def _show_about(self) -> None:
+        docs = Path(__file__).resolve().parents[3] / "docs"
+        docs_text = str(docs) if docs.is_dir() else "the docs folder of the ANYmarine source repository"
+        components = "\n".join(f"  {name} {version}" for name, version in self._component_versions())
         self._notify_info(
             "ANYmarine",
-            "ANYmarine application foundation.\n\n"
+            f"ANYmarine {self._application_version()} - application foundation.\n"
+            "Licence: MPL-2.0\n"
+            f"Documentation: {docs_text}\n\n"
+            f"Components:\n{components}\n\n"
             "Synthetic replay results are deterministic demonstrations labelled "
             "'synthetic_unqualified'. They are not boundary-element-method output "
             "and not dynamics integration, and are not qualified for production use.",
