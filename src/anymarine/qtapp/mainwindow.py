@@ -90,6 +90,7 @@ from .assessment import (
 )
 from .details import DetailsPanel
 from .jobs import ACTIVE_STATES, JOB_STATE_FAILED, JobManager
+from .mesh_outline import coplanar_outline_groups
 from .plot import TimeSeriesPlot
 from .projectmodel import ProjectTreeModel
 from .theme import apply_theme
@@ -1237,8 +1238,11 @@ class MainWindow(QMainWindow):
             triangles=np.asarray(display_mesh.triangles, dtype=np.uint32),
         )
         attached = any(s.role == 'attached' for s in body.hydro_surfaces)
+        # Outline only real edges: coplanar triangles of one face share a group (no per-triangle diagonals).
+        groups = coplanar_outline_groups(mesh.positions, mesh.triangles)
         handle = viewer.add_mesh_arrays(mesh, tags=body.body_id, color=body.color,
-                                        cull_backface=not attached, two_sided_shell=attached)
+                                        cull_backface=not attached, two_sided_shell=attached,
+                                        _outline_groups=groups)
         transform = np.eye(4)
         transform[:3, :3] = body.reference_orientation
         transform[:3, 3] = body.reference_position

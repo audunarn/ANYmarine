@@ -29,6 +29,44 @@ def friendly_error(error):
 MATCHED_NOTE=('Saved incident waves that drove the shown result, at the replay time: Play moves bodies and waves together. '
     'Undisturbed incident field; diffraction and radiation are not drawn. Development preview — unqualified.')
 
+_FIELD_CACHE={}
+
+def _fingerprint(field):
+    import hashlib,json
+    return hashlib.sha256(json.dumps(field,sort_keys=True,separators=(',',':')).encode()).digest()
+
+def cached_positions(field,time,*,disturbed=False):
+    """Same result as anyhydro.wave_preview.positions_at_time, validating a field once.
+
+    Soundness: the full validate_field runs whenever the field's content fingerprint (SHA-256 of its
+    whole JSON form, recomputed every call, so in-place edits and replaced objects are both seen)
+    differs from the one recorded after the last successful validation of that object. A failed
+    validation stores nothing and raises as before. The arithmetic below mirrors positions_at_time
+    on the validated copy (bit-identical; see tests/test_wave_preview_step_cost.py).
+    """
+    import math
+    from anyhydro.wave_preview import validate_field
+    key=id(field)
+    token=_fingerprint(field)
+    entry=_FIELD_CACHE.get(key)
+    if entry is None or entry[0] is not field or entry[1]!=token:
+        f=validate_field(field)
+        eta_in=np.asarray(f['incident_real'])+1j*np.asarray(f['incident_imag'])
+        eta_dif=np.asarray(f['diffraction_real'])+1j*np.asarray(f['diffraction_imag'])
+        vertices=np.array(f['vertices'],dtype=float)
+        for a in (eta_in,eta_dif,vertices):a.flags.writeable=False
+        entry=(field,token,f['kind'],f['request']['omega'],eta_in,eta_dif,vertices)
+        _FIELD_CACHE.clear();_FIELD_CACHE[key]=entry
+    _,_,kind,omega,eta_in,eta_dif,vertices=entry
+    if isinstance(time,bool) or not math.isfinite(float(time)):
+        raise ValueError('wave time must be finite')
+    if type(disturbed) is not bool or disturbed and kind!='fixed_body_diffraction_preview':
+        raise ValueError('disturbed view requires an actual diffraction field')
+    eta=eta_in+eta_dif if disturbed else eta_in
+    points=vertices.copy()
+    points[:,2]=np.real(eta*np.exp(-1j*omega*float(time)))
+    return points
+
 class WavesPanel(QWidget):
     @property
     def handle(self):
@@ -325,8 +363,7 @@ class WavesPanel(QWidget):
             points=np.array(self.field['vertices'],copy=True)
             points[:,2]=self.mechanical_environment.surface_elevation(points[:,:2],self.time)
             return points
-        from anyhydro.wave_preview import positions_at_time
-        return positions_at_time(self.field,self.time,disturbed=self.mode.currentIndex()==2)
+        return cached_positions(self.field,self.time,disturbed=self.mode.currentIndex()==2)
 
     def elevation_values(self,points):
         datum=self.mechanical_environment.still_water_level if self.follows_replay else 0.
