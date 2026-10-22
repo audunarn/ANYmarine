@@ -32,6 +32,11 @@ _PATHS = {
     "assessment": '<rect x="5" y="4" width="14" height="17" rx="1.5"/><path d="M9 4V3h6v1"/><path d="M8.5 12.5l2.2 2.2 4.8-5"/>',
     "results": '<path d="M4 18l4-6 4 3 4-8 4 5"/><path d="M4 21h16"/>',
     "log": '<rect x="4" y="4" width="16" height="16" rx="1.5"/><path d="M8 9h8M8 12h8M8 15h5"/>',
+    "body": '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M12 12v9M12 12L4 7.5M12 12l8-4.5"/>',
+    "surface": '<path d="M4 17l4-9h12l-4 9z"/><path d="M8 8l-1 3M12 8l-1.3 4.5"/>',
+    "member": '<circle cx="5.5" cy="18.5" r="2"/><circle cx="18.5" cy="5.5" r="2"/><path d="M7 17l10-10"/>',
+    "equilibrium": '<path d="M3 11h18"/><path d="M6 14c2 2 4 2 6 0s4-2 6 0"/><path d="M12 4v7M9 7l3-3 3 3"/>',
+    "settings": '<path d="M4 7h16M4 12h16M4 17h16"/><circle cx="9" cy="7" r="1.8"/><circle cx="15" cy="12" r="1.8"/><circle cx="8" cy="17" r="1.8"/>',
     "play": '<path d="M8 5l11 7-11 7z"/>',
     "pause": '<path d="M8 5v14M16 5v14"/>',
 }

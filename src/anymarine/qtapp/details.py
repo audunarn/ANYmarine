@@ -83,11 +83,11 @@ class DetailsPanel(QWidget):
         layout.addLayout(self._stack)
 
         # empty page
-        empty = QLabel("Select a body, settings or a result in the project tree above "
-                       "to see and edit its properties.")
+        empty = QLabel(self.EMPTY_NO_PROJECT)
         empty.setObjectName("EmptyState")
         empty.setWordWrap(True)
         empty.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        self._empty_label = empty
         self._stack.addWidget(empty)
 
         # body page
@@ -223,14 +223,29 @@ class DetailsPanel(QWidget):
 
     # ---------------------------------------------------------------- state
 
+    EMPTY_NO_PROJECT = "No project open. Open a project or try an example (File > Examples)."
+    EMPTY_SELECT = ("Select a body, settings or a result in the project tree above "
+                    "to see and edit its properties.")
+
+    def empty_text(self) -> str:
+        """The text of the empty page (it depends on whether a project is open)."""
+        return self._empty_label.text()
+
+    def is_empty(self) -> bool:
+        return self._stack.currentIndex() == _PAGE_EMPTY
+
+    def _show_empty_page(self) -> None:
+        self._empty_label.setText(self.EMPTY_SELECT if self._project is not None else self.EMPTY_NO_PROJECT)
+        self._stack.setCurrentIndex(_PAGE_EMPTY)
+
     def set_project(self, project: Optional[ProjectModel]) -> None:
         self._project = project
         self._current_body_id = None
-        self._stack.setCurrentIndex(_PAGE_EMPTY)
+        self._show_empty_page()
 
     def show_empty(self) -> None:
         self._current_body_id = None
-        self._stack.setCurrentIndex(_PAGE_EMPTY)
+        self._show_empty_page()
 
     def show_body(self, body_id: str) -> None:
         if self._project is None:

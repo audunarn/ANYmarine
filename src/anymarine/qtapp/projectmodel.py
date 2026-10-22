@@ -11,11 +11,27 @@ from ..domain import ProjectModel
 from ..services import ApplicationService
 
 
+# Display names for the stored result kinds (the raw kind stays in the tooltip and in the data).
+RESULT_NAMES = {
+    "synthetic_unqualified": "Synthetic replay (demo)",
+    "linear_development": "Linear development dynamics",
+    "mechanical_development": "Native mechanical run",
+    "equilibrium_development": "Static equilibrium",
+    "line_equilibrium_development": "Line equilibrium",
+}
+# Icon (qtapp/icons.py) per node kind and, for sections, per section title.
+KIND_ICONS = {"body": "body", "surface": "surface", "morison-member": "member", "equilibrium": "equilibrium",
+              "settings": "settings", "result": "results"}
+SECTION_ICONS = {"Bodies": "body", "Morison members": "member", "Equilibrium": "equilibrium",
+                 "Settings": "settings", "Results": "results"}
+
+
 class _Node:
-    def __init__(self, kind: str, label: str, payload=None, parent: "_Node | None" = None):
+    def __init__(self, kind: str, label: str, payload=None, parent: "_Node | None" = None, tooltip: str = ""):
         self.kind = kind
         self.label = label
         self.payload = payload
+        self.tooltip = tooltip
         self.parent = parent
         self.children: list["_Node"] = []
         if parent is not None:
@@ -58,9 +74,18 @@ class ProjectTreeModel(QAbstractItemModel):
             _Node("settings", "Analysis", "settings", settings)
             results = _Node("section", "Results", None, self._root)
             stale = set(self._service.stale_result_ids(project)) if project else set()
+            seen: dict = {}
+            totals: dict = {}
+            for result in project.results:
+                totals[result.kind] = totals.get(result.kind, 0) + 1
             for result in project.results:
                 flag = " [STALE]" if result.result_id in stale else ""
-                _Node("result", f"{result.kind}{flag}", result.result_id, results)
+                seen[result.kind] = seen.get(result.kind, 0) + 1
+                name = RESULT_NAMES.get(result.kind, str(result.kind).replace("_", " ").capitalize())
+                if totals[result.kind] > 1:
+                    name = f"{name} {seen[result.kind]}"
+                _Node("result", f"{name}{flag}", result.result_id, results,
+                      tooltip=f"{result.kind} - result {result.result_id[:8]}")
         self.endResetModel()
 
     def node_for_index(self, index: QModelIndex) -> Optional[_Node]:
@@ -110,6 +135,12 @@ class ProjectTreeModel(QAbstractItemModel):
         if role == Qt.ItemDataRole.ForegroundRole and node.kind == "result":
             if "[STALE]" in node.label:
                 return QColor("#b45309")
+        if role == Qt.ItemDataRole.DecorationRole:
+            from .icons import icon
+            name = SECTION_ICONS.get(node.label) if node.kind == "section" else KIND_ICONS.get(node.kind)
+            return icon(name) if name else None
+        if role == Qt.ItemDataRole.ToolTipRole:
+            return node.tooltip or node.label
         if role == Qt.ItemDataRole.UserRole:
             return node
         return None

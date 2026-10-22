@@ -39,12 +39,18 @@ class TimeSeriesPlot(QWidget):
         self._values: list[float] = []
         self._cursor_index: int = -1
         self._label: str = ""
+        self._display = None
         self._abscissa="time"
         self.setMinimumHeight(160)
 
+    def set_display(self, title: str = "", unit: str = "") -> None:
+        """Readable (title, unit) shown instead of the one derived from the stored channel id (display only)."""
+        self._display = (str(title), str(unit)) if title else None
+        self.update()
+
     def set_series(self, label: str, times, values) -> None:
         self._label = str(label)
-        self.setToolTip(self._label)
+        self.setToolTip(self._display[0] if self._display else self._label)
         self._times = [float(t) for t in times]
         self._values = [float(v) for v in values]
         self._cursor_index = min(max(self._cursor_index, 0), max(len(self._times) - 1, 0))
@@ -81,7 +87,7 @@ class TimeSeriesPlot(QWidget):
         font.setPointSizeF(max(font.pointSizeF() * 0.85, 6.0))
         painter.setFont(font)
         metrics = QFontMetrics(font)
-        title, unit = channel_title(self._label)
+        title, unit = self._display if self._display else channel_title(self._label)
         if len(self._times) < 2:
             painter.setPen(QColor("#54647a"))
             painter.drawText(QRectF(8, 8, max(width - 16, 1), max(height - 16, 1)), Qt.AlignmentFlag.AlignCenter, "no series loaded")

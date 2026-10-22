@@ -140,12 +140,30 @@ class _ResultLabel(_ElidedLabel):
 class _ChannelCombo(QComboBox):
     """Channel selector: readable titles are shown, the stored channel id is the item data."""
 
-    def set_channels(self, names) -> None:
+    @staticmethod
+    def title_parts(raw: str, body_names: Optional[dict] = None) -> tuple[str, str]:
+        """(title, unit) for a stored channel id; body ids become body names (display only)."""
         from .plot import channel_title
+        text, found = str(raw), []
+        for body_id, name in (body_names or {}).items():
+            if body_id and body_id in text:
+                text = text.replace(f":{body_id}", "").replace(f"/{body_id}", "").replace(body_id, "")
+                found.append(name)
+        text = text.replace("//", "/").strip(":/ ")
+        title, unit = channel_title(text)
+        if found:
+            title = f"{title} ({', '.join(found)})"
+        return title, unit
+
+    @classmethod
+    def display_title(cls, raw: str, body_names: Optional[dict] = None) -> str:
+        title, unit = cls.title_parts(raw, body_names)
+        return f"{title} [{unit}]" if unit else title
+
+    def set_channels(self, names, body_names: Optional[dict] = None) -> None:
         self.clear()
         for raw in sorted(names):
-            title, unit = channel_title(raw)
-            self.addItem(f"{title} [{unit}]" if unit else title, raw)
+            self.addItem(self.display_title(raw, body_names), raw)
             self.setItemData(self.count() - 1, raw, Qt.ItemDataRole.ToolTipRole)
 
     def setCurrentText(self, text):  # noqa: N802
@@ -154,6 +172,39 @@ class _ChannelCombo(QComboBox):
             index = self.findText(text)
         if index >= 0:
             self.setCurrentIndex(index)
+
+
+class _WelcomeCard(QFrame):
+    """Start-state card laid over the empty viewport. It is a child of the viewport (never of the 3D view),
+    sits outside the layout and covers only its own rectangle, so picking, fitting and screenshots are unaffected."""
+
+    def __init__(self, parent: QWidget):
+        super().__init__(parent)
+        self.setObjectName("Card")
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(22, 18, 22, 18)
+        layout.setSpacing(8)
+        title = QLabel("Welcome to ANYmarine")
+        title.setObjectName("PanelTitle")
+        text = QLabel("Open a saved project, or try a bundled example to see the 3D view, the replay and the results.")
+        text.setProperty("role", "hint")
+        text.setWordWrap(True)
+        row = QHBoxLayout()
+        row.setSpacing(8)
+        self.open_button = QPushButton("Open project")
+        self.example_button = QPushButton("Try an example")
+        self.example_button.setProperty("primary", True)
+        self.help_button = QPushButton("Help")
+        self.open_button.setToolTip("Open a saved ANYmarine project (project.json)")
+        self.example_button.setToolTip("Load the bundled two-body replay; more examples are under File > Examples")
+        self.help_button.setToolTip("Short steps for loading models")
+        for button in (self.example_button, self.open_button, self.help_button):
+            row.addWidget(button)
+        layout.addWidget(title)
+        layout.addWidget(text)
+        layout.addLayout(row)
+        self.setFixedWidth(400)
+        self.adjustSize()
 
 
 def _plain_json(value):
@@ -232,6 +283,16 @@ class MainWindow(QMainWindow):
         self._viewport_layout.setContentsMargins(0, 0, 0, 0)
         self._viewport_layout.setSpacing(0)
         self._viewport_layout.addWidget(self.viewer, 1)
+        # One-line "Next:" hint above the 3D view after an example loads (hidden otherwise).
+        self._next_hint_bar = QFrame()
+        self._next_hint_bar.setObjectName('NextHint')
+        hint_layout = QHBoxLayout(self._next_hint_bar)
+        hint_layout.setContentsMargins(12, 5, 12, 5)
+        self._next_hint = _ResultLabel('')
+        self._next_hint.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        hint_layout.addWidget(self._next_hint)
+        self._next_hint_bar.hide()
+        self._viewport_layout.insertWidget(0, self._next_hint_bar)
         self._central_stack = QStackedWidget()
         self._central_stack.addWidget(self._viewport)
         self.setCentralWidget(self._central_stack)
@@ -269,6 +330,8 @@ class MainWindow(QMainWindow):
         self._build_status_bar()
         self._refresh_startup_development_status()
         self._log_viewer_backend()
+        self._build_welcome()
+        self._refresh_action_states()
 
         self._job_manager.state_changed.connect(self._on_job_state)
         self._job_manager.progress_changed.connect(self._on_job_progress)
@@ -287,6 +350,11 @@ class MainWindow(QMainWindow):
 
     def showEvent(self,event):  # noqa: N802
         super().showEvent(event)
+        self._apply_icon_scale()
+        native = self.windowHandle()
+        if native is not None and getattr(self, '_icon_scale_window', None) is not native:
+            self._icon_scale_window = native
+            native.screenChanged.connect(lambda _screen: self._apply_icon_scale())
         if self._startup_renderer_pending:
             self._watch_startup_window();self._startup_renderer_timer.start(0)
 
@@ -308,6 +376,98 @@ class MainWindow(QMainWindow):
         self._startup_renderer_pending=False
         self._change_renderer(backend)
         if self._handles:self._schedule_fit()
+
+    # ----------------------------------------------------- start state and guidance
+
+    def _build_welcome(self) -> None:
+        """Start card over the empty viewport and a placeholder in the empty project tree."""
+        self._welcome = _WelcomeCard(self._viewport)
+        self._welcome.open_button.clicked.connect(lambda: self._open_project())
+        self._welcome.example_button.clicked.connect(lambda: self.load_example())
+        self._welcome.help_button.clicked.connect(lambda: self._show_loading_help())
+        self._tree_placeholder = QLabel('No project open\nUse File > Open project or File > Examples.',
+                                        self._tree.viewport())
+        self._tree_placeholder.setObjectName('EmptyState')
+        self._tree_placeholder.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
+        self._tree_placeholder.setWordWrap(True)
+        self._viewport.installEventFilter(self)
+        self._tree.viewport().installEventFilter(self)
+        self._refresh_welcome()
+
+    def _place_welcome(self) -> None:
+        card = self._welcome
+        area = self._viewport.rect()
+        card.adjustSize()
+        x = max(0, (area.width() - card.width()) // 2)
+        y = max(0, (area.height() - card.height()) // 2)
+        card.move(x, y)
+        card.raise_()
+
+    def _place_tree_placeholder(self) -> None:
+        viewport = self._tree.viewport()
+        self._tree_placeholder.setGeometry(8, 14, max(60, viewport.width() - 16), 90)
+
+    def _refresh_welcome(self) -> None:
+        empty = self._project is None
+        self._welcome.setVisible(empty)
+        self._tree_placeholder.setVisible(empty)
+        if empty:
+            self._place_welcome()
+            self._place_tree_placeholder()
+            self._tree_placeholder.raise_()
+
+    def _set_next_hint(self, text: str) -> None:
+        """One-line 'Next:' guidance above the 3D view (cleared by the next project change)."""
+        self._next_hint.setText(text)
+        self._next_hint_bar.setVisible(bool(text))
+
+    def _land_example(self, hint: str, mode: str = 'model') -> None:
+        """Every example opens in Model mode with a 'Next:' hint; only wave examples open in Waves mode."""
+        self._set_mode(mode)
+        self._set_next_hint(hint)
+
+    # Preconditions of the menu actions that used to open a "load X first" box. A disabled action keeps the old
+    # explanation in its tooltip; the methods themselves still refuse and explain when called directly.
+    _NEEDS_PROJECT = 'needs a project: open one (File > Open project...) or try File > Examples'
+    _NEEDS_NATIVE = ('needs declared native inputs: Jobs > Import native mechanical inputs..., '
+                     'or open a native example (File > Examples)')
+    _NEEDS_SEA_STATE = 'needs the coupled seeded-wave example (File > Examples > Load coupled seeded-wave example)'
+    _NEEDS_EQUILIBRIUM = ('select a current static equilibrium result in the project tree first '
+                          '(Jobs > Run coupled static equilibrium job creates one)')
+    _NEEDS_LINEAR = ('needs stored linear inputs: Jobs > Run linear development job stores demo inputs for the '
+                     'loaded bodies; Jobs > Import hydrodynamic inputs... stores ANYhydro inputs')
+
+    def _action_rule(self, action, predicate, reason: str) -> None:
+        self._action_rules.append([action, predicate, reason, None])
+
+    def _refresh_action_states(self) -> None:
+        project = self._project
+        facts = {
+            'project': project is not None,
+            'native': project is not None and project.native_inputs is not None,
+            'sea': (project is not None and project.native_inputs is not None
+                    and project.native_inputs.wave_realization is not None),
+            'equilibrium': self._current_result is not None and self._current_result.kind == 'equilibrium_development',
+            'linear': project is not None and project.linear_inputs is not None,
+        }
+        for rule in getattr(self, '_action_rules', ()):
+            action, key, reason, base = rule
+            if base is None:
+                base = rule[3] = action.toolTip()
+            ok = facts[key]
+            action.setEnabled(ok)
+            action.setToolTip(base if ok else f'{base} - unavailable: {reason}')
+
+    @staticmethod
+    def _mode_icon_size(ratio: float) -> int:
+        """Mode-bar icon edge in logical pixels: larger on scaled (high-DPI) displays, 22 at 100 %."""
+        return 22 if ratio < 1.25 else 26 if ratio < 1.75 else 30
+
+    def _apply_icon_scale(self) -> None:
+        size = self._mode_icon_size(self.devicePixelRatioF())
+        bar = getattr(self, '_mode_bar', None)
+        if bar is not None and bar.iconSize().width() != size:
+            bar.setIconSize(QSize(size, size))
 
     # ------------------------------------------------------------- dialogs
     # Thin wrappers so tests (offscreen) can replace modal dialogs.
@@ -347,6 +507,7 @@ class MainWindow(QMainWindow):
         ('scripts', 'Scripts', 'log', 'Trusted Python scripts and recorded Stability GUI actions'),
         ('stability', 'Stability', 'assessment', 'Analytical stability study inputs, results, save and open'),
     )
+    CONTEXT_DEFAULT_WIDTH = 420
     MODE_TITLES = {'model': 'Model', 'waves': 'Waves', 'rao': 'RAO', 'assessment': 'Assessment',
                    'results': 'Results', 'scripts': 'Scripts', 'stability': 'Stability'}
 
@@ -370,6 +531,9 @@ class MainWindow(QMainWindow):
         dock.setTitleBarWidget(QWidget())
 
     def _build_docks(self) -> None:
+        # The left and right regions keep their full height; the jobs drawer opens under the 3D view only.
+        self.setCorner(Qt.Corner.BottomLeftCorner, Qt.DockWidgetArea.LeftDockWidgetArea)
+        self.setCorner(Qt.Corner.BottomRightCorner, Qt.DockWidgetArea.RightDockWidgetArea)
         # navigator: project tree above the properties of the selected item
         tree = QTreeView()
         tree.setModel(self._tree_model)
@@ -386,6 +550,8 @@ class MainWindow(QMainWindow):
         self._details.surface_create_failed.connect(
             lambda message: self._notify_warning("Surface creation refused", message))
         navigator = QSplitter(Qt.Orientation.Vertical)
+        self._navigator = navigator
+        self._navigator_empty_split = None
         navigator.setObjectName('Navigator')
         navigator.setChildrenCollapsible(False)
         tree_section = self._section('Project', tree, (10, 8, 6, 4))
@@ -421,6 +587,21 @@ class MainWindow(QMainWindow):
         jobs_dock = QDockWidget("Jobs and log", self)
         jobs_dock.setObjectName('anymarine-dock-Jobs')
         jobs_dock.setFeatures(QDockWidget.DockWidgetFeature.DockWidgetClosable)
+        # Same heading style as the other regions; a small close button replaces the plain dock title bar.
+        header = QWidget()
+        header_layout = QHBoxLayout(header)
+        header_layout.setContentsMargins(10, 4, 6, 0)
+        drawer_heading = QLabel('JOBS AND LOG')
+        drawer_heading.setProperty('role', 'section')
+        close_button = QToolButton()
+        close_button.setText('\u00d7')
+        close_button.setAutoRaise(True)
+        close_button.setToolTip('Hide the jobs and log drawer (Ctrl+J)')
+        close_button.clicked.connect(lambda: self._set_jobs_drawer(False))
+        header_layout.addWidget(drawer_heading)
+        header_layout.addStretch(1)
+        header_layout.addWidget(close_button)
+        jobs_dock.setTitleBarWidget(header)
         jobs_dock.setWidget(drawer)
         jobs_dock.setMinimumHeight(110)
         self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, jobs_dock)
@@ -524,7 +705,8 @@ class MainWindow(QMainWindow):
         bar.setObjectName('ModeBar')
         bar.setMovable(False)
         bar.setOrientation(Qt.Orientation.Vertical)
-        bar.setIconSize(QSize(22, 22))
+        size = self._mode_icon_size(self.devicePixelRatioF())
+        bar.setIconSize(QSize(size, size))
         bar.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextUnderIcon)
         self.addToolBar(Qt.ToolBarArea.LeftToolBarArea, bar)
         group = QActionGroup(self)
@@ -552,7 +734,7 @@ class MainWindow(QMainWindow):
     def _set_mode(self, mode: str) -> None:
         """Show the context page of one workspace mode (Model shows the model only).
 
-        Each mode keeps its own panel width; RAO starts wider so its graph grid is readable.
+        Each mode keeps its own panel width; every mode starts at the same default width.
         """
         previous = self._mode
         focused = {'stability', 'scripts'}
@@ -595,7 +777,7 @@ class MainWindow(QMainWindow):
         self._context_stack.setCurrentWidget(page)
         self._context_title.setText(self.MODE_TITLES[mode])
         self._context_dock.show()
-        width = widths.get(mode, int(self.width() * 0.42) if mode == 'rao' else 420)
+        width = widths.get(mode, self.CONTEXT_DEFAULT_WIDTH)
         room = self.width() - self._mode_bar.width() - self._navigator_dock.width() - 500
         self.resizeDocks([self._context_dock], [max(340, min(width, room))], Qt.Orientation.Horizontal)
 
@@ -603,7 +785,8 @@ class MainWindow(QMainWindow):
         from .icons import icon
         bar = self.statusBar()
         self._viewer_backend_label = QLabel()
-        self._viewer_backend_label.setToolTip('Change renderer under View > Renderer')
+        self._viewer_backend_label.setObjectName('RendererStatus')
+        self._viewer_backend_label.setToolTip('Renderer. Change it under View > Renderer.')
         bar.addPermanentWidget(self._viewer_backend_label)
         self._jobs_button = QToolButton()
         self._jobs_button.setObjectName('JobsIndicator')
@@ -629,7 +812,7 @@ class MainWindow(QMainWindow):
         was_hidden = self._jobs_dock.isHidden()
         self._jobs_dock.setVisible(visible)
         if visible and was_hidden:
-            self.resizeDocks([self._jobs_dock], [180], Qt.Orientation.Vertical)
+            self.resizeDocks([self._jobs_dock], [140], Qt.Orientation.Vertical)
         self._sync_jobs_button()
 
     def _show_jobs_drawer(self) -> None:
@@ -667,14 +850,16 @@ class MainWindow(QMainWindow):
         add(self._actions['new'], 'new', 'New project')
         add(self._actions['open'], 'open', 'Open project…')
         add(self._actions['save'], 'save', 'Save project (Ctrl+S)')
+        self._action_rule(self._actions['save'], 'project', self._NEEDS_PROJECT)
         bar.addSeparator()
         calc = QAction('Calculate waves', self)
         calc.triggered.connect(lambda: self._waves.compute.click())
         add(calc, 'waves', 'Calculate the body disturbance for the current wave inputs', text_beside=True)
+        self._action_rule(calc, 'project', self._NEEDS_PROJECT)
         add(self._actions['run'], 'run', self._actions['run'].text().replace('&', ''), text_beside=True)
-        add(self._actions['cancel'], 'stop', 'Cancel all jobs')
+        add(self._actions['cancel'], 'stop', 'Cancel all jobs', text_beside=True)
         bar.addSeparator()
-        add(self._actions['fit'], 'fit', 'Fit model to view (Ctrl+F)')
+        add(self._actions['fit'], 'fit', 'Fit model to view (Ctrl+F)', text_beside=True)
         for label, name, azimuth, elevation in (('Isometric view', 'iso', 45.0, 28.0),
                                                 ('Top view', 'top', 0.0, 89.0),
                                                 ('Side view', 'side', 0.0, 0.0)):
@@ -690,6 +875,7 @@ class MainWindow(QMainWindow):
         self._fit_model()
 
     def _build_menus(self) -> None:
+        self._action_rules = []
         self._menu_bar = self.menuBar()
         file_menu = self._menu_bar.addMenu("&File")
         new_action = QAction("&New project", self)
@@ -813,6 +999,13 @@ class MainWindow(QMainWindow):
         jobs_menu.addAction(adoption_action)
         jobs_menu.addSeparator()
         jobs_menu.addAction(cancel_action)
+        for action in (run_linear_action, run_action, run_hams_action, static_action, import_hydro_action,
+                       import_derived_action, import_native_action):
+            self._action_rule(action, 'project', self._NEEDS_PROJECT)
+        for action in (run_native_action, edit_native_action):
+            self._action_rule(action, 'native', self._NEEDS_NATIVE)
+        self._action_rule(edit_sea_action, 'sea', self._NEEDS_SEA_STATE)
+        self._action_rule(adoption_action, 'equilibrium', self._NEEDS_EQUILIBRIUM)
 
         assessment_menu = self._menu_bar.addMenu("&Assessment")
         register_case_action = QAction("&Register case...", self)
@@ -827,6 +1020,9 @@ class MainWindow(QMainWindow):
         assessment_menu.addAction(assess_action)
         assessment_menu.addAction(pair_action)
         assessment_menu.addAction(reopen_action)
+        assessment_menu.setToolTipsVisible(True)
+        for action in (register_case_action, assess_action):
+            self._action_rule(action, 'linear', self._NEEDS_LINEAR)
 
         view_menu = self._menu_bar.addMenu("&View")
         fit_action = QAction("&Fit model", self)
@@ -931,6 +1127,7 @@ class MainWindow(QMainWindow):
             self._waves.reset();self._notify_warning('Calculated wave example',str(error));return
         self.setWindowTitle('ANYmarine — calculated wave preview (unsaved, unqualified)')
         self.statusBar().showMessage('Stored incident + diffraction waves; use Waves to switch disturbance off/on')
+        self._land_example('Next: use the Waves panel to switch the stored body disturbance on or off.', 'waves')
         self._diagnostics.appendPlainText('Loaded sealed Capytaine 3.0.0 fixed-body diffraction: 28 panels, 801 surface nodes. No solve while loading; visualization development evidence only.')
 
     def open_hams_wave_bundle(self):
@@ -947,7 +1144,7 @@ class MainWindow(QMainWindow):
         except (ImportError,ValueError) as error:
             self._waves.reset();self._notify_warning('Stored HAMS waves',str(error));return
         self.setWindowTitle('ANYmarine — stored HAMS wave samples (unsaved, unqualified)')
-        self._set_mode('waves')
+        self._land_example('Next: in Waves, choose incident, total, scattered or radiation samples.', 'waves')
         self.statusBar().showMessage('Stored HAMS samples — Waves selects incident, total, scattered or prescribed-motion radiation')
         self._diagnostics.appendPlainText('Loaded saved source-bound HAMS point fields. No calculation. Surface samples have true elevation; submerged dynamic pressure is retained separately. Development, unqualified.')
 
@@ -957,6 +1154,7 @@ class MainWindow(QMainWindow):
         self._set_project(self._service.load_native_sea_state_example())
         self.setWindowTitle('ANYmarine — coupled seeded waves (unsaved, unqualified)')
         self.statusBar().showMessage('Jobs → Edit shared sea state / Run native mechanical job; Waves → Mechanical incident waves')
+        self._land_example('Next: Jobs > Edit shared sea state..., then Jobs > Run native mechanical job...')
         self._diagnostics.appendPlainText('Saved seeded waves drive synthetic excitation and Morison members. No solve while loading; development fixture, unqualified.')
 
     def _edit_shared_sea_state(self) -> None:
@@ -981,6 +1179,7 @@ class MainWindow(QMainWindow):
         self._set_project(self._service.load_native_morison_example())
         self.setWindowTitle('ANYmarine — wave/current Morison example (unsaved, unqualified)')
         self.statusBar().showMessage('Member centrelines loaded; Jobs → Edit native mechanical inputs / Run native mechanical job')
+        self._land_example('Next: Jobs > Run native mechanical job..., or edit the members under Jobs > Edit native mechanical inputs...')
         self._diagnostics.appendPlainText('Declared Airy waves/current and straight Morison members. No solve while loading. Waves tab is a separate preview, not the mechanical environment.')
 
     def _record_stability_action(self,action,source,outcome='success',error=''):
@@ -998,6 +1197,7 @@ class MainWindow(QMainWindow):
         project=self._service.load_equilibrium_example()
         self._project_root=None;self._set_project(project)
         self.statusBar().showMessage('Static example loaded; Jobs → Run coupled static equilibrium job')
+        self._land_example('Next: Jobs > Run coupled static equilibrium job.')
 
     def load_native_contact_example(self) -> None:
         if not self._confirm_discard():return
@@ -1005,6 +1205,7 @@ class MainWindow(QMainWindow):
         self._set_project(self._service.load_native_contact_example())
         self.setWindowTitle('ANYmarine — compliant seabed contact example (unsaved, unqualified)')
         self.statusBar().showMessage('Three lines and seabed loaded; Jobs → Run native mechanical job')
+        self._land_example('Next: Jobs > Run native mechanical job...')
         self._diagnostics.appendPlainText('Compliant frictionless contact, explicit initial penetration31.25 mm and zero gravity. Three development steps; equilibrium/friction/W6 incomplete. Red crosses replay stored active endpoints after a job.')
 
     def load_native_line_hydro_example(self) -> None:
@@ -1013,6 +1214,7 @@ class MainWindow(QMainWindow):
         self._set_project(self._service.load_native_line_hydro_example())
         self.setWindowTitle('ANYmarine — wave/current mooring example (unsaved, unqualified)')
         self.statusBar().showMessage('Two members and three lines loaded; Jobs → Run native mechanical job')
+        self._land_example('Next: Jobs > Run native mechanical job...')
         self._diagnostics.appendPlainText('Members and lines share saved wave/current inputs. Three development steps; contact/equilibrium/W6 incomplete. No solve while loading.')
         self._waves.mode.setCurrentIndex(3)
 
@@ -1022,6 +1224,7 @@ class MainWindow(QMainWindow):
         self._set_project(self._service.load_native_mooring_example())
         self.setWindowTitle('ANYmarine — mooring example (unsaved, unqualified)')
         self.statusBar().showMessage('Three anchored lines loaded; Jobs → Run native mechanical job')
+        self._land_example('Next: Jobs > Run native mechanical job... to integrate the bodies and mooring lines.')
         self._diagnostics.appendPlainText('Two bodies and three dynamic mooring nodes. Three development steps; no line hydrodynamics/contact qualification. No solve while loading.')
 
     def load_native_fluid_example(self) -> None:
@@ -1031,6 +1234,7 @@ class MainWindow(QMainWindow):
         self._set_project(self._service.load_native_fluid_example())
         self.setWindowTitle('ANYmarine — coupled fluid example (unsaved, unqualified)')
         self.statusBar().showMessage('Development fluid inputs loaded; Jobs → Run native mechanical job starts integration')
+        self._land_example('Next: Jobs > Run native mechanical job... to integrate the coupled fluid example.')
         self._diagnostics.appendPlainText('Synthetic coupled operators and axial link; no numerical run while loading. Development fixture, unqualified.')
 
     def load_plate_example(self) -> None:
@@ -1046,6 +1250,7 @@ class MainWindow(QMainWindow):
         self._dirty = True
         self.setWindowTitle('ANYmarine — attached plates (geometry preview, unsaved)')
         self.statusBar().showMessage('Two rigid bodies with submerged plates; geometry preview. Native sheet hydrodynamics are unsupported.')
+        self._land_example('Next: select a body in the project tree to inspect its attached plates (geometry preview only).')
         self._diagnostics.appendPlainText('Attached plates share owner motion. No numerical coefficients, added mass, fictitious displacement or qualification implied.')
 
     # Local, licensed reference data: never shipped. A prepared artifact is looked up next to a sibling
@@ -1103,7 +1308,7 @@ class MainWindow(QMainWindow):
         self._dirty = False
         self._rao.show_reference(data)
         self._reference_binding = (self._project, data['artifact_hash'])
-        self._set_mode('rao')
+        self._land_example('Next: compare OrcaWave and ANYhydro in the RAO graphs (this example opens in RAO mode).', 'rao')
         self.setWindowTitle(f"ANYmarine — {data['title']} (reference comparison, unqualified)")
         self.statusBar().showMessage('External reference comparison in RAO mode: one line per program; development, unqualified')
         self._diagnostics.appendPlainText(f'Loaded reference comparison {path} (hash {data["artifact_hash"][:12]}). '
@@ -1188,6 +1393,7 @@ class MainWindow(QMainWindow):
         self._set_project(self._service.load_native_example())
         self.setWindowTitle('ANYmarine — native dry example (unsaved, unqualified)')
         self.statusBar().showMessage('Native dry/link inputs loaded; Jobs → Run native mechanical job starts integration')
+        self._land_example('Next: Jobs > Run native mechanical job... to integrate the two bodies.')
         self._diagnostics.appendPlainText('Declared uniform cubes and axial spring; no solver run while loading. Development example, unqualified.')
 
     def load_example(self) -> None:
@@ -1204,6 +1410,7 @@ class MainWindow(QMainWindow):
         self._set_result(project.results[0])
         self.setWindowTitle("ANYmarine — Two-body example (unsaved copy)")
         self.statusBar().showMessage("Synthetic example — press Play to replay; Save creates your own copy")
+        self._land_example('Next: press Play to replay the stored motion; File > Save project makes your own copy.')
         self._diagnostics.appendPlainText(
             "Loaded bundled two-body example with stored synthetic replay. "
             "Not BEM output or dynamics integration; unqualified demonstration."
@@ -1221,7 +1428,7 @@ class MainWindow(QMainWindow):
         self._project_root = None
         self._set_project(project)
         self._set_result(project.results[0])
-        self._set_mode('waves')
+        self._land_example('Next: press Play: the bodies and their forcing wave move together.', 'waves')
         self.setWindowTitle("ANYmarine — moored bodies in a regular wave (unsaved copy)")
         self.statusBar().showMessage("Stored solved replay — press Play: bodies and their forcing wave move together")
         self._diagnostics.appendPlainText(
@@ -1248,6 +1455,19 @@ class MainWindow(QMainWindow):
         self._set_result(None)
         self._schedule_fit()
         self._refresh_assessment_detachment()
+        self._set_next_hint('')
+        self._refresh_welcome()
+        self._refresh_navigator_split()
+        self._refresh_action_states()
+
+    def _refresh_navigator_split(self) -> None:
+        """While nothing is selected the tree gets the room; a selection gives Properties its share back."""
+        empty = self._details.is_empty()
+        if empty == self._navigator_empty_split:
+            return
+        self._navigator_empty_split = empty
+        total = max(sum(self._navigator.sizes()), 520)
+        self._navigator.setSizes([total - 170, 170] if empty else [int(total * 0.55), int(total * 0.45)])
 
     def _sync_viewer_bodies(self, project: Optional[ProjectModel] = None, *, line_nodes=None) -> None:
         """Add each body mesh once; replay reuses handles via set_transform."""
@@ -1370,6 +1590,9 @@ class MainWindow(QMainWindow):
         old.backend_changed.disconnect(self._on_backend_changed)
         self._viewport_layout.replaceWidget(old, candidate)
         old.hide()
+        welcome = getattr(self, '_welcome', None)
+        if welcome is not None:
+            welcome.raise_()
         self.viewer = candidate
         self._handles = handles
         self._member_scene = member_scene
@@ -1415,6 +1638,12 @@ class MainWindow(QMainWindow):
                 and watched is self._startup_window
                 and event.type()==QEvent.Type.Expose):
             self._startup_renderer_timer.start(0)
+        if watched is getattr(self, '_viewport', None) and event.type() in (QEvent.Type.Resize, QEvent.Type.Show):
+            if getattr(self, '_welcome', None) is not None and self._welcome.isVisible():
+                self._place_welcome()
+        elif getattr(self, '_tree', None) is not None and watched is self._tree.viewport() \
+                and event.type() == QEvent.Type.Resize and getattr(self, '_tree_placeholder', None) is not None:
+            self._place_tree_placeholder()
         if watched is self.viewer and self._fit_pending:
             if event.type() in (
                 QEvent.Type.Show,
@@ -1430,13 +1659,20 @@ class MainWindow(QMainWindow):
         name = self.viewer.backend_name
         notes = tuple(self.viewer.backend_diagnostics)
         self._viewer_backend_label.setText(f"ANY3dView: {name}")
+        self._viewer_backend_label.setToolTip(self._renderer_tooltip(name, notes))
         message = f"viewer backend: {name}"
         if notes:
             message += f" ({'; '.join(notes)})"
         self._diagnostics.appendPlainText(message)
 
+    @staticmethod
+    def _renderer_tooltip(name: str, notes=()) -> str:
+        text = f"Renderer in use: {name}. Change it under View > Renderer."
+        return text + (f" ({'; '.join(notes)})" if notes else "")
+
     def _on_backend_changed(self, name: str) -> None:
         self._viewer_backend_label.setText(f"ANY3dView: {name}")
+        self._viewer_backend_label.setToolTip(self._renderer_tooltip(name, tuple(self.viewer.backend_diagnostics)))
         self._diagnostics.appendPlainText(f"viewer backend changed to {name}")
         self.statusBar().showMessage(f"Viewer backend: {name}")
         # A fallback replaces the rendering surface. Fit after its layout,
@@ -1621,6 +1857,7 @@ class MainWindow(QMainWindow):
         self._tree_model.set_project(project)
         self._details.set_project(project)
         self._refresh_assessment_detachment()
+        self._refresh_action_states()
         if self._current_result is not None:
             stale = self._service.result_stale(project, self._current_result)
             self._result_status = self._result_status_text(self._current_result, stale)
@@ -1714,6 +1951,7 @@ class MainWindow(QMainWindow):
         else:
             self._details.show_empty()
             self.viewer.set_highlight([])
+        self._refresh_navigator_split()
 
     # ------------------------------------------------------------------ jobs
 
@@ -2056,10 +2294,20 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------- assessment
 
     def _assessment_project_ready(self) -> bool:
-        if self._project is None or self._project.linear_inputs is None:
+        if self._project is None:
             self._notify_info(
                 "Assessment",
-                "Open a project with stored linear inputs first.",
+                "No project is open. Open a project that has stored linear inputs, or load an example "
+                "(File > Examples) and run Jobs > Run linear development job, which stores demo linear "
+                "inputs for its bodies.",
+            )
+            return False
+        if self._project.linear_inputs is None:
+            self._notify_info(
+                "Assessment",
+                "This project has no stored linear inputs yet. Run Jobs > Run linear development job "
+                "(it stores demo inputs for the loaded bodies) or import ANYhydro inputs with Jobs > Import "
+                "hydrodynamic inputs..., then try again.",
             )
             return False
         return True
@@ -2461,6 +2709,12 @@ class MainWindow(QMainWindow):
     # ----------------------------------------------------------------- replay
 
     def _set_result(self, result: Optional[ResultRecord], status: Optional[str] = None) -> None:
+        try:
+            self._set_result_body(result, status)
+        finally:
+            self._refresh_action_states()
+
+    def _set_result_body(self, result: Optional[ResultRecord], status: Optional[str] = None) -> None:
         if (result is not None and result.kind == 'linear_development' and result.surface_snapshot is None
                 and result.result_layout is None):
             from ..surface_assignments import has_surface_intent
@@ -2510,6 +2764,7 @@ class MainWindow(QMainWindow):
         if result is None:
             self._frame_slider.setRange(0, 0)
             self._channel_combo.clear()
+            self._plot.set_display()
             self._plot.set_series("", [], [])
             self._result_status = "no result"
             self._frame_label.setText("no result")
@@ -2520,7 +2775,9 @@ class MainWindow(QMainWindow):
         self._frame_slider.setValue(0)
         self._channel_combo.blockSignals(True)
         self._channel_combo.clear()
-        self._channel_combo.set_channels(result.channels)
+        source = self._replay_project or self._project
+        self._channel_combo.set_channels(
+            result.channels, {b.body_id: b.name for b in source.bodies} if source is not None else None)
         self._channel_combo.blockSignals(False)
         self._on_channel_changed(self._channel_combo.currentData() or '')
         self._current_frame = 0
@@ -2538,6 +2795,9 @@ class MainWindow(QMainWindow):
         if self._current_result is None or not name:
             return
         values = self._current_result.channels.get(name, ())
+        source = self._replay_project or self._project
+        self._plot.set_display(*_ChannelCombo.title_parts(
+            name, {b.body_id: b.name for b in source.bodies} if source is not None else None))
         self._plot.set_abscissa('stage' if self._current_result.kind in ('equilibrium_development','line_equilibrium_development') else 'time')
         self._plot.set_series(name, self._current_result.times, values)
         self._plot.set_cursor(self._current_frame)
@@ -2629,7 +2889,8 @@ class MainWindow(QMainWindow):
             if result.kind in ('equilibrium_development', 'line_equilibrium_development'):
                 text = f"stage {index + 1}/{frames}"
             else:
-                text = f"frame {index + 1}/{frames} · t = {result.times[index]:.2f} s"
+                total = f" / {result.times[-1]:.2f}" if result.times else ""
+                text = f"frame {index + 1}/{frames} · t = {result.times[index]:.2f}{total} s"
             lowered = full.lower()
             if 'stale' in lowered:
                 text += " · stale"
@@ -2691,14 +2952,11 @@ class MainWindow(QMainWindow):
 
     def _show_loading_help(self) -> None:
         self._notify_info('Loading models',
-            'File > Open project...: select project.json in a saved ANYmarine project.\n\n'
-            'File > Load example (two-body replay): ready-to-play stored demonstration.\n'
-            'File > Load native coupled fluid example: load two bodies; '
-            'Jobs > Run native mechanical job... creates results.\n\n'
-            'View > Fit model (Ctrl+F): bring the loaded bodies into view.\n'
-            'For a black canvas, choose View > Renderer > Software (compatible).\n\n'
-            'CAD/mesh-file import is not available yet. Built-in numerical examples '
-            'are development inputs and remain unqualified.')
+            '1. Pick a bundled example under File > Examples (or "Try an example" on the start screen).\n'
+            '2. Or choose File > Open project... and select project.json of a saved ANYmarine project.\n'
+            '3. Press Play to replay results; Ctrl+F fits the model to the view.\n\n'
+            'Black canvas? Choose View > Renderer > Software (compatible).\n'
+            'CAD/mesh-file import is not available yet. Built-in examples are development inputs and remain unqualified.')
 
     def _refresh_startup_development_status(self) -> None:
         try:

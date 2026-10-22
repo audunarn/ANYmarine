@@ -57,10 +57,14 @@ WORKBENCH_STYLESHEET = f"""
             font-weight: 600; text-transform: uppercase; }}
         QLabel#WorkspaceHeading, QLabel[role="section"] {{ color: {MUTED}; font-size: 8.5pt; font-weight: 700;
             letter-spacing: 0.4px; padding: 6px 0 2px 0; }}
-        QLabel#PanelTitle {{ font-size: 12pt; font-weight: 600; color: {TEXT}; padding: 2px 0 6px 0; }}
+        QLabel#PanelTitle {{ font-size: 12pt; font-weight: 600; color: {TEXT}; padding: 2px 0 6px 0;
+            border: 0 solid #c6cfdb; border-bottom: 1px solid #c6cfdb; }}
+        QFrame#NextHint {{ background: {ACCENT_SOFT}; border: 0 solid {BORDER}; border-bottom: 1px solid {BORDER}; }}
+        QFrame#NextHint QLabel {{ color: {ACCENT_HOVER}; }}
+        QLabel#RendererStatus {{ color: {MUTED}; font-size: 8pt; }}
         QLabel[role="hint"] {{ color: {MUTED}; }}
         QLabel#EmptyState {{ color: {MUTED}; padding: 18px; }}
-        QLabel#DevBadge {{ background: {WARN_BG}; color: {WARN_TEXT}; border-radius: 9px; padding: 2px 10px;
+        QLabel#DevBadge {{ background: {WARN_BG}; color: {WARN_TEXT}; border-radius: 9px; padding: 2px 10px; margin-left: 8px;
             font-size: 8.5pt; font-weight: 600; }}
         QScrollArea {{ border: none; background: transparent; }}
         QScrollArea > QWidget > QWidget {{ background: transparent; }}
