@@ -147,6 +147,58 @@ class ApplicationService:
         except W5Error as error:
             raise ServiceError(str(error)) from error
 
+    # Optional, separate owner-backed studies; no mutation of this marine project.
+    def stability_capabilities(self):
+        from .stability_service import capabilities
+        return capabilities()
+
+    def stability_example_inputs(self):
+        from .stability_service import example_inputs
+        return example_inputs()
+
+    def parse_stability_inputs(self, text):
+        from .stability_service import parse_inputs
+        return parse_inputs(text)
+
+    def calculate_stability(self, inputs, *, allow_reference=False):
+        from .stability_service import calculate
+        return calculate(inputs, allow_reference=allow_reference)
+
+    def save_stability_study(self, inputs, path, *, result=None):
+        from .stability_service import save_study
+        return save_study(inputs, path, result=result)
+
+    def open_stability_study(self, path):
+        from .stability_service import open_study
+        return open_study(path)
+
+    # Saved recipe3 reference studies; separate from S1 box and mechanical models.
+    def reference_barge_example(self):
+        from .reference_barge import load_reference_barge
+        return load_reference_barge()
+    def open_reference_barge(self,path):
+        from .reference_barge import load_reference_barge
+        return load_reference_barge(path)
+    def save_reference_barge(self,study,path):
+        from .reference_barge import save_reference_barge
+        return save_reference_barge(study,path)
+    def select_reference_barge_case(self,study,name):
+        from .reference_barge import select_reference_case
+        return select_reference_case(study,name)
+    def reference_barge_view(self,study):
+        from .reference_barge import reference_barge_view
+        return reference_barge_view(study)
+    def reference_barge_controls(self,study,controls):
+        from .reference_barge import with_reference_controls
+        return with_reference_controls(study,controls)
+    def attach_reference_barge_result(self,study,path):
+        from .reference_barge import attach_coupled_result
+        return attach_coupled_result(study,path)
+
+    def run_reference_barge(self,study,path,*,allow_reference=False):
+        from .reference_barge_run import ReferenceBargeRun
+        return ReferenceBargeRun(study,path,allow_reference=allow_reference)
+
     # ------------------------------------------------------------- lifecycle
 
     def new_project(self, name: str) -> ProjectModel:

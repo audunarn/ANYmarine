@@ -79,7 +79,11 @@ def test_examples_are_a_file_submenu(window):
     file_menu = window._menus[0]
     assert window._examples_menu in [a.menu() for a in file_menu.actions() if a.menu()]
     titles = [a.text() for a in window._examples_menu.actions() if not a.isSeparator()]
-    assert len(titles) >= 13 and all(t.startswith("Load ") for t in titles)
+    assert len(titles) >= 13
+    # This separately tested optional study action predates the Scripts mode.
+    stability_label = "ANYstability analytical box…"
+    assert titles.count(stability_label) == 1
+    assert all(t.startswith("Load ") for t in titles if t != stability_label)
 
 
 def test_water_plane_sized_from_model_and_not_pickable(qapp, window):

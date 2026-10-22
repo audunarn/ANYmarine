@@ -1,0 +1,3 @@
+exclude .anymarine-local.json
+include run_gui.py local_gui_config.py
+prune src/anymarine/examples/reference-barge-recipe3

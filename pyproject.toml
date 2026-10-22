@@ -13,6 +13,7 @@ authors = [{ name = "ANYmarine developers" }]
 dependencies = ["numpy>=1.24"]
 
 [project.optional-dependencies]
+stability = ["ANYstability>=0.1.0.dev1,<0.2"]
 gui = ["PySide6>=6.10.1,<6.11", "ANY3dView[qt,gpu]>=0.5.5,<0.6"]
 native-morison = ["ANYsolver>=0.4.7", "ANYloads>=0.1.0"]
 native-waves = ["ANYsolver>=0.4.7", "ANYloads>=0.1.0", "ANYhydro>=0.2.0,<0.3"]
@@ -35,3 +36,6 @@ addopts = "--basetemp=.pytest-tmp"
 
 [tool.setuptools.package-data]
 anymarine = ["development_status.json", "qtapp/assets/*.svg", "examples/hams-wave-points/*.json", "examples/hams-wave-points/*.nc", "examples/calculated-wave-preview/*.json", "examples/shared-sea-state-development/*.json", "examples/two-body-replay/*.json", "examples/two-body-replay/bodies/*.json", "examples/two-body-replay/results/*.json", "examples/regular-wave-replay/*.json", "examples/regular-wave-replay/bodies/*.json", "examples/regular-wave-replay/native_inputs/*.json", "examples/regular-wave-replay/results/*.json"]
+
+[tool.setuptools.exclude-package-data]
+anymarine = ["examples/reference-barge-recipe3/*", "examples/reference-barge-recipe3/**/*"]

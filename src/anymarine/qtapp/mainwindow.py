@@ -159,6 +159,10 @@ class MainWindow(QMainWindow):
         super().__init__(parent)
         self.setWindowTitle("ANYmarine")
         self._service = ApplicationService()
+        from .scripts import StabilityRecording
+        self._stability_recording = StabilityRecording(self)
+        self._scripts_host = None
+        self._stability_host = None
         self._project: Optional[ProjectModel] = None
         self._project_root: Optional[Path] = None
         self._dirty = False
@@ -202,7 +206,9 @@ class MainWindow(QMainWindow):
         self._viewport_layout.setContentsMargins(0, 0, 0, 0)
         self._viewport_layout.setSpacing(0)
         self._viewport_layout.addWidget(self.viewer, 1)
-        self.setCentralWidget(self._viewport)
+        self._central_stack = QStackedWidget()
+        self._central_stack.addWidget(self._viewport)
+        self.setCentralWidget(self._central_stack)
         from .member_scene import MemberScene
         self._member_scene = MemberScene(self.viewer)
         # Project loads reuse the viewer; only an explicit renderer change replaces it.
@@ -312,9 +318,11 @@ class MainWindow(QMainWindow):
         ('rao', 'RAO', 'rao', 'Frequency-domain RAO cases and graphs'),
         ('assessment', 'Assess', 'assessment', 'Assessment evidence: register, assess, pair, reopen'),
         ('results', 'Results', 'results', 'Time series of the selected result channel'),
+        ('scripts', 'Scripts', 'log', 'Trusted Python scripts and recorded Stability GUI actions'),
+        ('stability', 'Stability', 'assessment', 'Analytical stability study inputs, results, save and open'),
     )
     MODE_TITLES = {'model': 'Model', 'waves': 'Waves', 'rao': 'RAO', 'assessment': 'Assessment',
-                   'results': 'Results'}
+                   'results': 'Results', 'scripts': 'Scripts', 'stability': 'Stability'}
 
     @staticmethod
     def _section(title: str, widget: QWidget, margins: tuple[int, int, int, int]) -> QWidget:
@@ -516,11 +524,39 @@ class MainWindow(QMainWindow):
         Each mode keeps its own panel width; RAO starts wider so its graph grid is readable.
         """
         previous = self._mode
+        focused = {'stability', 'scripts'}
+        chrome = tuple(widget for widget in (getattr(self, '_navigator_dock', None),
+                       getattr(self, '_jobs_dock', None), getattr(self, '_toolbar', None)) if widget is not None)
+        if mode in focused:
+            if previous not in focused:
+                self._workspace_chrome = tuple((widget, not widget.isHidden()) for widget in chrome)
+            for widget in chrome:
+                widget.hide()
+        elif previous in focused:
+            for widget, visible in getattr(self, '_workspace_chrome', ()):
+                widget.setVisible(visible)
         widths = self._context_widths
         if previous in self._context_pages and self._context_dock.isVisible():
             widths[previous] = self._context_dock.width()
         self._mode = mode
         self._mode_actions[mode].setChecked(True)
+        if mode == 'scripts':
+            if self._scripts_host is None:
+                from .scripts import ScriptsHost
+                self._scripts_host = ScriptsHost(self._stability_recording,self)
+                self._central_stack.addWidget(self._scripts_host)
+            self._central_stack.setCurrentWidget(self._scripts_host)
+            self._context_dock.hide()
+            return
+        if mode == 'stability':
+            if self._stability_host is None:
+                from .reference_barge import Recipe3StabilityHost
+                self._stability_host = Recipe3StabilityHost(self._service,self,recorder=self._record_stability_action)
+                self._central_stack.addWidget(self._stability_host)
+            self._central_stack.setCurrentWidget(self._stability_host)
+            self._context_dock.hide()
+            return
+        self._central_stack.setCurrentWidget(self._viewport)
         page = self._context_pages.get(mode)
         if page is None:
             self._context_dock.hide()
@@ -636,6 +672,9 @@ class MainWindow(QMainWindow):
         file_menu.addAction(open_action)
         examples_menu = QMenu("&Examples", self)
         self._examples_menu = examples_menu
+        stability_action = QAction("ANYstability analytical box…", self)
+        stability_action.triggered.connect(self.open_stability_example)
+        examples_menu.addAction(stability_action)
         example_action = QAction("Load &example (two-body replay)", self)
         example_action.triggered.connect(self.load_example)
         examples_menu.addAction(example_action)
@@ -885,6 +924,16 @@ class MainWindow(QMainWindow):
         self.setWindowTitle('ANYmarine — wave/current Morison example (unsaved, unqualified)')
         self.statusBar().showMessage('Member centrelines loaded; Jobs → Edit native mechanical inputs / Run native mechanical job')
         self._diagnostics.appendPlainText('Declared Airy waves/current and straight Morison members. No solve while loading. Waves tab is a separate preview, not the mechanical environment.')
+
+    def _record_stability_action(self,action,source,outcome='success',error=''):
+        if not self._stability_recording.record(action,source,outcome,error):
+            self.statusBar().showMessage(self._stability_recording.warning)
+
+    def open_stability_example(self):
+        """Focus the same retained study as Stability mode; never reload or solve."""
+        self._set_mode('stability')
+        self._stability_host.open_legacy_box()
+        if self._stability_host.study is not None:self._stability_host.study.inputs.setFocus()
 
     def load_equilibrium_example(self):
         if not self._confirm_discard():return
@@ -2631,9 +2680,12 @@ class MainWindow(QMainWindow):
             if not self._confirm_discard():
                 event.ignore()
                 return
+            if self._stability_host is not None and self._stability_host.shutdown() is False:
+                event.ignore();return
             self._fit_timer.stop()
             self._play_timer.stop()
             self._waves.timer.stop()
+            if self._scripts_host is not None:self._scripts_host.shutdown()
             event.accept()
             return
         answer = QMessageBox.question(
@@ -2658,9 +2710,12 @@ class MainWindow(QMainWindow):
         if not self._confirm_discard():
             event.ignore()
             return
+        if self._stability_host is not None and self._stability_host.shutdown() is False:
+            event.ignore();return
         self._fit_timer.stop()
         self._play_timer.stop()
         self._waves.timer.stop()
+        if self._scripts_host is not None:self._scripts_host.shutdown()
         event.accept()
 
 

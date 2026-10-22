@@ -4,11 +4,18 @@ from pathlib import Path
 import runpy
 import subprocess
 import sys
+from local_gui_config import local_settings
 
 
 def main():
     root = Path(__file__).resolve().parent
-    configured = os.environ.get("ANYMARINE_PYTHON")
+    try:
+        configured, assets = local_settings(root, os.environ)
+    except (OSError, ValueError, UnicodeError) as error:
+        print(f"ANYmarine local configuration refused: {error}", file=sys.stderr)
+        return 2
+    if assets is not None:
+        os.environ['ANYMARINE_REFERENCE_BARGE_DIR'] = assets
     candidates = [root / ".venv" / "Scripts" / "python.exe",
                   root / ".venv" / "bin" / "python",
                   root.parent / "anymarine-evidence" / "runtime" / "Scripts" / "python.exe"]

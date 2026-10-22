@@ -47,6 +47,13 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--version", action="version", version=f"anymarine {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
 
+    sub.add_parser("stability-info", help="inspect optional analytical stability capabilities")
+    stability_example = sub.add_parser("stability-example", help="save analytical box study inputs; no solve")
+    stability_example.add_argument("--path", required=True, help="empty study folder")
+    stability_run = sub.add_parser("run-stability", help="calculate fixed-attitude analytical box draught")
+    stability_run.add_argument("--project", required=True, help="ANYstability study folder")
+    stability_run.add_argument("--allow-reference", action="store_true", help="explicit analytical reference opt-in")
+
     new = sub.add_parser("new", help="create a new synthetic two-body project")
     new.add_argument("--path", required=True, help="project directory (created if missing)")
     new.add_argument("--name", default="Two-body demonstrator", help="project name")
@@ -977,9 +984,35 @@ def _cmd_inspect_wave_bundle(args):
     return 0
 
 
+def _cmd_stability_info(args):
+    print(json.dumps(ApplicationService().stability_capabilities(), sort_keys=True))
+    return 0
+
+
+def _cmd_stability_example(args):
+    service = ApplicationService()
+    info = service.save_stability_study(service.stability_example_inputs(), args.path)
+    print(json.dumps(info, sort_keys=True))
+    return 0
+
+
+def _cmd_run_stability(args):
+    service = ApplicationService()
+    inputs, _stored = service.open_stability_study(args.project)
+    result = service.calculate_stability(inputs, allow_reference=args.allow_reference)
+    info = service.save_stability_study(inputs, args.project, result=result)
+    info.update(draft_m=result.to_dict()["output"]["draft_m"],
+                assurance=result.to_dict()["assurance"], production_qualified=False)
+    print(json.dumps(info, sort_keys=True))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     handlers = {
+        "stability-info": _cmd_stability_info,
+        "stability-example": _cmd_stability_example,
+        "run-stability": _cmd_run_stability,
         'inspect-hams-config': _cmd_inspect_hams_config,
         'run-hams-fields': _cmd_run_hams_fields,
         "inspect-wave-bundle": _cmd_inspect_wave_bundle,

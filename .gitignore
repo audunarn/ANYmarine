@@ -6,6 +6,8 @@ __pycache__/
 .venv*/
 build/
 dist/
+.anymarine-local.json
+src/anymarine/examples/reference-barge-recipe3/
 
 # Local execution evidence and editor state (preserved on disk)
 .development-evidence/

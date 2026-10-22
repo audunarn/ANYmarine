@@ -4,6 +4,16 @@ Marine multibody application foundation (W0-W1 slice): domain records, robust
 project/results persistence, a headless CLI, and a PySide6 Qt Widgets shell
 hosting the public ANY3dView Qt viewer.
 
+## Optional reference-barge Stability workspace
+
+With explicit local private-data configuration, select **Stability / Ctrl+7** for the current recipe3 reference barge, eight WB
+tanks, saved calibration and five illustrative loading conditions. The default
+is saved coupled-equilibrium evidence; opening/selecting never solves. Portable
+save/reopen works without ANYgeometry. Explicit coupled Run uses a bounded child;
+fresh developmental verification is separately bounded and does not confer qualification. The analytical box remains
+an explicit legacy tab/menu and retains its existing CLI. See [installation,
+workflow and limits](docs/STABILITY.md). Certified admission remains blocked.
+
 ## Status and scope
 
 This repository delivers the application foundation and a bounded linear development route:
@@ -325,7 +335,7 @@ Windows Python 3.13.9 was exercised locally; remote CI was not run. See
 `TASK.md` for the living record and `docs/IMPLEMENTATION_PLAN.md` for the
 adopted roadmap snapshot. No release or qualification is claimed.
 
-The root launcher runs the current checkout. It discovers `.venv`, the local tested runtime, or `ANYMARINE_PYTHON`. The `tools/run_gui.py` launcher exercises installed packages.
+The root launcher runs the current checkout. A git-ignored `.anymarine-local.json` selects a reviewed installed Python runtime and external private recipe3 folder; explicit `ANYMARINE_PYTHON` / `ANYMARINE_REFERENCE_BARGE_DIR` override corresponding values. Without local runtime configuration it retains legacy runtime discovery. Private recipe3 data is not packaged or auto-discovered. See [local setup](docs/STABILITY.md#local-only-setup). The `tools/run_gui.py` launcher exercises installed packages.
 
 
 Explicit body CG and full CG inertia can be edited in the Qt Body panel and
@@ -490,3 +500,19 @@ point displays, portable save/reopen and the shared headless CLI.
 Explicit native HAMS field jobs share the Qt/CLI queue and validation contracts;
 see [native HAMS fields](docs/NATIVE_HAMS_FIELDS.md) for producer availability,
 configuration, lifecycle guarantees and outstanding scientific admission.
+
+
+## Main-window Python Scripts
+
+Use **Scripts / Ctrl+6** in the main Qt window to paste and explicitly run full
+trusted Python scripts. The separate Stability GUI action recording can be
+copied into the editor or saved as `.py`; text loading/copying never runs it.
+The optional ANYstability reusable console pane is loaded only when selected,
+and its child interpreter starts only on Run. See [workflow and safety scope](docs/STABILITY.md#main-window-scripts-section).
+
+
+The **Stability / Ctrl+7** mode retains the recipe3 study across mode changes.
+The analytical-box File Examples action selects its separate legacy tab. Missing
+optional ANYstability shows a diagnostic and Retry page. Reference dry loads are
+illustrative; saved convergence is not physical qualification. See
+[Stability workspace](docs/STABILITY.md#retained-stability-workspace).

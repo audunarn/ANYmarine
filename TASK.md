@@ -1,3 +1,328 @@
+## Delivered — Stability workspace redesign, 2026-10-21
+
+Delivered UI redesign: Overview / Loading & results / Advanced, persistent
+condition/Run/Cancel/Open/Save controls, readable unit-formatted result cards,
+fit-width/page/zoom drawing, structured coupled and attitude forces/moments, and
+compact always-visible result origin. Calibration/raw JSON remain Advanced;
+analytical example is secondary. Mainwindow hides unrelated chrome only in
+Stability/Scripts and restores its previous state elsewhere. Missing local data
+has Open/Retry/explicit analytical actions; real saved-study Open succeeds without
+a default configured. No private assets or owner implementation moved into product.
+
+Independent OpenAI source review found two P2s (attitude diagnostic shape omitted;
+valid pre-run edits caused successful completion to be quarantined); both repaired
+and regression-covered. Sonnet inference responded but all scoped file reads were
+denied despite inspected permissions; proposed source-export fallback was rejected
+by automatic approval review for lack of specifically recognized external export
+authorization. No source bundle/private data exported, no persistent config changed.
+OpenAI reviewer provided independent author separation; no different-family claim.
+
+Installed coverage:73 existing/new cases completed across57 initial passes plus16
+atomic-filesystem/test-metadata retries; final18 affected UI/recording cases passed
+after repairs, including10synthetic layout/state tests. Root used actual private
+saved studies with geometry imports blocked, synthetic job start/finish/cancel,
+actual save/reopen and recorded source replay with the same synthetic backend;
+Scripts insertion starts no interpreter. This is NOT new numerical-run evidence.
+Layouts accepted at1280x850 and1024x720. All failure attempts remain in evidence.
+A new dedicated runtime is selected by ignored local config; prior runtime remains
+unchanged. Final artifact/source/launch receipt and budgets: evidence root/EVIDENCE.json.
+No real geometry queries, qualification/release/Git publication or owner-code changes.
+
+## Current — Stability workspace usability, 2026-10-21
+
+User authorises a simpler, functional and visually coherent Stability interface,
+working on the assumption that certified ANYgeometry B1 delivery is forthcoming.
+This is a presentation/workflow milestone, not renewed S2 qualification or geometry
+execution authority. Preserve the existing typed service boundary, reference
+opt-in/admission, exact recording, cancellation, dirty-result pairing and portable
+save/reopen identity. No owner geometry jobs, physics or loading-recipe changes.
+The private example/add-on/configuration remain local-only.
+
+Living evidence/staging: C:/ANYworkspaceWork/marine-stability-ux-20261021.
+Implementation owner: existing OpenAI fallback author, staged qtapp UI only;
+Sonnet configured route attempted one useful bounded Read: scoped read tool was
+rejected and the route returned provider400 prefill incompatibility. Failure is
+cached for this milestone; Mistral remains exhausted. No private fixture/data was
+sent. Root owns cross-repository boundary decisions, local visual/integration
+checks, guarded source reconciliation, dedicated runtime and final acceptance.
+Budgets for this new UI slice: author120s/root180s ordinary sequential checks,
+reviewer30s if needed; zero real geometry queries. Preserve previous evidence and
+consumed numerical budgets. New tests exercise UI contracts; old numerical evidence
+is reused only where unchanged service/owner source permits it. No publishing,
+release, commit/push or upgrade of pre-existing runtime; normal ignored launcher
+configuration may select a new dedicated verified runtime after integration.
+
+## Current — Local-only recipe3 and fresh pane execution, 2026-10-20
+
+Final local-only privacy closure: the exact ANYstability recipe source is now in
+C:/ANYworkspaceWork/anymarine-local/anystability-local-reference, installed as a
+private add-on beside the public core in the dedicated runtime. Public owner
+wheel/sdist also exclude the quantitative recipe documents and fixture test;
+source/stale-build reappearance is refused. Final core/consumer installed files
+match actual checkouts and wheels;34 original owner modules (all numerical code)
+remain byte-identical, with only the typed CLI missing-add-on guard changed.
+Final GUI/reopen works with geometry imports blocked. The original fresh Run,
+Scripts and cancellation evidence remains valid through exact numerical identity.
+No private add-on publication, numerical requalification or existing runtime upgrade.
+Evidence receipts: root/FINAL_PUBLIC_ARTIFACTS.json, FINAL_RUNTIME_IDENTITY.json,
+ISOLATED_MISSING_ADDON.json and EVIDENCE.json under the current evidence folder.
+Retain the dependency-provision timeout and earlier Windows I/O refusals; the
+subsequent isolated missing-add-on proof passed without cross-runtime paths.
+
+User authorises fresh coupled Run/cancellation/Scripts/save-reopen verification
+and wants normal run_gui.py to expose this example locally only. A git-ignored
+local configuration selects a matching dedicated runtime and external private
+asset path. Remove the25 private dataset files from package/source-distribution
+contents while preserving exact bytes and legacy/optional behavior. No auto
+install/download, change to existing live runtimes, or publication. Installed
+apps without explicit local configuration must not expose the private dataset.
+
+Evidence/staging C:/ANYworkspaceWork/marine-recipe3-local-runs-20261020; root-owned
+private assets C:/ANYworkspaceWork/anymarine-local/recipe3. Same fallback author
+owns staged consumer only (Mistral cached unavailable), root owns configuration,
+matching runtime and real numerical verification/reconciliation; separate review.
+Preserve original source/model/request/tolerances and physics. Original90s/512
+query/24evaluation/6iteration request caps stay unchanged. Root one sequential
+geometry job,300s cumulative fresh GUI/replay/cancel process-wall with60s reserve;
+cancel probe30s outer. Ordinary check limits author120s/root180s/reviewer30s;
+author no actual geometry calls. Exact logs/timing and failed attempts retained.
+This new development integration authority does not renew S2/P0/P1 campaigns or
+establish certification, stability proof, real-vessel approval or full regression
+completion.
+
+Delivered local-only discovery and normal checkout runtime selection; the
+ignored .anymarine-local.json points to the dedicated matching installed runtime
+and external private asset folder. Private25files are preserved outside Git and
+excluded from wheel/sdist; both artifacts were inspected including exact private
+file hashes and deliberately present local config. No-env installed default
+refuses; explicit legacy box remains available.105 installed package members
+match final frozen source/wheel; pinned owner wheels verified independently.
+
+Actual final fresh pane run:155 queries, expected z=-0.8m and236304.32kg,
+residualFz=-0.00206846N, physical moments~1e-9Nm; fresh Save/Open identity preserved.
+Actual recorded Scripts paste starts no interpreter/work until Run; replay
+executes155queries and reopens its own new saved result without live-study/model
+mutation. Recording fix uses per-path generated identities with preamble reset;
+external Opens retain fixed pins. Active Cancel after21completed queries exits
+the process, retains a typed cooperative-cancellation/refused partial and leaves
+the study unchanged. No native in-call cancellation guarantee is established.
+
+Installed focused regressions55passed. Retain original real replay identity
+failure, Windows atomic-publication access refusals and observer failures; do not
+claim those attempts passed or that intermittent external I/O locking is fixed.
+Metadata-only cancellation observation passed without opening a live journal.
+New numerical process-wall138.5465356/300s including failures,60sreserve intact;
+ordinary checks remain within180s and author55.6979067/120s; review source/evidence
+only0/30s process probes. Exact final accounting/settings/results are under
+root/checks, flows, EVIDENCE.json and review/REVIEW.txt. Historical full-owner
+regression timeout remains incomplete, not rerun or erased. No new owner code,
+physics, calibration, certification, S2/P0/P1 campaign or release action.
+
+## Previous — Recipe3 reference barge in Stability, 2026-10-20
+
+User requests the current recipe3 barge, tanks and loading conditions as the
+default Stability case. Consume exact saved ANYstability public records and
+source bindings, package portable data without personal paths, and display the
+real reference model, eight WB tank tables and existing loading-condition
+mass/CG/pose/results. Preserve explicit estimated/illustrative provenance,
+model-versus-plan capacities, no liquid storage in pump/void spaces, no duplicate
+liquid weight/FSM, and old box saved studies through an explicit legacy route.
+
+Same connected fallback author owns staged end-to-end consumer code/docs/tests;
+root owns reconciliation, notes and installed checks, with separate review.
+Snapshot/evidence C:/ANYworkspaceWork/marine-recipe3-integration-20261020.
+Owner services/geometry remain authoritative; no copied geometry or new physics.
+Default open/reopen/selection/record never calculates. Explicit new runs, if
+included after route adoption, use existing bounded public reference APIs with
+captured immutable requests, cancellation and non-success preserved. Check
+budgets author180s/root180s/reviewer30s process-wall, owner-free only: no actual
+ANYgeometry query/rebuild/calibration or numerical qualification campaign.
+No live installation, release/Git action or renewal of consumed authority.
+Prior dirty work/results/failures and scientific gates remain protected.
+Delivered recipe3 default on Ctrl+7: source preview, eight WB storage tanks,
+40 saved height-calibration rows and five conditions, initially the saved coupled
+reference. Accepted mass/CG comes from the public ANYstability ledger helper;
+unselected tanks, illustrative dry loads and model/drawing capacities remain
+explicit. Exact records are portable and bound to source/request; opening or
+selecting never calculates. Explicit legacy box and Scripts recording remain.
+Coupled-only Run is opt-in, bounded, separately supervised and request-bound;
+fresh numerical execution remains UNVERIFIED in this owner-free slice.
+
+Installed evidence under the snapshot root/root: consumer48pass/one oldmock
+failure, repaired case passes separately; installed owner ledger test passes.
+Final wheel03 UI covers all5cases,8tanks/40rows, geometry-import-blocked opening,
+portable save/reopen, legacy/Scripts and a real expired-before-owner child refusal.
+Actual screenshots and source/wheel/installed byte identities inspected. Broader
+owner regression hit its65s cap with no observed failures; INCOMPLETE, not a pass.
+Author85.9250683/180s and root140.4933522/180s check-wall used; independent source/
+evidence reviewer0/30s process probes. Prior failures/timeouts remain on disk.
+See root/EVIDENCE.json, SOURCE_IDENTITY.json and INTEGRATION.json, plus
+review/REVIEW.txt. Reconcile only reviewed hash-guarded files, preserving baseline
+dirty work. A matching disposable runtime is available through
+root/Launch-ANYmarine-Recipe3.ps1; no live installation, Git/release or new
+geometry/qualification campaign. S2/certification/criteria gates remain unchanged.
+
+## Previous — Main-window Stability interface, 2026-10-20
+
+User requests ANYstability's interface in ANYmarine. Add a dedicated Stability
+mode alongside Scripts, with a single retained study and existing example,
+inputs/results, explicit calculation, reports and save/open controls. Route the
+legacy example menu to that same study; preserve standalone dialog API through
+shared implementation. Keep recording, optional-provider refusal/retry and
+current reference-only scientific scope. No calculation on open/navigation.
+
+Same fallback author owns staged implementation (cached Mistral unavailable);
+root owns reconciliation/installed checks/notes and separate review assesses the
+complete slice. Evidence/snapshot: C:/ANYworkspaceWork/marine-stability-pane-20261020.
+Ordinary check bounds author90s/root90s/reviewer15s process-wall. No live install,
+new geometry/solver/native/BEM qualification, Git publication or release.
+Current dirty work and previous evidence remain protected.
+
+Delivered shared StabilityPane QWidget and compatible StabilityDialog, plus a
+lazy retained StabilityHost in the main centre. Stability is Ctrl+7; Scripts
+remains Ctrl+6. The existing example menu focuses the same study without
+discarding edits/results or recalculating. Missing owner has inline typed
+diagnostic/Retry; recording and all four-full-tank reference controls remain.
+
+Installed wheel:36 affected UI/legacy-dialog/recording/workspace/layout/startup
+checks pass. Actual GUI reference calculation matches438500/(1025*200) within
+unchanged tolerance, saved result reopens identically, navigation/menu retains
+study and no live marine model changes. Readable1280x850 screenshot inspected;
+offscreen fonts are supplied in the test only. Root7.1661607/90s process-wall;
+author7.2531821/90s (12 first passes plus one restricted-save rerun; original
+sandbox hardlink failure retained). Separate source/evidence review found no
+remaining actionable issue. No owner geometry or qualification campaign ran.
+
+Evidence: C:/ANYworkspaceWork/marine-stability-pane-20261020/root/FINAL.json,
+root/INTEGRATION.json, root/stability-interface.png and author/review records.
+Only reviewed interface/test/docs files are reconciled after dirty-baseline
+hash checks. Installed runtime is disposable; the live environment is unchanged.
+
+## Previous — Embedded Scripts pane, 2026-10-20
+
+User explicitly requests an ANYfem-style Scripts section in the main app,
+including full Python scripts and command recording. Add it to this Qt shell,
+consuming the public ANYstability console; record the existing stability study
+example/open/calculate/save actions as explicit replayable Python. Preserve
+optional dependencies, existing viewport/modes, saved studies and scientific
+admission. Opening/recording does not execute; accepted app close stops the owned
+console. Scripts execute in an isolated persistent child, not against live GUI
+objects or as an implicit update to the marine mechanical model.
+
+Connected implementation owner remains the cached-unavailability fallback;
+author edits the staged mirror, root owns reconciliation into this checkout and
+installed checks, with a separate complete-slice reviewer. Snapshot and evidence:
+C:/ANYworkspaceWork/stability-scripts-pane-20261020. Separate ordinary check
+process-wall limits author120s/root120s/reviewer20s. No owner geometry, renewed
+qualification campaign, live installation, release or Git publication. Preserve
+all historical dirty work and evidence.
+
+Delivered: Scripts mode in the main-window centre (Ctrl+6), shared public
+QWidget console with kernel-on-Run, and separate recorded Stability GUI actions.
+Recorded example/open/calculate/save calls bind literal inputs, opt-in, absolute
+paths and the actual result/None. Copy/paste/save never execute; replay uses a
+separate study/interpreter and does not mutate the live marine model. Old or
+incompatible optional consoles show an unavailable pane without breaking close.
+
+Installed evidence:68 affected host checks pass across the original66 passes
+and two focused repaired rechecks;3 checkout-only launcher tests skip in this
+installed copy. Ten owner-console checks pass. Real installed Qt workflow
+records/replays four GUI actions into a new folder, matches the original stored
+result, leaves live project/study unchanged and stops the interpreter on accepted
+close. Readable1280x900 screenshot inspected (offscreen fonts registered in test
+only). Root checks16.8647524/120s; author18.8689093/120s. Independent review found
+an incompatible-widget initialization defect; repaired and rechecked. Original
+fixture, temporary-directory, cleanup-order and stale-menu-assertion failures
+remain in evidence. No scientific tolerance or admission claim changed.
+
+Evidence: C:/ANYworkspaceWork/stability-scripts-pane-20261020/root, author and
+review; exact source/wheel/check identities in root/FINAL.json and controlled
+file reconciliation in root/INTEGRATION.json. Baseline dirty-file hashes checked
+before integrating only this slice. No live runtime installation or publication.
+
+## Previous — Full tanks added to stability example, 2026-10-19
+
+User requested tanks in the example model. Prospective scope: four declared full
+rectangular tanks represented through the existing public owner MassItem ledger,
+with dimensions, capacity, liquid density and fixed-CG assumptions preserved as
+source provenance. This adds reference inputs, not tank/free-surface physics or
+geometry-owner work. No sibling edits, existing-study migration, live install,
+scientific campaign or consumed execution authority is implied. Existing dirty
+integration files were snapshotted before edits; previous evidence is preserved.
+
+Port/starboard ballast: 10 m³ / 10,250 kg each. Fore/aft freshwater: 4 m³ /
+4,000 kg each. Contents total 28,500 kg; tank shell mass remains in lightship.
+New total mass 438,500 kg and independent draught 438500/(1025*20*10) =
+2.13902439024 m. Symmetry preserves zero longitudinal/transverse CG. Keep prior
+scientific tolerances, opt-in, query budget and reference-only assurance.
+Direct owner: Codex; this is a small fixture/UI/documentation extension within
+the connected implementation. Verified against this reference-input scope:
+27 focused public-API/CLI/persistence/Qt tests pass against isolated installed
+wheels. They cover individual tank definitions, liquid masses, total CG,
+independent draft/CB, immutable examples, old no-tank reproduction, preserved
+refusals and query limits, saved provenance and report/UI tank entries.
+Standalone example returned draft 2.139024391770363 m (reference
+2.1390243902439026 m; unchanged tolerances), using 31 queries. Save/reopen and
+loading the previously saved 2 m / two-item study both pass without a solve.
+Rendered Qt tank ledger inspected. No broader scientific acceptance claimed.
+
+Evidence: C:/ANYworkspaceWork/anymarine-stability-tanks-20261019/HANDOFF.md,
+EVIDENCE.json, verified-example.json and checks/* retain exact commands,
+installed origins, versions, wheel/source hashes, timing and test results.
+ANYmarine wheel SHA256 9884dd1048fc75da6d60899d9df714bd45b29cbc710724646dedc8570d06b3ed.
+Fresh disposable environment consumes the unchanged ANYstability dev1 wheel
+and read-only existing NumPy/Qt/ANY3dView dependencies. No live runtime change.
+Previous no-tank saved studies, the owner's two-item example and earlier
+evidence remain unchanged. Partial fill/free surfaces, tank-fluid motion,
+certified geometry, GZ and criteria remain unsupported by this workbench.
+
+## Current — ANYstability consumer example, 2026-10-19
+
+Prospective transition: the user requested adding ANYstability to ANYmarine with
+an example. This authorizes the optional reference workbench, shared public API,
+CLI, owner-backed study persistence and focused analytic/Qt checks. It does not
+renew W5/native/BEM campaigns, S2's consumed pilot or full qualification authority.
+Historical failures and evidence below remain controlling for their own routes.
+
+Direct implementation owner: Codex. The connected consumer boundary crosses
+application services, optional dependency isolation, GUI/CLI and owner persistence;
+the earlier S2 Mistral Edit attempts were unreliable, so no repeated probe is made.
+No ANYstability/ANYgeometry source edits or live runtime installation are needed.
+Review the complete consumer slice independently; author verification is not
+scientific acceptance. No release, commit or push is authorized.
+
+Contract: use public ANYstability APIs, no copied hydrostatics, no automatic
+mechanical-model transfer, no false production/certification claims. The analytical
+box requires explicit opt-in and at most 128 queries. Opening/loading never solves.
+Save only matching results; preserve existing artifacts and publish receipts last.
+Implemented and verified for the assigned reference-only scope. GUI: File >
+Examples > ANYstability analytical box. CLI: stability-info, stability-example,
+run-stability. Runnable example: examples/stability_workflow.py; instructions:
+docs/STABILITY.md. Owner stores and reports are used unchanged; strict JSON
+decoding, matching-input save/reopen, opt-in and work limits are tested.
+
+Installed candidate02: 62 passed, 1 skipped (Windows symlink privilege absent),
+covering the new route and existing lifecycle/persistence/headless workflows.
+Final candidate03 only improves Qt report rendering; its 3 affected GUI tests
+pass. Standalone example and rendered GUI both pass with draft 1.999999988824129 m
+against the independent 2 m reference, within unchanged owner tolerances.
+Independent read-only reviewer /root/s2_independent_review found a nested-JSON
+refusal gap; fixed using the owner's public guarded decoder, then independently
+rechecked with no residual findings. No broader scientific acceptance claimed.
+
+Evidence: C:/ANYworkspaceWork/anymarine-stability-20261019/HANDOFF.md and
+EVIDENCE.json retain commands, versions, hashes, timing, original failed test
+and installer attempts. Final wheel ddc5f8c611861e621124317cc720b5991398a0cdfeeb861b97862e4882c7db5a;
+owner wheel c66c102239e968d5cd75489b650aed0646f941f0c9cdde281f69cba397dfbc7b.
+Both packages were installed only in a disposable environment outside checkouts;
+NumPy/Qt/ANY3dView dependencies were inherited read-only from the existing runtime.
+Offscreen Qt enumerated zero fonts; explicit local fonts were registered in the
+screenshot harness only. Source and live runtime font configuration is unchanged.
+
+S2 certified geometry remains blocked; GZ/criteria/tanks and coupling to marine
+mechanics remain unavailable. Existing marine project schema, saved results and
+historical campaigns are unchanged. No commit, publication or live installation.
+
 ## Current — W5 v6: free decay passes; regular-wave case wave-0 NOGO, 2026-10-13
 
 v6 (w5-physical-20261013c; dt 0.025/0.0125, kernel horizon 250 s, A_inf calibrated on the fine
