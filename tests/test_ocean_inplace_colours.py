@@ -15,7 +15,7 @@ from conftest import requires_qt
 
 from anymarine.qtapp import ocean
 
-SIBLING_SRC = Path(r"C:\Github\wt\any3dview-face-colors\src")
+SIBLING_SRC = Path(r"C:\Github\ANY3dView\src")  # local source checkout (carries MeshHandle.update_face_colors since 1141837)
 
 _POS = np.array([[-5, -2, -1], [5, -2, -1], [5, 2, -1], [-5, 2, -1], [-5, -2, 1], [5, -2, 1], [5, 2, 1], [-5, 2, 1]], float)
 _TRI = np.array([[0, 2, 1], [0, 3, 2], [4, 5, 6], [4, 6, 7], [0, 1, 5], [0, 5, 4], [2, 3, 7], [2, 7, 6],
@@ -211,7 +211,7 @@ print("OK")
 
 def test_real_viewer_inplace_when_api_available(tmp_path):
     if not (SIBLING_SRC / "any3dview").is_dir():
-        pytest.skip("sibling ANY3dView face-colour worktree not present")
+        pytest.skip("sibling ANY3dView source checkout not present")
     pytest.importorskip("PySide6")
     env = dict(os.environ, QT_QPA_PLATFORM="offscreen")
     own = str(Path(__file__).resolve().parent.parent / "src")
