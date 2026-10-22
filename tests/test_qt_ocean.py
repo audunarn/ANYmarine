@@ -402,6 +402,8 @@ def _failing_tick(scene, viewer, hull, how, monkeypatch):
 @pytest.mark.parametrize("how", ["colours", "set_visible", "add", "remove_old"])
 def test_animation_failure_anywhere_restores_static_plane_and_does_not_repeat(scene_env, how, monkeypatch):
     scene, viewer, hull, qapp = scene_env
+    # this test pins the replace-surface path; the in-place path has its own failure tests (test_ocean_inplace_colours.py)
+    monkeypatch.setattr(scene, "_inplace_colours", lambda: False)
     assert _failing_tick(scene, viewer, hull, how, monkeypatch) is False
     monkeypatch.undo()
     assert scene.diagnostics and any("animation" in d for d in scene.diagnostics)
