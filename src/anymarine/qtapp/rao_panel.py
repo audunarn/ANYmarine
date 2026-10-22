@@ -149,6 +149,41 @@ def _nice_ticks(lo, hi, count=5):
     return ticks
 
 
+def format_tick_labels(ticks):
+    """Labels for axis ticks: precision follows the tick spacing so distinct ticks never share a label.
+
+    Plain decimals for ordinary magnitudes; scientific notation (with enough mantissa digits) only
+    when the plain form would need more than 10 decimals or 15 integer digits.  No float noise,
+    never '-0'.
+    """
+    ticks = [float(t) for t in ticks]
+    if not ticks:
+        return []
+    gaps = [b - a for a, b in zip(ticks, ticks[1:]) if b - a > 0]
+    if not gaps:
+        return [('0' if t == 0 else f'{t:.6g}') for t in ticks]
+    step = min(gaps)
+    top = max(abs(t) for t in ticks)
+    zero = step * 1e-6
+    vals = [0.0 if abs(t) < zero else t for t in ticks]
+
+    def clean(text):
+        return '0' if float(text) == 0.0 else text
+
+    decimals = max(0, math.ceil(-math.log10(step) - 1e-9))
+    if decimals <= 10 and top < 1e15:
+        while True:
+            labels = [clean(f'{t:.{decimals}f}'.rstrip('0').rstrip('.') if decimals else f'{t:.0f}') for t in vals]
+            if len(set(labels)) == len(labels) or decimals >= 12:
+                return labels
+            decimals += 1
+    for mant in range(0, 18):
+        labels = [clean(f'{t:.{mant}e}') for t in vals]
+        if len(set(labels)) == len(labels) and all(abs(float(l) - t) <= 0.5 * step for l, t in zip(labels, vals)):
+            return labels
+    return [clean(f'{t:.17e}') for t in vals]
+
+
 class RaoAxes(QWidget):
     """One RAO graph: FD lines (dark red), TD markers (blue crosses), labelled axes and grid."""
 
@@ -218,16 +253,16 @@ class RaoAxes(QWidget):
         fx = lambda v: x0 + (v - xlo) / (xhi - xlo) * (x1 - x0)
         fy = lambda v: y1 - (v - ylo) / (yhi - ylo) * (y1 - y0)
         grid = QPen(QColor('#a0a0a0'), 1.0, Qt.PenStyle.DashLine)
-        for v in xt:
+        x_texts, y_texts = format_tick_labels(xt), format_tick_labels(yt)
+        for v, xtext in zip(xt, x_texts):
             painter.setPen(grid)
             painter.drawLine(QPointF(fx(v), y0), QPointF(fx(v), y1))
             painter.setPen(QColor('#202020'))
-            painter.drawText(QPointF(fx(v) - 10, y1 + 13), f'{v:g}')
-        for v in yt:
+            painter.drawText(QPointF(fx(v) - 10, y1 + 13), xtext)
+        for v, text in zip(yt, y_texts):
             painter.setPen(grid)
             painter.drawLine(QPointF(x0, fy(v)), QPointF(x1, fy(v)))
             painter.setPen(QColor('#202020'))
-            text = f'{v:.4g}'
             painter.drawText(QPointF(x0 - 4 - metrics.horizontalAdvance(text), fy(v) + 4), text)
         painter.drawText(QPointF((x0 + x1 - metrics.horizontalAdvance(self._xlabel)) / 2, y1 + 27), self._xlabel)
         painter.save()

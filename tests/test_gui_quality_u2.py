@@ -1,6 +1,10 @@
 """GUI quality slice U2: logic behind the easy-use fixes (error wording, contrast, enabling, snapshot discovery)."""
 from types import SimpleNamespace
 
+import math
+
+import pytest
+
 from conftest import requires_qt
 
 
@@ -205,3 +209,59 @@ def test_nice_ticks_survive_tiny_and_huge_magnitudes():
     assert any(t > 0 for t in ticks) and all(abs(t) < 1e-12 for t in ticks)
     big = _nice_ticks(1e9, 5e9, 4)
     assert len(set(f"{v:.4g}" for v in big)) == len(big)
+
+
+_TICK_RANGES = [(1e-13, 4e-13), (1e9, 1e9 + 4), (100000, 100004), (-1e-3, 1e-3), (0, 1), (-5, 5), (0, 100),
+                (-100004, -100000), (-1e9 - 4, -1e9), (2e-20, 9e-20), (1e20, 5e20), (-3, -1), (0.1, 0.7)]
+
+
+def _check_labels(lo, hi):
+    from anymarine.qtapp.rao_panel import _nice_ticks, format_tick_labels
+    ticks = _nice_ticks(lo, hi, 5)
+    labels = format_tick_labels(ticks)
+    assert len(labels) == len(ticks)
+    assert len(set(labels)) == len(labels), (lo, hi, ticks, labels)
+    assert all(not l.startswith('-0') or float(l) != 0 for l in labels) and '-0' not in labels, labels
+    step = min((b - a for a, b in zip(ticks, ticks[1:])), default=0.0)
+    if len(ticks) > 1 and 'e' not in labels[0]:
+        needed = max(0, math.ceil(-math.log10(step) - 1e-9))
+        for l in labels:
+            assert len(l.partition('.')[2]) <= needed, labels            # no float noise beyond the tick spacing
+    if len(ticks) > 1:
+        assert all(abs(float(l) - t) <= 0.5 * step for l, t in zip(labels, ticks)), (ticks, labels)
+    return labels
+
+
+@pytest.mark.parametrize("lo,hi", _TICK_RANGES)
+def test_tick_labels_distinct_clean_and_round_trip(lo, hi):
+    _check_labels(lo, hi)
+
+
+def test_tick_labels_ordinary_ranges_are_short_and_plain():
+    from anymarine.qtapp.rao_panel import format_tick_labels
+    assert format_tick_labels([0.0, 0.5, 1.0]) == ['0', '0.5', '1']
+    assert format_tick_labels([-5.0, 0.0, 5.0]) == ['-5', '0', '5']
+    assert format_tick_labels([0.0, 50.0, 100.0]) == ['0', '50', '100']
+    assert format_tick_labels([0.1 + 0.2, 0.6]) == ['0.3', '0.6']
+    assert format_tick_labels([-1e-17, 0.5, 1.0]) == ['0', '0.5', '1']
+    assert format_tick_labels([100000.0, 100001.0]) == ['100000', '100001']
+
+
+def test_tick_labels_random_sweep():
+    import random
+    rng = random.Random(20261022)
+    for _ in range(300):
+        base = rng.choice([0.0, 1.0, -1.0]) * 10.0 ** rng.uniform(-15, 12)
+        width = 10.0 ** rng.uniform(-14, 10)
+        lo = base - rng.random() * width
+        hi = lo + width
+        if hi - lo <= 4 * abs(lo) * 2.3e-16:      # span below float resolution at this offset: no distinct ticks exist
+            continue
+        _check_labels(lo, hi)
+
+
+@requires_qt
+def test_time_series_plot_with_large_offset_values_draws():
+    plot, _ = _plot_image()
+    plot.set_series('', [0.0, 1.0, 2.0], [100000.0, 100002.0, 100004.0])
+    assert not plot.grab().toImage().isNull()

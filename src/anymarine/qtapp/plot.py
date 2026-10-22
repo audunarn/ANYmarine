@@ -72,7 +72,7 @@ class TimeSeriesPlot(QWidget):
         return self._cursor_index
 
     def paintEvent(self, event) -> None:  # noqa: N802
-        from .rao_panel import _nice_ticks
+        from .rao_panel import _nice_ticks, format_tick_labels
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         width, height = self.width(), self.height()
@@ -94,7 +94,8 @@ class TimeSeriesPlot(QWidget):
             v_min, v_max = v_min - 1.0, v_max + 1.0
         yt = _nice_ticks(v_min, v_max, 4)
         xt = _nice_ticks(t_min, t_max, 5) if t_max > t_min else [t_min]
-        y_labels = [f"{v:.4g}" for v in yt]
+        y_labels = format_tick_labels(yt)
+        x_labels = format_tick_labels(xt)
         left = 12.0 + max(metrics.horizontalAdvance(s) for s in y_labels)
         top = 8.0 + metrics.height() + 4.0          # the title strip sits above the plot, never over the curve
         bottom = 8.0 + 2 * metrics.height()          # tick labels and the axis caption
@@ -125,9 +126,8 @@ class TimeSeriesPlot(QWidget):
         for v, text in zip(yt, y_labels):
             if v_min <= v <= v_max:
                 painter.drawText(QPointF(plot.left() - 4 - metrics.horizontalAdvance(text), y_of(v) + metrics.ascent() / 2), text)
-        for t in xt:
+        for t, text in zip(xt, x_labels):
             if t_min <= t <= t_max:
-                text = f"{t:g}"
                 painter.drawText(QPointF(x_of(t) - metrics.horizontalAdvance(text) / 2, plot.bottom() + metrics.ascent() + 2), text)
         caption = "stage" if self._abscissa == "stage" else "time [s]"
         painter.drawText(QPointF(plot.right() - metrics.horizontalAdvance(caption), height - 6), caption)
