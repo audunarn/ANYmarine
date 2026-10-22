@@ -13,7 +13,7 @@ from PySide6.QtWidgets import QWidget
 
 _UNITS = ("N", "Nm", "m", "rad", "s", "W", "J", "kg", "Pa", "m/s", "rad/s", "m/s2", "rad/s2")
 # Channel names whose last word fixes the unit (SI); anything else shows no unit rather than a guess.
-_WORD_UNITS = {"energy": "J", "dissipation": "J", "power": "W", "penetration": "m"}
+_WORD_UNITS = {"energy": "J", "power": "W", "penetration": "m"}
 
 
 def channel_title(name: str) -> tuple[str, str]:

@@ -265,3 +265,19 @@ def test_time_series_plot_with_large_offset_values_draws():
     plot, _ = _plot_image()
     plot.set_series('', [0.0, 1.0, 2.0], [100000.0, 100002.0, 100004.0])
     assert not plot.grab().toImage().isNull()
+
+
+def test_dissipation_channels_show_no_guessed_unit():
+    from anymarine.qtapp.plot import channel_title
+    assert channel_title('mooring/damping_dissipation')[1] == ''
+    assert channel_title('mooring/elastic_energy')[1] == 'J'
+
+
+def test_only_a_missing_module_is_reported_as_not_installed():
+    from anymarine.qtapp.waves import friendly_error
+    missing = ModuleNotFoundError("No module named 'anyloads'", name='anyloads')
+    assert 'not installed' in friendly_error(missing)[0]
+    broken = ImportError("cannot import name 'WaveRealization' from 'anyloads'", name='anyloads')
+    text, detail = friendly_error(broken)
+    assert 'not installed' not in text
+    assert 'WaveRealization' in detail

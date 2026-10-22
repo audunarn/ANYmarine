@@ -18,10 +18,12 @@ _MISSING_PACKAGE=('Mechanical waves need the {name} package, which is not instal
 
 def friendly_error(error):
     """(sentence, detail) for a status line: never a raw exception string for a missing package."""
-    if isinstance(error,ImportError):
+    if isinstance(error,ModuleNotFoundError):
         name=getattr(error,'name',None) or 'required'
         if name.split('.')[0]=='anyloads':return _MISSING_PACKAGE.format(name='anyloads'),str(error)
         return f'This needs the {name} package, which is not installed.',str(error)
+    if isinstance(error,ImportError):
+        return 'A required component could not be loaded.',str(error)
     return str(error),''
 
 MATCHED_NOTE=('Saved incident waves that drove the shown result, at the replay time: Play moves bodies and waves together. '
