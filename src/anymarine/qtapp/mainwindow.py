@@ -140,30 +140,47 @@ class _ResultLabel(_ElidedLabel):
 class _ChannelCombo(QComboBox):
     """Channel selector: readable titles are shown, the stored channel id is the item data."""
 
+    _UUID = r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
+
     @staticmethod
     def title_parts(raw: str, body_names: Optional[dict] = None) -> tuple[str, str]:
-        """(title, unit) for a stored channel id; body ids become body names (display only)."""
+        """(title, unit) for a stored channel id; a UUID-shaped body id at an identity position becomes the body
+        name (display only): ``<name>:<uuid>`` suffix, a whole ``/``-delimited ``<uuid>`` segment, or the native
+        ``wrench["<contribution>","<uuid>"]/<axis>`` pattern. Every other text, including non-UUID ids, stays raw."""
+        import json
         import re
         from .plot import channel_title
+        uuid = _ChannelCombo._UUID
+        lookup = {str(k).lower(): v for k, v in (body_names or {}).items() if re.fullmatch(uuid, str(k))}
         text, found, suffix = str(raw), [], ""
         unit_now = channel_title(text)[1]
         if unit_now and text.endswith(" " + unit_now):       # the unit suffix is never edited
             text, suffix = text[:-len(unit_now) - 1], " " + unit_now
-        ids = sorted((i for i in (body_names or {}) if i), key=len, reverse=True)
-        if ids:
-            # a body id is removed only as a whole identifier token (delimited by start/end or : / _ space);
-            # longest id first so overlapping ids attribute each channel to the right body
-            pattern = re.compile(r"[:/]?(?<![^:/_ ])(?:%s)(?![^:/_ ])" % "|".join(re.escape(i) for i in ids))
-            hit = set()
-            def _drop(match):
-                hit.add(match.group(0).lstrip(":/"))
-                return ""
-            text = pattern.sub(_drop, text)
-            found = [name for body_id, name in (body_names or {}).items() if body_id in hit]
-        text = (text.replace("//", "/").strip(":/ ") + suffix).strip(":/ ")
+        wrench = re.fullmatch(r'wrench(\[\s*"[^"]*"\s*,\s*"(%s)"\s*\])/([A-Za-z]+)' % uuid, text)
+        if wrench and wrench.group(2).lower() in lookup:
+            try:
+                contribution = json.loads(wrench.group(1))[0]
+            except ValueError:
+                contribution = None
+            if isinstance(contribution, str):
+                found = [lookup[wrench.group(2).lower()]]
+                text = f"wrench {contribution} {wrench.group(3)}"
+        elif lookup:
+            tail = re.fullmatch(r"(.*):(%s)" % uuid, text)
+            if tail and tail.group(2).lower() in lookup:
+                found, text = [lookup[tail.group(2).lower()]], tail.group(1)
+            parts = text.split("/")
+            kept = []
+            for part in parts:
+                if re.fullmatch(uuid, part) and part.lower() in lookup:
+                    found.append(lookup[part.lower()])
+                else:
+                    kept.append(part)
+            text = "/".join(kept)
+        text = (text + suffix).strip()
         title, unit = channel_title(text)
         if found:
-            title = f"{title} ({', '.join(found)})"
+            title = f"{title} ({', '.join(dict.fromkeys(found))})"
         return title, unit
 
     @classmethod

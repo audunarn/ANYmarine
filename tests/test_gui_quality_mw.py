@@ -454,19 +454,20 @@ _UUID_B = "cad3c9b9-4c64-43db-a13e-6e4a1d742b86"
 
 def test_title_parts_removes_ids_only_as_whole_tokens():
     from anymarine.qtapp.mainwindow import _ChannelCombo as C
-    assert C.title_parts("equilibrium/moment_residual Nm", {"m": "Body M"}) == ("Equilibrium / moment residual", "Nm")
-    assert C.title_parts("m/moment_residual Nm", {"m": "Body M"}) == ("Moment residual (Body M)", "Nm")
-    assert C.title_parts("heave:m", {"m": "Body M"}) == ("Heave (Body M)", "")
+    n = {_UUID_A: "Body M"}
+    assert C.title_parts("equilibrium/moment_residual Nm", n) == ("Equilibrium / moment residual", "Nm")
+    assert C.title_parts(f"{_UUID_A}/moment_residual Nm", n) == ("Moment residual (Body M)", "Nm")
+    assert C.title_parts(f"heave:{_UUID_A}", n) == ("Heave (Body M)", "")
     assert C.title_parts("force Nm", {"N": "X", "m": "Y"}) == ("Force", "Nm")     # the unit suffix is never edited
 
 
-def test_title_parts_overlapping_ids_prefer_longest_and_attribute_correctly():
+def test_title_parts_two_bodies_attribute_correctly():
     from anymarine.qtapp.mainwindow import _ChannelCombo as C
-    names = {"a": "Body A", "ab": "Body AB"}
-    assert C.title_parts("heave:ab", names) == ("Heave (Body AB)", "")
-    assert C.title_parts("heave:a", names) == ("Heave (Body A)", "")
-    assert C.title_parts("ab/surge_abc", names) == ("Surge abc (Body AB)", "")
-    assert C.title_parts("a:ab/tension N", names) == ("Tension (Body A, Body AB)", "N")
+    names = {_UUID_A: "Body A", _UUID_B: "Body AB"}
+    assert C.title_parts(f"heave:{_UUID_B}", names) == ("Heave (Body AB)", "")
+    assert C.title_parts(f"heave:{_UUID_A}", names) == ("Heave (Body A)", "")
+    assert C.title_parts(f"{_UUID_B}/surge_abc", names) == ("Surge abc (Body AB)", "")
+    assert C.title_parts(f"{_UUID_A}/{_UUID_B}/tension N", names) == ("Tension (Body A, Body AB)", "N")
 
 
 def test_title_parts_bundled_example_titles_unchanged():
@@ -521,3 +522,54 @@ def test_welcome_treats_a_detached_replay_as_content(qapp, window):
     window._set_result(None)                               # clears the replay; no project -> empty state again
     _pump(qapp)
     assert window._welcome.isVisibleTo(window._viewport) and window._tree_placeholder.isVisibleTo(window._tree)
+
+
+# ---- contract (b): only UUID-shaped ids at known identity positions are replaced ---------------------------------
+# Channel formats produced by the native jobs / solvers (all channel names the GUI can list):
+#   '<bid>/WORLD vx' ... '<bid>/WORLD alphaz', '<bid>/total external Fx'    (native_jobs.py)
+#   'wrench["<contribution>","<bid>"]/Fx'                                    (native_jobs.py:263, rao_extraction)
+#   'kinetic_energy', 'link_potential_energy', 'link_damping_power', 'residual_norm', 'newton_iterations'
+#   'equilibrium/force_residual N', 'equilibrium/moment_residual Nm'         (equilibrium_jobs.py)
+#   'mooring/...', 'mooring[<line>,<segment>]/tensions', 'mooring/contact/...'  (no body id)
+#   'q:<label>', 'v:<label>', 'a:<label>', 'force_<kind>:<label>'            (linear.py; label = '<bid>:<dof>' style)
+#   'Heave:<bid>' / 'heave:<bid>' name:id suffix, '<bid>/force_x N', 'equilibrium/<bid>/moment_residual Nm' (examples)
+
+
+def test_non_uuid_body_ids_never_alter_global_channels():
+    from anymarine.qtapp.mainwindow import _ChannelCombo as C
+    assert C.title_parts("kinetic_energy", {"energy": "E"}) == ("Kinetic energy", "J")
+    assert C.title_parts("equilibrium/force_residual N", {"equilibrium": "Q"}) == ("Equilibrium / force residual", "N")
+    assert C.title_parts("equilibrium/moment_residual Nm", {"m": "Body M"}) == ("Equilibrium / moment residual", "Nm")
+    assert C.title_parts("heave:m", {"m": "Body M"}) == ("Heave:m", "")           # not a UUID: raw
+
+
+def test_uuid_ids_at_known_positions_map_as_before():
+    from anymarine.qtapp.mainwindow import _ChannelCombo as C
+    n = {_UUID_A: "Body A", "energy": "E", "equilibrium": "Q"}
+    assert C.title_parts(f"Heave:{_UUID_A}", n) == ("Heave (Body A)", "")
+    assert C.title_parts(f"{_UUID_A}/force x N", n) == ("Force x (Body A)", "N")
+    assert C.title_parts(f"{_UUID_A}/WORLD vx", n) == ("WORLD vx (Body A)", "")
+    assert C.title_parts(f"{_UUID_A}/total external Fx", n) == ("Total external Fx (Body A)", "")
+    assert C.title_parts(f"equilibrium/{_UUID_A}/moment_residual Nm", n) == (
+        "Equilibrium / moment residual (Body A)", "Nm")
+    assert C.title_parts(f"Heave:{_UUID_A.upper()}", {_UUID_A.upper(): "Up"}) == ("Heave (Up)", "")
+
+
+def test_wrench_channel_shows_body_name_and_keeps_raw_id():
+    from anymarine.qtapp.mainwindow import _ChannelCombo as C
+    raw = f'wrench["dry","{_UUID_A}"]/Fx'
+    title, unit = C.title_parts(raw, {_UUID_A: "Body A"})
+    assert "Body A" in title and _UUID_A not in title and "dry" in title and title.startswith("Wrench")
+    assert C.title_parts(raw, {"x": "X"})[0].count(_UUID_A) == 1               # unknown body: raw
+    combo = C()
+    combo.set_channels([raw], {_UUID_A: "Body A"})
+    assert combo.itemData(0) == raw and combo.itemData(0, Qt.ItemDataRole.ToolTipRole) == raw
+    assert _UUID_A not in combo.itemText(0)
+
+
+def test_uuid_inside_longer_token_is_untouched():
+    from anymarine.qtapp.mainwindow import _ChannelCombo as C
+    n = {_UUID_A: "Body A"}
+    for raw in (f"x{_UUID_A}y/a", f"heave:{_UUID_A}x", f"a_{_UUID_A}/b", f"{_UUID_A}_x/b"):
+        title, _ = C.title_parts(raw, n)
+        assert "Body A" not in title and _UUID_A.lower() in title.lower(), raw
