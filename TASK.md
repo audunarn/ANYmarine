@@ -1,5 +1,47 @@
 ## Delivered — Stability workspace redesign, 2026-10-21
 
+## Usable engineering equilibrium/GZ workflow delivered — 24 October 2026
+
+New public immutable study/result API, CLI, conserved actual-CG tanks, bounded
+coupled equilibrium, independent free/fixed-trim GZ branches, adaptive engineering
+metrics/opening limits, portable reports and owner-free save/reopen are implemented.
+ANYmarine's primary Stability actions use the new workflow; current recipe3/five
+conditions/eight tank geometries stay local. Scripts record public calls and exact
+saved pairs. Fresh result cards, stale history, progress, cancel and safe resume
+are connected. Hard-stopped accepted-only checkpoints are inspectable, not resumable.
+
+Installed verification:29 focused core and35 host checks pass. Earlier installed
+foundation/S2/reference regression:198 run,196pass/2platform skips; source-only
+hardlink sandbox failures and missing-add-on setup failures are retained, repaired
+in the separate installed environment. Two additional independent analytic mechanics
+checks pass. Public package contents match exact wheels; private payloads excluded.
+Claude CLI Opus5.5 medium completed independent source/follow-up reviews through
+verified Max subscription. Root resolved final deadline/resume findings with the
+real harmless3second subprocess test (typed deadline, no kill) and fail-closed tests.
+Real retained0.4.8 certificate record confirms raw_u2_v2_uv ordering without new calls.
+
+The ONE authorized real recipe3 attempt returned in9.3837324s process wall using
+23ownerqueries/9evaluations. Accepted equilibrium and±2degree samples; GZ±0.05342399135m.
+Maximum vertical residual0.01243524N, trim residual6.18084e-9Nm, tank-volume residual
+3.55271e-15m3. Result is PARTIAL:3point cap deliberately leaves adaptive intervals
+unresolved. No refusal or timeout. Save/reopen identity and report export checked
+owner-free; final run_gui.py launch opens this retained result with numerical imports
+blocked. The single-attempt authority is TERMINAL; unused time/queries cannot be reused.
+
+Checkout-local ignored configuration selects the new runtime under
+C:/ANYworkspaceWork/anystability-usable-gz-20261024/root/runtime313. Old configuration
+backup and runtime retained. Of153 protected hashes, only the authorized runtime
+selector changed; all152 other files unchanged. No private assets packaged/published.
+
+This is usable engineering implementation, not certified equilibrium/continuous GZ,
+regulatory criteria, full S2/P0/P1/panel qualification or release. The heavy campaign
+remains PAUSED. Full-profile throughput/large snapshots remain unmeasured; full
+snapshots are bounded64MiB and cumulative serialization cost remains an optimization
+item, not a measured performance claim. Source/state files remain uncommitted.
+
+Evidence: C:/ANYworkspaceWork/anystability-usable-gz-20261024/root/EVIDENCE.md.
+API: docs/engineering_workflow.md. Owner requirements: docs/ANYgeometry_REQUIREMENTS.md.
+
 Delivered UI redesign: Overview / Loading & results / Advanced, persistent
 condition/Run/Cancel/Open/Save controls, readable unit-formatted result cards,
 fit-width/page/zoom drawing, structured coupled and attitude forces/moments, and
@@ -9153,3 +9195,99 @@ Public domain/persistence/ANYhydro contracts unchanged, no physics/admission cha
 Authority: C:\ANYworkspaceWork\anymarine-evidence\w9-surface-editor-20261011\authority.md
 Preparation initially failed on absent optionaldocbaseline; null identity recorded,
 no worker/check/native launch occurred in failedpreparation.
+
+## Current — simplified marine examples, 26 October 2026
+User authorizes five primary cases: L01 with all supported run modes; L01 x2
+including multibody modes; L01 spread mooring (1000m polyester, 200m depth);
+cylinder with bottom dipole heave plate and online reference; simple L01-based
+stability with assumed tanks, retaining existing local reference.
+Policy 2026-09-24.2 retained. Preserve all pre-existing dirty stability work and
+protected evidence. No publication, sibling edits, renewed paused campaigns or
+reuse of consumed geometry authority. New bounded example development checks
+are authorized; real run requests apply only to these new examples, not old gates.
+Slices: (1) pure factories + five-entry GUI catalog and run-mode admission;
+(2) genuine thin-sheet cylinder public workflow/reference; (3) simple tank study;
+(4) focused headless/Qt checks and numerical smoke where public providers permit.
+Acceptance: correct geometry/body ownership and SI parameters; no synthetic
+coefficients mislabeled physical; supported run routes connected; persistence
+and refusal checks; actual commands/status reported. No qualification claim.
+Initial question: can public owners execute the requested cases, or do capabilities
+need explicit unavailable states? Inspect public owner APIs and use small focused
+checks; do not replace missing physics with coefficients from cube demonstrations.
+Mistral exhausted per global policy. Claude Sonnet subscription-only Read attempt
+has repeated unknown service errors without tools; evidence outside source at
+C:/ANYworkspaceWork/anymarine-examples-20261026/claude-read. OpenAI fallback owns
+implementation to avoid blocked delivery. Parent retains public contracts/review.
+
+Scope extension explicitly approved by user 26 October 2026: include ANYhydro
+coupled cylinder/dipole solver implementation and verification. This is new
+TS4-development work for this case, not revival of W5/energy-point-02 or old
+consumed budgets. Preserve tutorial untracked assets and old failures. Adopt
+an additive mixed hull + separated submerged sheet development backend using
+existing Galerkin thin-sheet operators and pinned Capytaine Green functions.
+No general thin-sheet qualification, surface-piercing sheet, finite-depth sheet,
+viscous damping, A-infinity or time-domain capability implied without evidence.
+Use finite-frequency coefficients/pressure jump and a plate-free control;
+reciprocity/dissipation, orientation reversal and hull-only comparison discriminate
+coupling/sign errors. Never symmetrize/clamp to conceal a failed formulation.
+Reference: 2016 Experimental Study on the Suppression of a Vertical Circular
+Cylinder with a Heave Plate (journalksnre.com, aidx=6137); model2 geometry,
+65mm keel gap, zero-thickness idealization explicitly distinguished from2mm
+experimental plate. The experimental inertia/viscous response is not reproduced.
+
+## Delivered — five primary study examples, 26 October 2026
+Five primary File > Examples entries: L01 single, L01 x2 multibody, L01 four-line
+polyester spread, cylinder/dipole heave plate, simple L01-based analytical stability.
+Historical examples remain Advanced and the current local reference is retained.
+Study run modes connects native, reference animation, physical-linear import,
+static, RAO FD/TD case setup and HAMS configuration. Missing physical inputs stay
+unavailable; direct L01/cylinder linear command refuses synthetic substitution.
+Local full SI mass extraction supplies L01 inertia; no licensed assets packaged.
+Spread: four1000m lines at200m depth; educational polyester constants and slack
+initialization, no catenary/contact/station-keeping or physical equilibrium claim.
+Simple stability:100x18x12m explicitly approximate box, four full160m3 fixed-mass
+tanks; total L01 mass/CG preserved. Analytic draft/GM works; no actual L01 GZ,
+free-surface or rotational-equilibrium claim. Existing recipe3 remains local.
+
+New public additive ANYhydro MixedHullSheetBackend solves one hull with one
+separated planar submerged zero-thickness sheet in infinite depth, finite
+frequencies. Genuine source/dipole coupling, six shared body modes, signed jump,
+exact nodal force/moment map; no silent isolated-coefficient sum. Original
+CapytaineBackend refuses sheets unchanged. Native implemented/unqualified dataset
+state is narrow; existing external verified source gate retained.
+Actual cylinder run at periods1.0/.78s: A33=.1833404965/.1824143740kg;
+B33=.02122897503/.01566873793Ns/m. Default mesh12sectors/3vertical/3diskrings.
+Installed GUI QProcess run completed in61.468s process wall; solve/save58.8298s.
+Canonical save/reopen/content hash and stale-input refusal verified. Cancellation,
+input tamper and loader no-execution tested. No real geometry owner calls or old
+frozen campaigns; no Ainf, TD-radiation, viscous damping or qualification claim.
+Scaled A reciprocity residuals0.004676/0.006687; B0.018728/0.030237; minimum
+symmetric B eigenvalues negative(-1.56e-7/-7.55e-7). These scientific acceptance
+limitations remain open and are retained, never symmetrized/clamped away.
+Reference geometry:2016 New & Renewable Energy cylinder/heave-plate model2,
+https://www.journalksnre.com/_PR/view/index.php?aidx=6137&bidx=487 . Its physical
+2mm plate is idealised as dipole midsurface; finite flume/viscous response not matched.
+
+Checks/evidence (exact commands/receipts in EVIDENCE.json):
+- marine-final-04: seven focused test modules,65passed;10.859s process wall.
+- hydro-final-05: mixed/surface/native-schema modules,68passed;33.891s wall.
+- marine-lookup-07: stability + local-source lookup,12passed;3.328s wall.
+- schema-followup-08: native narrowness/external compatibility,9passed;3.828s wall.
+- Independent three native L01 workers completed21frames each,6.984s cumulative
+  including preserved missing-dependency attempt; dry/slack development only.
+- Final installed visual smoke passed, no numerical jobs; Windows fonts explicitly
+  loaded for offscreen screenshot QA. Initial missing installed lookup timeout
+  repaired; both failure and pass retained. Qt finished-signal collision and
+  metadata hash/save issues repaired with initial failures retained.
+- Independent OpenAI author-separated Read review found no remaining implementation
+  blocker. No different-family claim: subscription-authenticated Sonnet timed out
+  with service retries and zero tools; no API fallback/Mistral probe.
+
+Separate runtime selected in ignored .anymarine-local.json; prior selector and
+runtimes retained, reference path unchanged. Runtime layers existing local
+libraries; no clean-environment/standalone release claim. Installed wheels match
+all97marine/50hydro Python sources. No commit/push/publication or private packaging.
+Restart ANYmarine to use current menu/backend. Full source/evidence/limits:
+C:/ANYworkspaceWork/anymarine-examples-20261026/EVIDENCE.json
+Retained result: same root/retained-cylinder-result/coefficients.nc
+Docs: docs/EXAMPLES.md and ANYhydro/docs/MIXED_HULL_SHEET.md.

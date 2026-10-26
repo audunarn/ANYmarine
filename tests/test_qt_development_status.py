@@ -76,7 +76,7 @@ def test_existing_menu_paths_preserved(window):
     assert not any(title.startswith("Load ") for title in file_titles)
     assert "Open stored HAMS wave bundle…" in file_titles
     example_titles = [
-        action.text() for action in window._examples_menu.actions()
+        action.text() for action in window._advanced_examples_menu.actions()
     ]
     for expected in (
         "Load &example (two-body replay)",

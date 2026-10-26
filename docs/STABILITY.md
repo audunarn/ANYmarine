@@ -183,3 +183,80 @@ is not artifact proof. Missing/incompatible providers show a diagnostic/Retry
 page, while the marine shell and explicit legacy tab remain independently usable.
 No live environment is upgraded automatically. Headless imports do not require Qt
 or ANYgeometry. No physical or certified admission is added by this interface.
+
+## Engineering equilibrium, GZ and retained reports
+
+The existing saved reference study and all five loading conditions remain in the
+Stability workspace. Its default **Equilibrium & GZ** tab uses the public
+`anystability.services` workflow. The top **Run equilibrium** and Cancel actions
+operate this engineering route; legacy service APIs and retained results remain
+available for historical compatibility. The selected dry loading ledger, named WB liquid
+quantities and densities are carried across; no analytical box is substituted.
+The reference drawing, historical calibration and old equilibrium result remain
+historical evidence. They do not certify a fresh engineering curve.
+
+Use **Preview GZ** first. Free trim or a specified fixed trim, requested heel
+range and visible global wall/query/evaluation/point caps define the calculation.
+**Full GZ** exposes its larger limits before explicit execution. Advanced contains
+provider wheel provenance, editable pose search bounds and optional critical
+openings. The default search box uses ±R for body-origin height, where R is the
+largest authored hull-vertex distance from the origin, heel ±80° and trim ±20°.
+The old reference search box is preserved unchanged. The provider wheel defaults
+from `ANYSTABILITY_OWNER_WHEEL` or installed distribution direct-URL metadata when
+that local file exists. Missing providers remain explicit diagnostics.
+
+Calculations run in an owned child process after an immutable input snapshot is
+saved. On Windows, the parent assigns a kill-on-close process Job before opening
+its execution gate. Cancel first requests cooperative cancellation, then stops
+only that owned process tree after a bounded grace period. Structured phases,
+counts, stdout/stderr and accepted-result checkpoints remain in the run directory.
+Accepted checkpoints can be reopened without importing the geometry owner.
+
+Input edits label retained results historical. History selection, paired JSON
+save/open and report export use exact frozen input/result pairs. **Resume retained**
+is available only for an unchanged incomplete GZ request with unspent wall,
+query, evaluation and point limits. It passes the prior result to the public
+service and subtracts spent wall time from parent supervision; it cannot renew
+consumed limits. Starting another request is an explicit new calculation.
+
+The native Qt chart shows retained samples in metres versus degrees. It draws
+connections only across owner-resolved branch intervals, retains unresolved gaps,
+and marks retained opening immersion observations. Hover displays sample values
+and identities. Metrics distinguish hydrostatic GM from the moving-liquid GZ
+slope. Unavailable continuous or downflooding metrics retain their reasons.
+An empty opening inventory is a closed-envelope diagnostic, never an intact proof
+or regulatory PASS.
+
+**Open engineering**, **Save paired study** and static report export perform no
+numerical execution. Reports use public retained-data HTML, Markdown, CSV, JSON
+and SVG services. Scripts recording stores public service commands, local source
+paths, selected condition, provider, frozen bounds and run limits. Recording does
+not execute the script or package private source/model data. Replaying a recorded
+Run explicitly launches that calculation; selecting/opening/reporting does not.
+
+
+The independent-review transport repairs keep progress messages compact and retry
+transient Windows replacement locks. A dedicated background reader caches file
+signatures and parses changed snapshots up to the public64MiB transport limit;
+GUI polling performs no file I/O. Large saved studies are read in the background.
+The separate lightweight watchdog enforces the owned hard deadline even while a
+large snapshot is being parsed. Parent hard timeout is distinct from user Cancel;
+the core reserves finalization time within the same overall wall limit.
+
+Accepted-only checkpoints have `work.resumable=false`: work spent after the last
+checkpoint is unknown after a hard kill, so those artifacts remain available for
+inspection, saving and reports but cannot resume. Only final cooperative results
+with an accounted work ledger can resume under unspent unchanged-request caps.
+Preview prescribes four heels (range minimum, half minimum, half maximum, range
+maximum); the accepted floating equilibrium supplies the fifth point. Opening
+markers represent immersed intact-limiting openings whose closing state is not
+closed. Closed or non-limiting openings do not receive downflooding markers.
+
+The child public workflow receives the host's `execution_started_monotonic`
+context, outside physical request identity, so snapshot preparation, launch and
+imports consume the same wall cap. Resume debits prior accounted time once;
+parent hard deadlines are unchanged. Resumability requires an explicit true flag,
+including for older saved artifacts. Missing flags fail closed. Background display
+compaction failures retain the output files and finish as an explicit refusal.
+A three-second real subprocess regression uses only a harmless fake provider and
+requires cooperative `DEADLINE_EXCEEDED`, a final returned receipt and no hard kill.

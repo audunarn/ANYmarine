@@ -122,7 +122,7 @@ def _validate_selection(a,root,records,selection):
 def _study(a,root,raw,records,selection):
  return ReferenceBargeStudy(root,tuple(raw.items()),a.v.canonical_bytes(records),a.v.canonical_bytes(selection))
 
-def load_reference_barge(path=None):
+def load_reference_barge(path=None,*,allow_local_dataset=False):
  if path is None:
   configured=os.environ.get('ANYMARINE_REFERENCE_BARGE_DIR')
   if not configured:raise ReferenceBargeError('LOCAL_DATA_UNAVAILABLE','Set ANYMARINE_REFERENCE_BARGE_DIR to the private local recipe3 dataset; no private assets are installed')
@@ -131,7 +131,7 @@ def load_reference_barge(path=None):
  with _owner() as a:
   root=_path(path if path is not None else configured)
   raw,records=_validated(root,a)
-  if path is not None and not (root/'study.json').is_file():raise ReferenceBargeError('INTEGRITY_ERROR','portable study commit marker missing')
+  if path is not None and not allow_local_dataset and not (root/'study.json').is_file():raise ReferenceBargeError('INTEGRITY_ERROR','portable study commit marker missing')
   selection={'schema_version':1,'dataset_identity':DATASET,'selected_case':'coupled','request':None,'result':None}
   if (root/'study.json').exists():
    envelope=a.v.decode_json(a.p.read_bytes(root/'study.json'));a.v.exact(envelope,{'selection','integrity'},'study envelope')

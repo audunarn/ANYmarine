@@ -4,6 +4,10 @@ Marine multibody application foundation (W0-W1 slice): domain records, robust
 project/results persistence, a headless CLI, and a PySide6 Qt Widgets shell
 hosting the public ANY3dView Qt viewer.
 
+The primary example menu contains L01, L01 × 2, spread-moored L01, a cylinder
+with a dipole heave plate, and a simple L01-based tank/stability study.
+See [example inputs, run modes and limits](docs/EXAMPLES.md).
+
 ## Optional reference-barge Stability workspace
 
 With explicit local private-data configuration, select **Stability / Ctrl+7** for the current recipe3 reference barge, eight WB

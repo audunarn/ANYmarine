@@ -920,58 +920,70 @@ class MainWindow(QMainWindow):
         file_menu.addAction(open_action)
         examples_menu = QMenu("&Examples", self)
         self._examples_menu = examples_menu
+        from ..study_examples import PRIMARY_EXAMPLES
+        callbacks = (lambda: self.load_l01_study_example(),
+                     lambda: self.load_l01_study_example(count=2),
+                     lambda: self.load_l01_study_example(moored=True),
+                     self.load_cylinder_study_example, self.load_simple_l01_stability_example)
+        for (_, label), callback in zip(PRIMARY_EXAMPLES, callbacks):
+            action = QAction(label, self)
+            action.triggered.connect(callback)
+            examples_menu.addAction(action)
+        examples_menu.addSeparator()
+        advanced_menu = examples_menu.addMenu('Advanced examples')
+        self._advanced_examples_menu = advanced_menu
         stability_action = QAction("ANYstability analytical box…", self)
         stability_action.triggered.connect(self.open_stability_example)
-        examples_menu.addAction(stability_action)
+        advanced_menu.addAction(stability_action)
         example_action = QAction("Load &example (two-body replay)", self)
         example_action.triggered.connect(self.load_example)
-        examples_menu.addAction(example_action)
+        advanced_menu.addAction(example_action)
         regular_wave_action = QAction('Load moored bodies in a regular wave (solved replay)', self)
         regular_wave_action.triggered.connect(self.load_regular_wave_example)
-        examples_menu.addAction(regular_wave_action)
+        advanced_menu.addAction(regular_wave_action)
         native_example_action = QAction('Load native dry two-body example', self)
         native_example_action.triggered.connect(self.load_native_example)
-        examples_menu.addAction(native_example_action)
+        advanced_menu.addAction(native_example_action)
         plates_action = QAction('Load attached-plate geometry example', self)
         plates_action.triggered.connect(self.load_plate_example)
-        examples_menu.addAction(plates_action)
-        examples_menu.addSeparator()
+        advanced_menu.addAction(plates_action)
+        advanced_menu.addSeparator()
         mooring_example_action=QAction('Load native mooring example (three lines)',self)
         mooring_example_action.triggered.connect(self.load_native_mooring_example)
-        examples_menu.addAction(mooring_example_action)
+        advanced_menu.addAction(mooring_example_action)
         fluid_example_action = QAction('Load native coupled fluid example',self)
         fluid_example_action.triggered.connect(self.load_native_fluid_example)
-        examples_menu.addAction(fluid_example_action)
+        advanced_menu.addAction(fluid_example_action)
         sea_example_action=QAction('Load coupled seeded-wave example',self)
         sea_example_action.triggered.connect(self.load_native_sea_state_example)
-        examples_menu.addAction(sea_example_action)
+        advanced_menu.addAction(sea_example_action)
         calculated_wave_action=QAction('Load calculated wave preview example',self)
         calculated_wave_action.triggered.connect(self.load_calculated_wave_example)
-        examples_menu.addAction(calculated_wave_action)
-        examples_menu.addSeparator()
+        advanced_menu.addAction(calculated_wave_action)
+        advanced_menu.addSeparator()
         hams_wave_action=QAction('Load stored HAMS wave samples',self)
         hams_wave_action.triggered.connect(lambda:self.load_hams_wave_bundle())
-        examples_menu.addAction(hams_wave_action)
+        advanced_menu.addAction(hams_wave_action)
         open_hams_wave_action=QAction('Open stored HAMS wave bundle…',self)
         open_hams_wave_action.triggered.connect(self.open_hams_wave_bundle)
         file_menu.addAction(open_hams_wave_action)
         morison_example_action = QAction('Load native wave/current Morison example', self)
         morison_example_action.triggered.connect(self.load_native_morison_example)
-        examples_menu.addAction(morison_example_action)
+        advanced_menu.addAction(morison_example_action)
         line_hydro_action=QAction('Load native wave/current mooring example',self)
         line_hydro_action.triggered.connect(self.load_native_line_hydro_example)
-        examples_menu.addAction(line_hydro_action)
+        advanced_menu.addAction(line_hydro_action)
         contact_action=QAction('Load native seabed contact example',self)
         contact_action.triggered.connect(self.load_native_contact_example)
-        examples_menu.addAction(contact_action)
-        examples_menu.addSeparator()
+        advanced_menu.addAction(contact_action)
+        advanced_menu.addSeparator()
         static_example_action=QAction('Load coupled static equilibrium example',self)
         static_example_action.triggered.connect(self.load_equilibrium_example)
-        examples_menu.addAction(static_example_action)
-        examples_menu.addSeparator()
+        advanced_menu.addAction(static_example_action)
+        advanced_menu.addSeparator()
         l01_action = QAction('Load L01 default vessel — OrcaWave vs ANYhydro (local data)', self)
         l01_action.triggered.connect(self.load_l01_reference_example)
-        examples_menu.addAction(l01_action)
+        advanced_menu.addAction(l01_action)
         file_menu.addAction(save_action)
         file_menu.addSeparator()
         file_menu.addMenu(examples_menu)
@@ -982,6 +994,9 @@ class MainWindow(QMainWindow):
         file_menu.addAction(exit_action)
 
         jobs_menu = self._menu_bar.addMenu("&Jobs")
+        study_runs = QAction('Study run modes…', self)
+        study_runs.triggered.connect(self.open_study_run_modes)
+        jobs_menu.addAction(study_runs)
         run_action = QAction("&Run synthetic job", self)
         run_action.triggered.connect(self._run_job)
         run_linear_action = QAction(
@@ -1291,6 +1306,9 @@ class MainWindow(QMainWindow):
     def _l01_reference_candidates(self) -> list:
         from PySide6.QtCore import QSettings
         candidates = []
+        configured = os.environ.get('ANYMARINE_L01_REFERENCE_COMPARISON')
+        if configured:
+            candidates.append(Path(configured))
         # Source checkout only (<workspace>/ANYmarine/src/anymarine/qtapp): a sibling ANYhydro checkout.
         parents = Path(__file__).resolve().parents
         if len(parents) > 4 and parents[2].name == 'src' and (parents[3] / 'pyproject.toml').is_file():
@@ -1303,6 +1321,107 @@ class MainWindow(QMainWindow):
     def _remember_l01_reference(self, path: Path) -> None:
         from PySide6.QtCore import QSettings
         QSettings('ANYmarine', 'ANYmarine').setValue(self.L01_SETTING, str(path))
+
+    def load_simple_l01_stability_example(self):
+        from .l01_stability import open_l01_stability
+        open_l01_stability(self)
+
+    def load_cylinder_study_example(self):
+        if not self._confirm_discard(): return
+        from ..cylinder_heave_plate import cylinder_heave_plate_project
+        try:
+            project = cylinder_heave_plate_project()
+        except (ValueError, ImportError, RuntimeError) as error:
+            self._notify_warning('Cylinder study', str(error)); return
+        self._project_root = None
+        self._set_project(project)
+        self._dirty = True
+        self._land_example('Jobs > Study run modes shows available routes and required inputs.')
+
+    def open_cylinder_coefficient_run(self):
+        from .cylinder_study import open_cylinder_study
+        open_cylinder_study(self)
+
+    def load_l01_study_example(self, *, count=1, moored=False):
+        from ..study_examples import l01_study, l01_mass_properties
+        from ..reference_comparison import load
+        if not self._confirm_discard(): return
+        path = next((p for p in self._l01_reference_candidates() if p.is_file()), None)
+        if path is None:
+            chosen = self._ask_open_file('Open local L01 reference comparison', 'Reference comparison (*.json)')
+            if not chosen: return
+            path = Path(chosen)
+        # Explicit local exported mass, never shipped or inferred from display hull.
+        extraction = Path(os.environ.get('ANYMARINE_L01_MASS_EXTRACTION',
+            'C:/ANYworkspaceWork/anymarine-evidence/l01-default-vessel-20261015/l1_reference/orcawave_reference.json'))
+        try:
+            props = l01_mass_properties(extraction, load(path)['body']) if extraction.is_file() else None
+            example = l01_study(path, count=count, moored=moored, mass_properties=props)
+        except (OSError, ValueError, KeyError) as error:
+            self._notify_warning('L01 study refused', str(error)); return
+        self._remember_l01_reference(path)
+        self._project_root = None
+        self._set_project(example.project)
+        self._dirty = True
+        self.setWindowTitle('ANYmarine — '+example.project.name+' (unsaved, unqualified)')
+        if count == 1 and not moored:
+            self._rao.show_reference(example.reference)
+            self._reference_binding = (self._project, example.reference['artifact_hash'])
+        for note in example.notes: self._diagnostics.appendPlainText(note)
+        if extraction.is_file(): self._diagnostics.appendPlainText('Full dry mass/CG inertia read from local extraction: '+str(extraction))
+        self._land_example('Jobs > Study run modes shows routes and requirements; loading does not run a calculation.')
+
+    def open_study_run_modes(self):
+        from ..study_examples import run_modes
+        if self._project is None:
+            self._notify_info('Study run modes', 'Load a study example first.'); return
+        binding = self._reference_binding
+        reference = binding is not None and binding[0] is self._project
+        dialog = QDialog(self)
+        dialog.setWindowTitle('Study run modes — input readiness, unqualified')
+        layout = QVBoxLayout(dialog)
+        info = QLabel('Select a route. The project stays loaded; each numerical owner validates inputs before execution.')
+        info.setWordWrap(True); layout.addWidget(info)
+        scroll = QScrollArea(dialog);scroll.setWidgetResizable(True)
+        content = QWidget(scroll);scroll.setWidget(content);layout.addWidget(scroll)
+        layout = QVBoxLayout(content)
+        if len(self._project.bodies) == 1 and self._project.bodies[0].body_id == 'cylinder-heave-plate':
+            dipole = QPushButton('Coupled hull + dipole plate coefficients…')
+            dipole.setToolTip('Finite-frequency coupled BEM in a separate process; development, unqualified.')
+            dipole.clicked.connect(lambda: (dialog.accept(), self.open_cylinder_coefficient_run()))
+            layout.addWidget(dipole)
+        routes = dict(reference=lambda: self._set_mode('rao'), native=self._run_native_job,
+                      rao=lambda: self._set_mode('rao'), linear=self._run_linear_job,
+                      static=self._run_equilibrium_job, hydro=self._run_hams_job)
+        for mode in run_modes(self._project, reference_available=reference):
+            button = QPushButton(mode.label + (' — available' if mode.available else ' — requires inputs'))
+            button.setEnabled(mode.available); button.setToolTip(mode.diagnostic)
+            label = QLabel(mode.diagnostic); label.setWordWrap(True)
+            def execute(checked=False, key=mode.key):
+                dialog.accept(); routes[key]()
+            button.clicked.connect(execute)
+            layout.addWidget(button); layout.addWidget(label)
+        if all(b.body_id.startswith('l01-') for b in self._project.bodies):
+            mass_button = QPushButton('Choose local L01 full mass extraction…')
+            def choose_mass():
+                from ..study_examples import l01_mass_properties
+                chosen = self._ask_open_file('Open local OrcaWave mass extraction', 'JSON (*.json)')
+                if not chosen: return
+                try:
+                    body = self._project.bodies[0]
+                    props = l01_mass_properties(chosen, dict(mass_kg=body.mass,
+                        centre_of_mass_m=(2.53, 0., -1.974)))
+                    self._mark_edited(self._project.with_edits(bodies=tuple(
+                        b.with_edits(mass_properties=props) for b in self._project.bodies)))
+                except (OSError, ValueError, KeyError) as error:
+                    self._notify_warning('L01 mass refused', str(error)); return
+                dialog.accept()
+            mass_button.clicked.connect(choose_mass); layout.addWidget(mass_button)
+        import_button = QPushButton('Import physical hydrodynamic inputs…')
+        import_button.clicked.connect(lambda: (dialog.accept(), self._import_hydro_inputs()))
+        layout.addWidget(import_button)
+        close = QPushButton('Close'); close.clicked.connect(dialog.reject); layout.addWidget(close)
+        dialog.resize(660, 520); dialog.exec()
 
     def load_l01_reference_example(self) -> None:
         """OrcaWave L01 default vessel vs ANYhydro RAOs from a locally prepared reference comparison."""
@@ -2251,6 +2370,13 @@ class MainWindow(QMainWindow):
             return
         inputs = self._project.linear_inputs
         if inputs is None:
+            if any(b.body_id.startswith('l01-') or b.body_id == 'cylinder-heave-plate'
+                   for b in self._project.bodies):
+                self._notify_info('Physical hydrodynamic inputs required',
+                    'This study has no bound linear hydrodynamic coefficients. Use Jobs > '
+                    'Import hydrodynamic inputs, or the cylinder coupled-dipole coefficient route. '
+                    'Study examples do not create synthetic marine coefficients.')
+                return
             try:
                 inputs = self._service.linear_demo_inputs(self._project)
                 project = self._service.set_linear_inputs(self._project, inputs)
@@ -3077,6 +3203,9 @@ class MainWindow(QMainWindow):
                 return
             if self._stability_host is not None and self._stability_host.shutdown() is False:
                 event.ignore();return
+            cylinder = getattr(self, '_cylinder_study_dialog', None)
+            if cylinder is not None and not cylinder.shutdown():
+                event.ignore();return
             self._fit_timer.stop()
             self._play_timer.stop()
             self._waves.timer.stop()
@@ -3106,6 +3235,9 @@ class MainWindow(QMainWindow):
             event.ignore()
             return
         if self._stability_host is not None and self._stability_host.shutdown() is False:
+            event.ignore();return
+        cylinder = getattr(self, '_cylinder_study_dialog', None)
+        if cylinder is not None and not cylinder.shutdown():
             event.ignore();return
         self._fit_timer.stop()
         self._play_timer.stop()

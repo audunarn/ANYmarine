@@ -79,6 +79,10 @@ def test_examples_are_a_file_submenu(window):
     file_menu = window._menus[0]
     assert window._examples_menu in [a.menu() for a in file_menu.actions() if a.menu()]
     titles = [a.text() for a in window._examples_menu.actions() if not a.isSeparator()]
+    from anymarine.study_examples import PRIMARY_EXAMPLES
+    assert titles[:5] == [label for _,label in PRIMARY_EXAMPLES]
+    assert titles[5] == 'Advanced examples'
+    titles = [a.text() for a in window._advanced_examples_menu.actions() if not a.isSeparator()]
     assert len(titles) >= 13
     # This separately tested optional study action predates the Scripts mode.
     stability_label = "ANYstability analytical box…"

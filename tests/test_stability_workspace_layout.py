@@ -61,7 +61,7 @@ def test_primary_actions_and_cards_stay_visible_across_pages_and_resize(pane,app
 
 def test_named_selection_dirty_refusal_and_result_invalidation(pane,app):
  widget,service,records=pane
- widget.case_selector.setCurrentText('combined');assert widget.study.selected_case=='combined' and not widget.run_button.isEnabled()
+ widget.case_selector.setCurrentText('combined');assert widget.study.selected_case=='combined' and widget.run_button.isEnabled()
  before=widget.study
  widget.controls.setPlainText('{broken')
  assert all(card.text()=='Not paired' for card in widget.result_cards.values()) and widget.result_table.rowCount()==0
@@ -150,3 +150,43 @@ def test_focused_main_modes_restore_user_chrome_and_fit_window(app,monkeypatch):
  window._set_mode('model');app.processEvents()
  assert window._toolbar.isHidden() and not window._jobs_dock.isHidden() and not window._navigator_dock.isHidden()
  window._dirty=False;window.close();app.processEvents()
+
+
+def test_primary_equilibrium_button_calls_public_engineering_route(pane,monkeypatch):
+ widget,service,_=pane;calls=[]
+ monkeypatch.setattr(widget.engineering,'run',lambda profile:calls.append(profile))
+ widget.allow.setChecked(True);widget.run_button.click()
+ assert calls==['equilibrium'] and widget.engineering.allow.isChecked()
+ assert widget.tabs.currentIndex()==widget.engineering_index
+ assert widget.tabs.tabText(widget.engineering_index)=='Equilibrium & GZ'
+ assert set(service.calls)<={'load','view'}
+
+
+def test_engineering_equilibrium_updates_outer_header_and_edits_mark_history(pane):
+ from types import SimpleNamespace
+ from dataclasses import replace
+ widget,service,_=pane
+ original=widget.study
+ frozen=SimpleNamespace(identity='engineering-frozen-study')
+ data={'study_identity':frozen.identity,'request_identity':'engineering-request','status':'partial',
+  'assurance':{'geometry':'engineering_estimate'},'points':[],'metrics':{},
+  'equilibrium':{'mass_kg':62000.,'cg_body_m':[1.,2.,3.],'heel_rad':.2,'trim_rad':.1,'origin_z_m':-1.234}}
+ result=SimpleNamespace(identity='engineering-retained-result',to_dict=lambda:data)
+ widget.engineering._retain(frozen,result)
+ assert widget.result_cards['mass'].text()=='62.00 t'
+ assert widget.result_cards['height'].text()=='-1.234 m'
+ assert '11.46' in widget.result_cards['angles'].text()
+ assert widget.evidence_badge.text()=='Engineering result · partial'
+ assert frozen.identity in widget.evidence_badge.toolTip()
+ assert widget.study is original and original.to_dict()['result'] is None
+ widget.engineering.fixed_trim.setValue(2)
+ assert widget.evidence_badge.text()=='Historical engineering · partial'
+ widget.study=replace(original,identity='selected-loading-changed')
+ widget.refresh()
+ assert widget.evidence_badge.text()=='Historical engineering · partial'
+ assert widget.result_cards['mass'].text()=='62.00 t'
+ # A study opened without engineering evidence restores the original saved-view cards.
+ widget.engineering.result=None
+ widget.engineering.retained_state_changed.emit(frozen,None,False)
+ assert widget.evidence_badge.text().startswith('Saved reference')
+ assert widget.result_cards['mass'].text()=='120.00 t'

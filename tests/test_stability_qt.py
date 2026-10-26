@@ -64,7 +64,7 @@ def test_mainwindow_menu_lifecycle_and_missing_owner(monkeypatch,tmp_path):
     window = MainWindow(viewer_backend="software")
     monkeypatch.setattr(window._service, "calculate_stability", lambda *a, **k: pytest.fail("mode/menu must not solve"))
     original_project = window._project
-    action = next(a for a in window._examples_menu.actions() if a.text() == "ANYstability analytical box…")
+    action = next(a for a in window._advanced_examples_menu.actions() if a.text() == "ANYstability analytical box…")
     other=None
     try:
         action.trigger(); app.processEvents()

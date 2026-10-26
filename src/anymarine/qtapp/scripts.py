@@ -23,6 +23,7 @@ service = ApplicationService()
 stability_inputs = None
 stability_result = None
 barge_saved_identities = {}
+engineering_pairs = {}
 
 '''
 

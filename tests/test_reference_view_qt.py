@@ -92,7 +92,7 @@ def test_l01_example_refuses_a_tampered_file(qapp, window, tmp_path, monkeypatch
 
 
 def test_l01_example_is_in_the_examples_submenu(window):
-    titles = [a.text() for a in window._examples_menu.actions()]
+    titles = [a.text() for a in window._advanced_examples_menu.actions()]
     assert any(t.startswith('Load L01 default vessel') for t in titles)
 
 

@@ -56,11 +56,42 @@ class ReferenceBargePane(QWidget):
   self.details=QTextBrowser();self.details.setMinimumHeight(180);al.addWidget(self.details)
   scroll=QScrollArea();scroll.setWidgetResizable(True);scroll.setWidget(advanced);self.tabs.addTab(scroll,'Advanced')
   self.status=QLabel('Saved study ready. No new calculation.');self.status.setWordWrap(True);self.status.setObjectName('Muted');layout.addWidget(self.status)
-  self.case_selector.currentIndexChanged.connect(lambda _index:self.select_case(self.case_selector.currentData()));self.controls.textChanged.connect(self._edited);self.run_button.clicked.connect(self.run);self.cancel_button.clicked.connect(lambda _checked=False:self.cancel())
+  self.case_selector.currentIndexChanged.connect(lambda _index:self.select_case(self.case_selector.currentData()));self.controls.textChanged.connect(self._edited);self.run_button.clicked.connect(self._engineering_equilibrium);self.cancel_button.clicked.connect(lambda _checked=False:self.cancel())
   for label in self.findChildren(QLabel):label.setWordWrap(True)
   self.timer=QTimer(self);self.timer.timeout.connect(self.poll);self.timer.start(80)
+  from .engineering_stability import EngineeringStabilityPane
+  self.engineering=EngineeringStabilityPane(lambda:self.study,self,recorder=self.recorder)
+  self.engineering.retained_state_changed.connect(self._engineering_header)
+  self.allow.setText('Allow development engineering');self.allow.toggled.connect(self.engineering.allow.setChecked)
+  self.engineering.allow.toggled.connect(self.allow.setChecked);self.engineering.allow.hide()
+  engineering_scroll=QScrollArea();engineering_scroll.setWidgetResizable(True);engineering_scroll.setMinimumSize(0,0);engineering_scroll.setWidget(self.engineering)
+  self.engineering_index=self.tabs.addTab(engineering_scroll,'Equilibrium & GZ')
+  self.tabs.setCurrentIndex(self.engineering_index)
   self.refresh()
   if not opened:self._record('Load recipe3 reference','barge_study = service.reference_barge_example()\n')
+ def _engineering_header(self,study,result,stale):
+  if result is None:
+   self.refresh();return
+  data=self.engineering._result_data(result)
+  if data.get('study_identity')!=study.identity:
+   self.evidence_badge.setText('Engineering binding refused');self._clear_result_cards();return
+  self._engineering_header_identity=study.identity
+  label='Historical engineering' if stale else 'Engineering result'
+  self.evidence_badge.setText(label+' · '+data['status'])
+  self.evidence_badge.setToolTip('Frozen engineering study '+study.identity+'\nResult '+result.identity+'\nRequest '+str(data.get('request_identity'))+'\nEngineering estimate; no production qualification.')
+  equilibrium=data.get('equilibrium')
+  if equilibrium is None:
+   self._clear_result_cards()
+   for card in self.result_cards.values():card.setText('Unavailable')
+   self.summary.setText(label+' · no accepted equilibrium retained · '+data['status']);return
+  mass=equilibrium.get('mass_kg');cg=equilibrium.get('cg_body_m')
+  self.result_cards['mass'].setText('Unavailable' if mass is None else format(mass/1000,'.2f')+' t')
+  self.result_cards['mass'].setToolTip('Frozen engineering equilibrium mass [kg]: '+_display(mass))
+  self.result_cards['cg'].setText('Unavailable' if cg is None else '('+', '.join(format(v,'.3f') for v in cg)+') m')
+  self.result_cards['angles'].setText(' / '.join('Unavailable' if equilibrium.get(k) is None else format(math.degrees(equilibrium[k]),'.2f') for k in ('heel_rad','trim_rad'))+' deg')
+  self.result_cards['height'].setText('Unavailable' if equilibrium.get('origin_z_m') is None else _display(equilibrium['origin_z_m'])+' m')
+  self.summary.setText(label+' · accepted equilibrium · '+data['status']+' · body-origin height is not draught · no production qualification')
+  self.summary.setToolTip(self.evidence_badge.toolTip())
  def _record(self,action,code,error=None):
   if self.recorder:self.recorder(action,code,'success' if error is None else 'refused',str(error or ''))
  def _guard(self,callback):
@@ -68,7 +99,9 @@ class ReferenceBargePane(QWidget):
   except (ServiceError,OSError,ValueError) as error:self.status.setText(str(error));QMessageBox.warning(self,'Reference study refused',str(error))
  def _edited(self):
   if not self._updating:
+   if hasattr(self,'engineering'):self.engineering.mark_stale()
    self._dirty=True;self.cancel('controls edited');self.evidence_badge.setText('Controls changed · result not paired');self._clear_result_cards();self.summary.setText('CONTROLS EDITED: prior equilibrium is not paired with these controls. Run or Save validates them; cached mass/pose is not a new result.');self.status.setText('Controls edited; result pairing invalidated.')
+   if self.engineering.result is not None:self._engineering_header(self.engineering.study,self.engineering.result,True)
  def _clear_result_cards(self):
   for card in self.result_cards.values():card.setText('Not paired')
   self.result_table.setRowCount(0)
@@ -82,9 +115,10 @@ class ReferenceBargePane(QWidget):
   table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive);table.horizontalHeader().setStretchLastSection(True)
   for column in range(len(headers)):table.setColumnWidth(column,135 if column else 110)
  def refresh(self):
+  if hasattr(self,'engineering'):self.engineering.source_changed(self.study.identity)
   view=self.service.reference_barge_view(self.study);self._updating=True
   self.case_selector.setCurrentText(self.study.selected_case);self.controls.setPlainText(json.dumps(view['controls'],indent=2));self._updating=False;self._dirty=False
-  self.run_button.setEnabled(self.study.selected_case=='coupled' and not self.job)
+  self.run_button.setEnabled(not self.job and not self.engineering.job)
   mass=view['mass_summary'];pose=view['pose']
   mass_text='Mass/CG not paired' if mass is None else 'Mass '+format(mass['mass_kg'],'.2f')+' kg | CG body m '+_display(mass['cg_body_m'])
   pose_text='Pose not retained' if pose is None else 'heel '+_display(pose['heel_rad'])+' rad | trim '+_display(pose['trim_rad'])+' rad | body-origin z '+_display(pose['origin_z_m'])+' m (not draught)'
@@ -96,7 +130,7 @@ class ReferenceBargePane(QWidget):
   self.result_cards['cg'].setText('Not paired' if mass is None else '('+', '.join(format(v,'.3f') for v in mass['cg_body_m'])+') m')
   self.result_cards['angles'].setText('Not retained' if pose is None else ' / '.join(('0.00' if format(math.degrees(pose[k]),'.2f')=='-0.00' else format(math.degrees(pose[k]),'.2f')) for k in ('heel_rad','trim_rad'))+' deg')
   self.result_cards['height'].setText('Not retained' if pose is None else _display(pose['origin_z_m'])+' m')
-  self.cancel_button.setEnabled(self.job is not None)
+  self.cancel_button.setEnabled(self.job is not None or self.engineering.job is not None)
   diagnostic=view['diagnostics'] or {};diagnostic_rows=[]
   for key,label in [('residual_Fz_Qheel_Qtrim','Residual Fz [N], Qheel / Qtrim [Nm]'),('net_moment_world_Nm','Net physical moment [Nm]'),('buoyancy_force_world_N','Buoyancy force · world [N]'),('weight_force_world_N','Weight force · world [N]'),('force_world_N','Weight force · world [N]'),('moment_world_Nm','Weight physical moment · world [Nm]'),('generalized_heel_trim_Nm','Weight generalized heel / trim [Nm]'),('moment_reference','Moment reference'),('reference','Weight moment reference'),('free_surface_treatment','Liquid treatment')]:
    if key in diagnostic:diagnostic_rows.append([label,diagnostic[key]])
@@ -110,6 +144,7 @@ class ReferenceBargePane(QWidget):
   self._table(self.calibration_table,['Tank','Height fraction','Height m','Volume m3','Volume fill fraction','Liquid CG body m','FS area m2'],[[r['tank_id'],r['height_fraction'],r['height_m'],r['volume_m3'],r['volume_fill_fraction'],r['liquid_cg_body_m'],None if r['free_surface'] is None else r['free_surface']['area_m2']] for r in view['calibration_rows']])
   condition=view['condition'];self._table(self.ledger,['Item','Mass kg','CG body m','Source','Physical covers'],[] if condition is None else [[r['item_id'],r['mass_kg'],r['cg_body_m'],r['source'],r['covers']] for r in condition['items']])
   self.details.setPlainText(json.dumps({k:view[k] for k in ('mass_basis','mass_summary','pose','condition','base_condition','diagnostics','tank_solutions','definition_identity','dataset_identity','limitations')},indent=2))
+  if self.engineering.result is not None:self._engineering_header(self.engineering.study,self.engineering.result,self.engineering.stale)
  def _control_candidate(self):
   raw=self.controls.toPlainText()
   candidate=self.service.reference_barge_controls(self.study,raw)
@@ -167,6 +202,12 @@ class ReferenceBargePane(QWidget):
  def save_dialog(self):
   path=QFileDialog.getSaveFileName(self,'Choose a NEW recipe3 study directory name')[0]
   if path:self._guard(lambda:self.save_study(path))
+ def _engineering_equilibrium(self):
+  if self.job is not None:
+   self.status.setText('Wait for legacy calculation cancellation cleanup.');return
+  self.tabs.setCurrentIndex(self.engineering_index)
+  self.engineering.allow.setChecked(self.allow.isChecked())
+  self.engineering.run('equilibrium')
  def run(self):
   def action():
    code=''
@@ -184,10 +225,12 @@ class ReferenceBargePane(QWidget):
    self.status.setText('Running explicit bounded reference; cached evidence unchanged until matching validated completion.')
   self._guard(action)
  def cancel(self,reason='user cancellation'):
+  if hasattr(self,'engineering') and self.engineering.job:self.engineering.cancel(str(reason))
   if self.job:
    self.job.cancel(str(reason));self._record('Cancel coupled Run','barge_run.cancel('+repr(str(reason))+')\n');self.status.setText('Abort requested; late replies quarantined; evidence directory retained.')
  def poll(self):
-  if not self.job:return
+  if not self.job:
+   self.run_button.setEnabled(not self.engineering.job);self.cancel_button.setEnabled(self.engineering.job is not None);return
   state=self.job.poll()
   if state in ('running','aborting','termination_unconfirmed'):return
   job=self.job;job.close();self.job=None
@@ -195,8 +238,9 @@ class ReferenceBargePane(QWidget):
    self.study=job.result;self.refresh();self.status.setText('Explicit Run completed; estimated residual convergence, not stability/certification.')
    self._record('Accept completed coupled Run','barge_study = barge_run.finish()\n')
   else:self.status.setText('Run '+state+': '+job.detail+' | all evidence retained at '+str(job.path))
-  self.run_button.setEnabled(self.study.selected_case=='coupled');self.cancel_button.setEnabled(False)
+  self.run_button.setEnabled(not self.engineering.job);self.cancel_button.setEnabled(False)
  def shutdown(self):
+  if hasattr(self,'engineering') and not self.engineering.shutdown():return False
   self.timer.stop()
   if self.job:
    if self.job.close() is False:self.timer.start(80);self.status.setText('Run termination unconfirmed; application stays open and retains supervision.');return False
@@ -205,7 +249,7 @@ class ReferenceBargePane(QWidget):
   return True
 class Recipe3StabilityHost(QWidget):
  def __init__(self,service,parent=None,*,recorder=None):
-  super().__init__(parent);self.service=service;self.recorder=recorder;self.reference=None;self._legacy=None
+  super().__init__(parent);self.service=service;self.recorder=recorder;self.reference=None;self._legacy=None;self.engineering_only=None
   layout=QVBoxLayout(self);layout.setContentsMargins(0,0,0,0)
   navigation=QHBoxLayout();self.back_button=QPushButton('← Reference barge (saved)');self.back_button.clicked.connect(lambda:self.tabs.setCurrentIndex(0));self.back_button.hide();navigation.addWidget(self.back_button);navigation.addStretch()
   self.legacy_button=QPushButton('Live analytical box →');self.legacy_button.setToolTip('Interactive tank loading on the analytical reference box: change fills, see draught and GM');self.legacy_button.setObjectName('studySwitch');self.legacy_button.clicked.connect(self.open_legacy_box);navigation.addWidget(self.legacy_button);layout.addLayout(navigation)
@@ -227,10 +271,16 @@ class Recipe3StabilityHost(QWidget):
     self.retry_button=QPushButton('Retry local study');self.retry_button.clicked.connect(self.retry);buttons.addWidget(self.retry_button)
     example=QPushButton('Analytical example');example.clicked.connect(self.open_legacy_box);buttons.addWidget(example);buttons.addStretch();missing.addLayout(buttons)
     self.diagnostic=QLabel();self.diagnostic.setWordWrap(True);self.diagnostic.setAlignment(Qt.AlignmentFlag.AlignCenter);self.diagnostic.setStyleSheet('color:#6b7785;font-size:11px');missing.addWidget(self.diagnostic);missing.addStretch();self.reference_layout.addWidget(self.unavailable)
+   if self.engineering_only is None:
+    from .engineering_stability import EngineeringStabilityPane
+    self.engineering_only=EngineeringStabilityPane(parent=self,recorder=self.recorder)
+    self.engineering_scroll=QScrollArea();self.engineering_scroll.setWidgetResizable(True);self.engineering_scroll.setWidget(self.engineering_only)
+    self.reference_layout.addWidget(self.engineering_scroll)
    self.diagnostic.setText(str(error));return
   self._show_reference(candidate)
  def _show_reference(self,candidate):
   if hasattr(self,'unavailable'):self.unavailable.hide()
+  if self.engineering_only is not None:self.engineering_scroll.hide()
   self.reference_layout.addWidget(candidate);self.reference=candidate
  def _open_saved(self):
   path=QFileDialog.getExistingDirectory(self,'Open saved stability study')
@@ -252,4 +302,5 @@ class Recipe3StabilityHost(QWidget):
    self._legacy=StabilityHost(self.service,self,recorder=self.recorder);self.legacy_layout.addWidget(self._legacy)
  def open_legacy_box(self):self.tabs.setCurrentIndex(1);self._tab(1)
  def shutdown(self):
+  if self.engineering_only is not None and not self.engineering_only.shutdown():return False
   return True if self.reference is None else self.reference.shutdown()
