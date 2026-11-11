@@ -2,7 +2,7 @@
 
 Choose **File > Load coupled static equilibrium example**, then **Jobs > Run
 coupled static equilibrium job**. Loading creates two bodies, a linear link and
-three anchored lines. The job runs the installed public ANYsolver coupled static
+three anchored lines. The job runs the installed public ANYfeSolver coupled static
 development API in an isolated child process supervised by QProcess. This is an
 unqualified example using synthetic coupled potential-flow coefficients.
 

@@ -72,7 +72,7 @@ def test_declaration_is_closed_world_and_finite():
 @requires_solver
 def test_solver_started_on_the_discrete_steady_state_stays_periodic_only_with_the_history():
     """Acceptance (plan slice 1): F - H keeps the exact discrete steady state; F alone does not."""
-    import anysolver.marine_linear as ml
+    import anyfesolver.marine_linear as ml
     n_steps, t0 = 3000, 0.3
     K = kernel(6000)
     mass = np.diag([1000.0, 1200.0, 900.0, 1100.0])

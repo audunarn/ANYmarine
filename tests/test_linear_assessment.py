@@ -301,7 +301,7 @@ def test_base_import_guard(tmp_path):
     )
     code = (
         "import sys; import anymarine.linear_assessment; "
-        "leaked = [m for m in ('PySide6', 'Capytaine', 'anysolver', 'any3dview') "
+        "leaked = [m for m in ('PySide6', 'Capytaine', 'anyfesolver', 'any3dview') "
         "if m in sys.modules]; "
         "assert not leaked, leaked; print('guard-ok')"
     )

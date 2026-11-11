@@ -4,7 +4,7 @@ The native mechanical input contract has one optional `potential_flow` record.
 Absent records are omitted from serialization, preserving old dry input hashes.
 The pure-data DTO freezes full coupled arrays, exact ordered equilibrium frames,
 source identity, force basis/role, kernel grid, bounds and baseline/excitation.
-It imports neither a solver nor Qt. Public ANYsolver owns mathematical admission
+It imports neither a solver nor Qt. Public ANYfeSolver owns mathematical admission
 and exact binding/order; executable providers and unknown semantics are refused.
 
 Both GUI and CLI submit the existing frozen native snapshot with the complete

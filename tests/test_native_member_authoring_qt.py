@@ -1,7 +1,7 @@
 """Production Morison member authoring tests; real public compiler, no solve.
 
 Exercises the production dialog event handlers and the shared
-ApplicationService.load_native_inputs admission (public ANYsolver/ANYloads
+ApplicationService.load_native_inputs admission (public ANYfeSolver/ANYloads
 compiler, no integration, no job). Fabricated transport fixtures are clearly
 labelled and never scientific evidence.
 """
@@ -388,7 +388,7 @@ def test_missing_owner_package_refusal_is_actionable(monkeypatch):
     original = mechanics.importlib.import_module
 
     def imported(name):
-        if name == 'anysolver.marine_morison':
+        if name == 'anyfesolver.marine_morison':
             raise ImportError('test unavailable optional API')
         return original(name)
     monkeypatch.setattr(mechanics.importlib, 'import_module', imported)
@@ -397,7 +397,7 @@ def test_missing_owner_package_refusal_is_actionable(monkeypatch):
         project.bodies[0].body_id, [0., 0., 1.], project.bodies[1].body_id, [0., 0., -1.]))
     with pytest.raises(ServiceError) as error:
         service.load_native_inputs(project, data)
-    assert 'install the tested ANYsolver wheel with native Morison support' in str(error.value)
+    assert 'install the tested ANYfeSolver wheel with native Morison support' in str(error.value)
     assert 'morison' in project.native_inputs.to_dict()
     assert len(project.native_inputs.morison.data['members']) == 2
 

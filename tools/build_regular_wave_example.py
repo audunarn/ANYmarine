@@ -17,7 +17,7 @@ def build(target):
     from anymarine.native_jobs import project_from_snapshot, record_from_evidence
     from anymarine.persistence import ProjectStore
     from anymarine.services import ApplicationService
-    import anysolver.marine_mechanical as solver
+    import anyfesolver.marine_mechanical as solver
 
     target = Path(target)
     if target.exists():

@@ -89,7 +89,7 @@ def test_optional_backend_refusal(monkeypatch, missing):
     from types import SimpleNamespace
     original = mechanics.importlib.import_module
     def imported(name):
-        if name == 'anysolver.marine_morison':
+        if name == 'anyfesolver.marine_morison':
             if missing == 'missing': raise ImportError('test unavailable optional API')
             return SimpleNamespace(API_VERSION='unknown')
         return original(name)

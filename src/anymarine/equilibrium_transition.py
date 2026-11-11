@@ -191,8 +191,8 @@ def adopt_equilibrium(project,result,*,domain,regenerate=None,should_cancel=None
     cancel();_domain(candidate,domain)
     # Public stationary assemblies preserve each physical component separately.
     from .mechanics import prepare_native_run,prepare_native_nodes
-    from anysolver.marine_rigid import RigidBodyState
-    from anysolver.marine_coupled_equilibrium import evaluate_marine_static
+    from anyfesolver.marine_rigid import RigidBodyState
+    from anyfesolver.marine_coupled_equilibrium import evaluate_marine_static
     import numpy as np
     old_model,_,_=prepare_native_run(detached)
     new_model,new_states,_=prepare_native_run(candidate)

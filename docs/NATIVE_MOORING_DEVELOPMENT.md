@@ -8,7 +8,7 @@ geometry without importing or executing the numerical solver.
 fairleads, world free-node positions/velocities and per-segment SI coefficients.
 The shared application compiler validates edits. **Jobs â†’ Run native mechanical
 jobâ€¦** runs the example's three fixed steps in an isolated child process using
-the public ANYsolver coupled body/node driver. The example has explicit zero
+the public ANYfeSolver coupled body/node driver. The example has explicit zero
 gravity and is a transport/mechanics demonstration, not a catenary benchmark.
 
 Each accepted frame stores body transforms, world node positions, velocities,

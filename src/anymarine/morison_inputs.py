@@ -1,6 +1,6 @@
 """Immutable native member/environment intent; no Qt or owner-package imports.
 
-This is a named data envelope. ANYloads and ANYsolver own physical admission.
+This is a named data envelope. ANYloads and ANYfeSolver own physical admission.
 Loading a project does not construct a wave backend or execute mechanics.
 """
 from collections.abc import Mapping

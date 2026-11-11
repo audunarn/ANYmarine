@@ -16,7 +16,7 @@ class MechanicsUnavailableError(MechanicsError):
 
 
 def prepare_rigid_body(project, body_id):
-    """Compile explicit inputs using public ANYsolver validation.
+    """Compile explicit inputs using public ANYfeSolver validation.
 
     Returns RigidBody6D, never a result or integrator. Existing project mesh
     axes at the reference pose are GLOBAL; the initial orientation is identity.
@@ -31,11 +31,11 @@ def prepare_rigid_body(project, body_id):
     if body.mass_properties is None:
         raise MechanicsInputError(f"body {body.name!r} has no explicit CG/inertia; supply mass properties first")
     try:
-        solver = importlib.import_module("anysolver.marine_rigid")
+        solver = importlib.import_module("anyfesolver.marine_rigid")
     except ImportError as error:
-        raise MechanicsUnavailableError("install the tested ANYsolver wheel with marine_rigid_v1") from error
+        raise MechanicsUnavailableError("install the tested ANYfeSolver wheel with marine_rigid_v1") from error
     if getattr(solver, "API_VERSION", None) != "marine_rigid_v1":
-        raise MechanicsUnavailableError("the installed ANYsolver rigid-body API is incompatible; install the tested wheel")
+        raise MechanicsUnavailableError("the installed ANYfeSolver rigid-body API is incompatible; install the tested wheel")
     try:
         from .native_inputs import _number
         mass = _number(body.mass, "declared body mass", positive=True)
@@ -61,9 +61,9 @@ def prepare_mechanical_model(project, *, links=(), gravity_world=None):
             or any(body.hydro_sidecar is not None for body in project.bodies)):
         raise MechanicsInputError("native dry mechanics cannot consume or silently omit configured hydrodynamics")
     try:
-        solver = importlib.import_module('anysolver.marine_mechanical')
+        solver = importlib.import_module('anyfesolver.marine_mechanical')
     except ImportError as error:
-        raise MechanicsUnavailableError("install the tested ANYsolver wheel with marine_mechanical_v1") from error
+        raise MechanicsUnavailableError("install the tested ANYfeSolver wheel with marine_mechanical_v1") from error
     if getattr(solver, 'API_VERSION', None) != 'marine_mechanical_v1':
         raise MechanicsUnavailableError("the installed native mechanics API is incompatible")
     bodies = tuple(prepare_rigid_body(project, body.body_id) for body in project.bodies)
@@ -82,14 +82,14 @@ def solve_native_mechanics(project, initial_states, run_spec, *, links=(), gravi
     obligations; this synchronous service must not run on the GUI thread.
     """
     model = prepare_mechanical_model(project, links=links, gravity_world=gravity_world)
-    solver = importlib.import_module('anysolver.marine_mechanical')
+    solver = importlib.import_module('anyfesolver.marine_mechanical')
     return solver.solve_marine_mechanical(model, initial_states, run_spec,
                                          cancel=cancel, progress=progress)
 
 
 
 def prepare_native_run(project):
-    """Compile saved native intent using public ANYsolver contracts only.
+    """Compile saved native intent using public ANYfeSolver contracts only.
 
     Returns (model, initial_states, run_spec), without integration or Qt.
     Initial chart vectors are zero with the declared physical rotation as
@@ -124,11 +124,11 @@ def prepare_native_run(project):
         except ValueError as error:
             raise MechanicsInputError('shared waves refused: '+str(error)) from error
     base = prepare_mechanical_model(project)
-    solver = importlib.import_module('anysolver.marine_mechanical')
+    solver = importlib.import_module('anyfesolver.marine_mechanical')
     try:
-        rigid = importlib.import_module('anysolver.marine_rigid')
+        rigid = importlib.import_module('anyfesolver.marine_rigid')
     except ImportError as error:
-        raise MechanicsUnavailableError("install the tested ANYsolver rigid-body wheel") from error
+        raise MechanicsUnavailableError("install the tested ANYfeSolver rigid-body wheel") from error
     if getattr(rigid, 'API_VERSION', None) != 'marine_rigid_v1':
         raise MechanicsUnavailableError("the installed rigid-body API is incompatible")
     data = project.native_inputs.to_dict()
@@ -140,41 +140,41 @@ def prepare_native_run(project):
                                        for wrench in data['world_wrenches']]
         if 'potential_flow' in data:
             try:
-                fluid_api = importlib.import_module('anysolver.marine_potential_flow')
+                fluid_api = importlib.import_module('anyfesolver.marine_potential_flow')
             except ImportError as error:
-                raise MechanicsUnavailableError('install the tested ANYsolver wheel with native potential-flow development support') from error
+                raise MechanicsUnavailableError('install the tested ANYfeSolver wheel with native potential-flow development support') from error
             if getattr(fluid_api,'API_VERSION',None) != 'marine_potential_flow_development_v1':
                 raise MechanicsUnavailableError('the installed potential-flow development API is incompatible')
             model_data['contributions'].append({'type':'potential_flow_development','data':data['potential_flow']})
         if 'morison' in data:
             try:
-                morison_api = importlib.import_module('anysolver.marine_morison')
+                morison_api = importlib.import_module('anyfesolver.marine_morison')
             except ImportError as error:
-                raise MechanicsUnavailableError('install the tested ANYsolver wheel with native Morison support') from error
+                raise MechanicsUnavailableError('install the tested ANYfeSolver wheel with native Morison support') from error
             if getattr(morison_api, 'API_VERSION', None) != 'marine_morison_development_v1':
                 raise MechanicsUnavailableError('the installed Morison development API is incompatible')
             model_data['contributions'].append({'type': 'morison_members_development', 'data': data['morison']})
         if 'mooring' in data:
             if getattr(solver,'MOORING_API_VERSION',None)!='marine_mechanical_mooring_v1':
-                raise MechanicsUnavailableError('install the tested ANYsolver common mooring driver')
+                raise MechanicsUnavailableError('install the tested ANYfeSolver common mooring driver')
             if project.native_inputs.mooring.has_contact:
                 try:
-                    contact_api=importlib.import_module('anysolver.marine_seabed')
-                    mooring_api=importlib.import_module('anysolver.marine_mooring')
+                    contact_api=importlib.import_module('anyfesolver.marine_seabed')
+                    mooring_api=importlib.import_module('anyfesolver.marine_mooring')
                 except ImportError as error:
-                    raise MechanicsUnavailableError('install the tested ANYsolver seabed contact wheel') from error
+                    raise MechanicsUnavailableError('install the tested ANYfeSolver seabed contact wheel') from error
                 if (getattr(contact_api,'API_VERSION',None)!='marine_seabed_contact_v1'
                         or getattr(mooring_api,'CONTACT_API_VERSION',None)!='marine_mooring_contact_v1'):
                     raise MechanicsUnavailableError('installed seabed contact APIs are incompatible')
                 if (data['mooring']['data']['seabed_contact']['api_version']=='marine_seabed_contact_v2'
                         and getattr(contact_api,'CONTINUOUS_API_VERSION',None)!='marine_seabed_contact_v2'):
-                    raise MechanicsUnavailableError('install the tested ANYsolver continuous seabed contact v2 wheel')
+                    raise MechanicsUnavailableError('install the tested ANYfeSolver continuous seabed contact v2 wheel')
             if project.native_inputs.mooring.has_hydrodynamics:
                 try:
                     line_api=importlib.import_module('anyloads.marine_line')
-                    mooring_api=importlib.import_module('anysolver.marine_mooring')
+                    mooring_api=importlib.import_module('anyfesolver.marine_mooring')
                 except ImportError as error:
-                    raise MechanicsUnavailableError('install the tested ANYloads/ANYsolver line hydrodynamics wheels') from error
+                    raise MechanicsUnavailableError('install the tested ANYloads/ANYfeSolver line hydrodynamics wheels') from error
                 if (getattr(line_api,'API_VERSION',None)!='marine_line_loads_v1'
                         or getattr(mooring_api,'HYDRO_API_VERSION',None)!='marine_mooring_hydrodynamics_v1'):
                     raise MechanicsUnavailableError('installed line hydrodynamics APIs are incompatible')
@@ -211,7 +211,7 @@ def solve_configured_native_mechanics(project, *, cancel=None, progress=None):
     results, qualify physics, or convert rotations to Euler angles.
     """
     model, states, spec = prepare_native_run(project)
-    solver = importlib.import_module('anysolver.marine_mechanical')
+    solver = importlib.import_module('anyfesolver.marine_mechanical')
     return solver.solve_marine_mechanical(model, states, spec, cancel=cancel, progress=progress,
                                         initial_nodes=prepare_native_nodes(project))
 
@@ -220,7 +220,7 @@ def prepare_native_nodes(project):
     """Compile saved node intent through the public owner, without execution."""
     if project.native_inputs.mooring is None:return None
     try:
-        from anysolver.marine_mooring import MooringNodeState
+        from anyfesolver.marine_mooring import MooringNodeState
         import numpy as np
         value=project.native_inputs.mooring
         count=value.data['node_count']

@@ -1,4 +1,4 @@
-"""Qt-free input declaration; physical inertia admission belongs to ANYsolver."""
+"""Qt-free input declaration; physical inertia admission belongs to ANYfeSolver."""
 from dataclasses import dataclass
 from collections.abc import Mapping
 from numbers import Real

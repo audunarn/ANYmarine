@@ -939,8 +939,8 @@ def test_replay_reproduces_after_round_trip(tmp_path, artifacts):
 def test_cli_import_and_child_job(tmp_path, artifacts):
     root = tmp_path / "cli-proj"
     env = {
-        "PYTHONPATH": str(SRC) + ";" + str(Path("C:/Github/ANYsolver/src")),
-        "ANYMARINE_SOLVER_PATH": "C:/Github/ANYsolver/src",
+        "PYTHONPATH": str(SRC) + ";" + str(Path("C:/Github/ANYfeSolver/src")),
+        "ANYMARINE_SOLVER_PATH": "C:/Github/ANYfeSolver/src",
         "QT_QPA_PLATFORM": "offscreen",
         "OMP_NUM_THREADS": "1",
         "OPENBLAS_NUM_THREADS": "1",

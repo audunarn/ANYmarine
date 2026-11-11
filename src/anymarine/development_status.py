@@ -2,7 +2,7 @@
 
 Loads and validates ``development_status.json`` so wheel builds contain the
 same data as the checkout. Pure standard library: importing this module must
-never pull in Qt, Capytaine, ANYsolver or any numerical backend, and loading
+never pull in Qt, Capytaine, ANYfeSolver or any numerical backend, and loading
 never runs calculations. Corrupt or missing data fails with a clear
 :class:`DevelopmentStatusError`.
 """

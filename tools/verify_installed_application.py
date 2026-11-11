@@ -10,7 +10,7 @@ copied tests under a guard conftest.
 
 Scope: this is dependency-reuse verification, not a clean base install and
 not a full dependency-graph release claim. Dependencies (PySide6, ANY3dView,
-numpy, ANYloads, ANYsolver, ...) are borrowed from the preinstalled evidence
+numpy, ANYloads, ANYfeSolver, ...) are borrowed from the preinstalled evidence
 runtime through explicit inert directory entries in a clean venv; their
 exact versions and origins are recorded. Broad system site-packages and
 checkout editable finders are not inherited. No network, no global installs, no numerical jobs.
@@ -252,7 +252,7 @@ def command_install(args: argparse.Namespace) -> int:
         "venv_stderr_tail": created.stderr[-1000:],
         "base_python": sys.executable,
         "borrowed_dependencies": (
-            "PySide6/ANY3dView/numpy/ANYloads/ANYsolver/pytest/Pillow are "
+            "PySide6/ANY3dView/numpy/ANYloads/ANYfeSolver/pytest/Pillow are "
             "borrowed only from explicitly supplied directories by a generated "
             ".pth entry added to "
             "the target venv site-packages; the borrowed .pth files of those "
@@ -500,7 +500,7 @@ def run_checks(args, started):
     borrowed = {}
     for dist_name, import_name in (
         ("ANYloads", "anyloads"),
-        ("ANYsolver", "anysolver"),
+        ("ANYfeSolver", "anyfesolver"),
         ("PySide6", "PySide6"),
         ("ANY3dView", "any3dview"),
         ("numpy", "numpy"),
@@ -521,7 +521,7 @@ def run_checks(args, started):
                 fail("borrowed_deps", dist_name + " imported from checkout: " + origin)
         except Exception as error:
             borrowed[dist_name] = {"error": type(error).__name__ + ": " + str(error)}
-    for required in ("ANYloads", "ANYsolver"):
+    for required in ("ANYloads", "ANYfeSolver"):
         if "error" in borrowed.get(required, {}):
             fail(
                 "borrowed_deps",

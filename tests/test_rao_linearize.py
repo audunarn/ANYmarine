@@ -63,8 +63,8 @@ def test_per_contribution_blocks_sum_to_the_assembled_tangents():
 
 
 def _residual(model, states, dt, q, v, a):
-    import anysolver.marine_contributions as mc
-    from anysolver.marine_rigid import RigidBodyState
+    import anyfesolver.marine_contributions as mc
+    from anyfesolver.marine_rigid import RigidBodyState
     items = rl._owner_contributions(model, mc)
     trial_states = {}
     for i, bid in enumerate(model.body_ids):
@@ -109,7 +109,7 @@ def test_refusals():
     model, states, spec = prepare_native_run(project())
     moving = dict(states)
     bid = model.body_ids[0]
-    from anysolver.marine_rigid import RigidBodyState
+    from anyfesolver.marine_rigid import RigidBodyState
     moving[bid] = RigidBodyState(position=states[bid].position, velocity=(0.1, 0, 0, 0, 0, 0),
                                  anchor=states[bid].anchor)
     with pytest.raises(rl.RaoLinearizationError, match='stationary'):

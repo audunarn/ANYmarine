@@ -399,7 +399,7 @@ def solve_record(project, *, wall_seconds, store=None):
     from .services import ApplicationService
     from .native_jobs import project_from_snapshot, record_from_evidence
     from .mechanics import prepare_native_nodes
-    import anysolver.marine_mechanical as solver
+    import anyfesolver.marine_mechanical as solver
     _supported(project)
     steps = project.native_inputs.run_spec['steps']
     snapshot = ApplicationService().native_input_snapshot(project, max_frames=steps + 1, wall_seconds=wall_seconds)

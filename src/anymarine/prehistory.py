@@ -1,6 +1,6 @@
 """Periodic radiation prehistory for regular-wave starts; Qt-free and solver-free.
 
-The public linear solver (``anysolver.marine_linear``) evaluates the radiation memory
+The public linear solver (``anyfesolver.marine_linear``) evaluates the radiation memory
 with a direct causal trapezoid sum and ZERO prehistory before t0::
 
     memory_n = dt*(0.5*K[n] v_0 + sum(j=1..n-1, K[n-j] v_j) + 0.5*K[0] v_n),  memory_0 = 0

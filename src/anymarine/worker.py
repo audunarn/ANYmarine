@@ -14,7 +14,7 @@ Protocol:
   recomputed from the reconstructed inputs; a mismatch refuses the job.
 - Job kinds: ``synthetic_unqualified`` (deterministic synthetic replay),
   ``linear_development`` (four-DOF two-body linear route through the public
-  ``anysolver.marine_linear`` API) and the ``assessment_*`` job kinds
+  ``anyfesolver.marine_linear`` API) and the ``assessment_*`` job kinds
   (case registration, single/paired assessment, snapshot adjudication),
   which dispatch to the Qt-free :mod:`anymarine.assessment_jobs` executor. The linear path additionally re-verifies
   the complete equilibrium binding (identity, order, name, reference
@@ -390,7 +390,7 @@ def _run_native(snapshot, output_path, cancel_path):
             raise ValueError('native output path already exists; evidence must not be overwritten')
         project = project_from_snapshot(snapshot)
         model, initial_states, spec = prepare_native_run(project)
-        import anysolver.marine_mechanical as solver
+        import anyfesolver.marine_mechanical as solver
     except (ImportError, KeyError, TypeError, ValueError, OSError) as error:
         print(f'native input preparation failed: {error}', file=sys.stderr)
         return EXIT_INVALID_INPUT
@@ -425,8 +425,8 @@ def _run_native(snapshot, output_path, cancel_path):
             _emit('CANCELLED' if status == 'cancelled' else 'FAILED')
             return EXIT_CANCELLED if status == 'cancelled' else EXIT_FAILURE
         if project.native_inputs.potential_flow is not None:
-            from anysolver.marine_rigid import RigidBodyState
-            from anysolver.marine_potential_flow import PotentialFlowDevelopmentContribution
+            from anyfesolver.marine_rigid import RigidBodyState
+            from anyfesolver.marine_potential_flow import PotentialFlowDevelopmentContribution
             last = result.accepted[-1]
             accepted_states = {bid:RigidBodyState(position=last.positions[bid],
                 anchor=last.rotations[bid],velocity=last.world_velocities[bid],

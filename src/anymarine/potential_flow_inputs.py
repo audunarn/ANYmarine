@@ -17,7 +17,7 @@ FIELDS = {'api_version','frames','equilibrium_hash','dt','kernel','added_mass_in
 
 @dataclass(frozen=True)
 class NativePotentialFlowInputs:
-    """Immutable JSON intent; public ANYsolver owns final mathematical admission."""
+    """Immutable JSON intent; public ANYfeSolver owns final mathematical admission."""
     data: Mapping
 
     def __post_init__(self):

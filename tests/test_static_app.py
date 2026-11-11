@@ -82,7 +82,7 @@ def test_static_stage_and_component_transport_refusals(actual,mutation):
 def test_incomplete_static_preserves_accepted_line_and_coupled_evidence(actual,tmp_path,monkeypatch,cancelled):
     from types import SimpleNamespace as S
     from anymarine.equilibrium_jobs import run_job
-    solver=pytest.importorskip('anysolver.marine_coupled_equilibrium')
+    solver=pytest.importorskip('anyfesolver.marine_coupled_equilibrium')
     snap,_,_=actual;output=tmp_path/'result.json';cancel=tmp_path/'cancel'
     def stopped(model,states,nodes,spec,**options):
         if cancelled:cancel.touch()

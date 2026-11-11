@@ -65,7 +65,7 @@ def test_optional_solver_failure_is_actionable(monkeypatch):
     def absent(name):
         raise ImportError('optional provider unavailable')
     monkeypatch.setattr(bridge.importlib,'import_module',absent)
-    with pytest.raises(MechanicsUnavailableError,match='tested ANYsolver wheel'):
+    with pytest.raises(MechanicsUnavailableError,match='tested ANYfeSolver wheel'):
         service.prepare_rigid_body(project,project.bodies[0].body_id)
 
 @pytest.mark.parametrize('payload', [[],{'version':'unsupported','cg_body':[0,0,0],'inertia_cg_body':[[1,0,0],[0,1,0],[0,0,1]]},

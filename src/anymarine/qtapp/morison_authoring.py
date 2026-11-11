@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QDialogButtonBox,
 from .theme import apply_theme
 
 # Public owner-record options (ANYloads HydrodynamicOwnership) and the public
-# solver quadrature bounds (anysolver MorisonMember). The shared compiler
+# solver quadrature bounds (anyfesolver MorisonMember). The shared compiler
 # re-checks every value; these lists only offer admissible user choices.
 PRIMARY_ROLES = ('morison_full', 'potential_flow', 'none')
 BUOYANCY_OWNERS = ('none', 'potential_flow', 'morison')

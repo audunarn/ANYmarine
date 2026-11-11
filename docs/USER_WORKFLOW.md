@@ -124,7 +124,7 @@ inputs…** to author them without external JSON:
   share one — plus the first member dialog.
 
 All authoring is admitted atomically through the shared
-`ApplicationService.load_native_inputs` and the public ANYsolver/ANYloads
+`ApplicationService.load_native_inputs` and the public ANYfeSolver/ANYloads
 compiler (no solve). Refusals — duplicate or empty identities, identical
 endpoints, invalid coefficients, incompatible ownership combinations,
 undeclared endpoint bodies or missing owner packages — show an actionable

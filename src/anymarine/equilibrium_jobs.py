@@ -217,7 +217,7 @@ def run_job(snapshot,output_path,cancel_path):
     try:
         project=project_from_snapshot(snapshot)
         from .mechanics import prepare_native_run,prepare_native_nodes
-        from anysolver import marine_coupled_equilibrium as solver
+        from anyfesolver import marine_coupled_equilibrium as solver
         if solver.API_VERSION!=SOLVER_API:raise NativeJobError('installed static solver API differs')
         model,states,_=prepare_native_run(project);nodes=prepare_native_nodes(project)
         _emit('PROGRESS 0.0000')

@@ -3,7 +3,7 @@
 This module owns the application side of the linear development slice. It
 builds and validates immutable input records (see
 :mod:`anymarine.domain`), provides one clearly labelled analytic demo with a
-linear link, and bridges to the public ``anysolver.marine_linear`` API. It
+linear link, and bridges to the public ``anyfesolver.marine_linear`` API. It
 never duplicates the numerical integration: the equation of motion, signs,
 direct causal convolution and zero prehistory convention live entirely in the
 solver and are called as-is.
@@ -71,14 +71,14 @@ __all__ = [
 
 LINEAR_RESULT_NOTE = (
     "Linear development dynamics (four-DOF two-body surge/heave) computed by "
-    "the public anysolver.marine_linear route (Newmark, direct causal radiation "
+    "the public anyfesolver.marine_linear route (Newmark, direct causal radiation "
     "convolution, zero prehistory). Development route only: not boundary-"
     "element-method output, not a qualified marine analysis."
 )
 
 LINEAR_RESULT_NOTE_HYDRO = (
     "Linear development dynamics (four-DOF two-body surge/heave) computed by "
-    "the public anysolver.marine_linear route (Newmark, direct causal radiation "
+    "the public anyfesolver.marine_linear route (Newmark, direct causal radiation "
     "convolution, zero prehistory) from effective matrices projected from an "
     "imported ANYhydro hydrodynamic dataset and radiation kernel. Development "
     "source, unqualified: not a qualified marine analysis."
@@ -86,7 +86,7 @@ LINEAR_RESULT_NOTE_HYDRO = (
 
 LINEAR_RESULT_NOTE_HYDRO_DERIVED = (
     "Linear development dynamics (four-DOF two-body surge/heave) computed by "
-    "the public anysolver.marine_linear route (Newmark, direct causal radiation "
+    "the public anyfesolver.marine_linear route (Newmark, direct causal radiation "
     "convolution, zero prehistory) from effective matrices admitted through "
     "the explicit ANYhydro derived-operator import (admitted derived Ainf, "
     "projected unmodified hydrostatics, derived radiation kernel). "
@@ -99,7 +99,7 @@ class LinearError(Exception):
 
 
 class LinearSolverUnavailableError(LinearError):
-    """The optional anysolver.marine_linear backend is not importable."""
+    """The optional anyfesolver.marine_linear backend is not importable."""
 
 
 class LinearBindingError(LinearError):
@@ -281,10 +281,10 @@ def rigid_dry_mass(bindings) -> np.ndarray:
     """
 
     try:
-        from anysolver import marine_rigid
+        from anyfesolver import marine_rigid
     except Exception as error:
         raise LinearSolverUnavailableError(
-            f"anysolver.marine_rigid is not available ({type(error).__name__}: {error}); the rigid "
+            f"anyfesolver.marine_rigid is not available ({type(error).__name__}: {error}); the rigid "
             "linear layout needs the solver-owned dry mass assembly"
         ) from error
     blocks = []
@@ -312,11 +312,11 @@ def _import_solver():
     """Lazily import the optional solver module (never at package import)."""
 
     try:
-        from anysolver import marine_linear
+        from anyfesolver import marine_linear
     except Exception as error:  # ImportError or a broken optional install
         raise LinearSolverUnavailableError(
-            "the optional solver module anysolver.marine_linear is not available "
-            f"({type(error).__name__}: {error}); install ANYsolver or extend "
+            "the optional solver module anyfesolver.marine_linear is not available "
+            f"({type(error).__name__}: {error}); install ANYfeSolver or extend "
             "PYTHONPATH / ANYMARINE_SOLVER_PATH with its src directory - the "
             "linear development route fails closed without it"
         ) from error
@@ -813,7 +813,7 @@ def _trapezoidal_memory(kernel: np.ndarray, v: np.ndarray, dt: float) -> tuple[n
     """The solver's memory force for every step, by FFT convolution (O(S log S)), and its operand scale.
 
     memory_0 = 0; memory_n = dt (sum_{j=0..n} K[n-j] v_j - K[n] v_0 / 2 - K[0] v_n / 2) for n >= 1 - the
-    trapezoidal rule of anysolver.marine_linear (past lags plus the current-step half weight).
+    trapezoidal rule of anyfesolver.marine_linear (past lags plus the current-step half weight).
     """
 
     steps = v.shape[0]
@@ -936,7 +936,7 @@ def run_linear(
 ) -> ResultRecord:
     """Run the linear route through the public solver API and store the result.
 
-    Calls ``anysolver.marine_linear.solve_marine_linear`` with the frozen
+    Calls ``anyfesolver.marine_linear.solve_marine_linear`` with the frozen
     inputs; the solver owns the equation, signs, direct convolution and zero
     prehistory. Only a complete, non-cancelled result with finite q/v/a and
     force decomposition becomes a ``linear_development`` ResultRecord: q, v,

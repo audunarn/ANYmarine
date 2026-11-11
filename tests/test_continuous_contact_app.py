@@ -46,7 +46,7 @@ def test_example_explicit_depth_and_missing_continuous_backend_fails_before_job(
     assert dict(p.native_inputs.mooring.data['seabed_contact'])==bed()
     original=module.importlib.import_module
     def load(name):
-        return SimpleNamespace(API_VERSION='marine_seabed_contact_v1') if name=='anysolver.marine_seabed' else original(name)
+        return SimpleNamespace(API_VERSION='marine_seabed_contact_v1') if name=='anyfesolver.marine_seabed' else original(name)
     monkeypatch.setattr(module.importlib,'import_module',load)
     with pytest.raises(MechanicsUnavailableError,match='continuous seabed contact v2'):
         ApplicationService().prepare_native_run(p)

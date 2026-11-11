@@ -30,7 +30,7 @@ This repository delivers the application foundation and a bounded linear develop
   explicitly labelled `kind: "synthetic_unqualified"`. They are **not**
   boundary-element-method output and **not** dynamics integration, and must
   not be used as production numerical evidence.
-- Two-body surge/heave dynamics through the public ANYsolver linear API:
+- Two-body surge/heave dynamics through the public ANYfeSolver linear API:
   full coupled 4x4 matrices, explicit infinite-frequency added mass, fixed-step
   Newmark integration, direct radiation convolution and a linear link. The
   supplied analytic demo exercises cross-body coupling; its results carry
@@ -271,8 +271,8 @@ python run_gui.py --project <project-dir>
 
 Choose **Run linear development job** in the GUI to create the analytic demo
 or execute stored linear inputs. The local `run_gui.py` launcher prefers the
-tested isolated runtime when available. The linear route requires an ANYsolver
-candidate containing `anysolver.marine_linear`; a missing backend produces a
+tested isolated runtime when available. The linear route requires an ANYfeSolver
+candidate containing `anyfesolver.marine_linear`; a missing backend produces a
 failed job with diagnostics. No backend is imported by base project services.
 
 Explicit inputs may be supplied with `run-linear --inputs FILE`; the JSON form
@@ -325,7 +325,7 @@ import bridge, not the full marine demonstrator. The GUI admits synthetic
 replay jobs and linear development jobs (analytic demo, explicit inputs, or
 ANYhydro dataset/kernel imports); no result is a qualified marine analysis.
 Capytaine preprocessing exists in the separate ANYhydro package and linear
-radiation dynamics in the separate ANYsolver development module; the bridge
+radiation dynamics in the separate ANYfeSolver development module; the bridge
 admits development imports only, never BEM qualification evidence.
 Native dry/link, declared potential-flow, body Morison and dynamic mooring mechanics
 are available as development routes. Physical six-DOF source admission, line
@@ -344,7 +344,7 @@ The root launcher runs the current checkout. A git-ignored `.anymarine-local.jso
 
 Explicit body CG and full CG inertia can be edited in the Qt Body panel and
 saved with the project. Validate dry mechanics uses the optional public
-ANYsolver rigid-body API; native dry/link jobs use its finite-rotation time integrator.
+ANYfeSolver rigid-body API; native dry/link jobs use its finite-rotation time integrator.
 See [rigid-body inputs](docs/RIGID_BODY_INPUTS.md).
 
 Native mechanics development route: File â†’ Load native dry two-body example

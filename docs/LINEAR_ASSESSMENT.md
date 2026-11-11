@@ -6,7 +6,7 @@ Everything here is **development output, unqualified**: a registered
 diagnostic of a stored `linear_development` result. It is never a qualified
 marine analysis, never a production promotion, and never a W5 claim.
 Boundary-element preprocessing and solving live in the separate ANYhydro /
-ANYsolver packages; this slice consumes only their public records, loaders
+ANYfeSolver packages; this slice consumes only their public records, loaders
 and verifiers.
 
 Three evidence levels are distinguished throughout:

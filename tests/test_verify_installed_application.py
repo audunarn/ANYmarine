@@ -442,7 +442,7 @@ def test_native_preparation_control_refuses_missing_marine_compiler(tmp_path):
         "import sys",
         "class MissingMarineCompiler:",
         "    def find_spec(self,fullname,path=None,target=None):",
-        "        if fullname == 'anysolver.marine_mechanical':",
+        "        if fullname == 'anyfesolver.marine_mechanical':",
         "            raise ModuleNotFoundError('legacy wheel has no marine compiler')",
         "        return None",
         "sys.meta_path.insert(0,MissingMarineCompiler())",

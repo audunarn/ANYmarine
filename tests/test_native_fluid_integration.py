@@ -95,7 +95,7 @@ def test_missing_or_incompatible_optional_fluid_backend_is_typed_and_atomic(monk
     p=project()
     for mode in ('missing','wrong'):
         def imported(name):
-            if name=='anysolver.marine_potential_flow':
+            if name=='anyfesolver.marine_potential_flow':
                 if mode=='missing': raise ImportError('test missing optional fluid interface')
                 return SimpleNamespace(API_VERSION='wrong')
             return original(name)
@@ -243,8 +243,8 @@ def test_project_transport_refuses_ghost_states_and_configured_real_hydro_sideca
 
 @pytest.mark.compile
 def test_coincident_geometry_cannot_hide_permuted_coupled_body_order():
-    from anysolver.marine_hydro_coordinates import EquilibriumHydroFrame
-    from anysolver.marine_potential_flow import equilibrium_geometry_hash
+    from anyfesolver.marine_hydro_coordinates import EquilibriumHydroFrame
+    from anyfesolver.marine_potential_flow import equilibrium_geometry_hash
     p=project()
     reference=p.bodies[0].reference_position
     data=p.native_inputs.to_dict()
@@ -265,8 +265,8 @@ def test_coincident_geometry_cannot_hide_permuted_coupled_body_order():
 @pytest.mark.parametrize('failure',('missing-partial','history-validation'))
 def test_public_solver_or_accepted_memory_validation_failure_keeps_unsealed_evidence(tmp_path,capsys,monkeypatch,failure):
     from anymarine.worker import run
-    import anysolver.marine_mechanical as solver
-    from anysolver.marine_potential_flow import PotentialFlowDevelopmentContribution
+    import anyfesolver.marine_mechanical as solver
+    from anyfesolver.marine_potential_flow import PotentialFlowDevelopmentContribution
     p=project()
     service=ApplicationService()
     snapshot=service.native_input_snapshot(p,max_frames=4,wall_seconds=6.)

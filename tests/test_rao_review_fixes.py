@@ -293,7 +293,7 @@ class _TwoSegmentMooring:
 
 
 def _two_segment(rest, ea, damping=0.0):
-    from anysolver.marine_mooring import MooringNodeState
+    from anyfesolver.marine_mooring import MooringNodeState
     mooring = _TwoSegmentMooring([[-2.5, 0, 0], [2.5, 0, 0]], rest, ea, damping)
     node = MooringNodeState(np.zeros((1, 3)), np.zeros((1, 3)), np.zeros((1, 3)))
     return SimpleNamespace(mooring=mooring, body_ids=()), {}, node

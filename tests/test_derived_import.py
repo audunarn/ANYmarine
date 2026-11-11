@@ -48,7 +48,7 @@ from anymarine.services import ApplicationService, ServiceError
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SRC = REPO_ROOT / "src"
-SOLVER_SRC = Path("C:/Github/ANYsolver/src")
+SOLVER_SRC = Path("C:/Github/ANYfeSolver/src")
 
 LAMBDA = 1.5
 DT = 0.05
