@@ -2,7 +2,7 @@
 
 New development examples declare nested `marine_seabed_contact_v2` with positive
 `activation_depth_m` in metres. The umbrella mooring schema and output arrays remain
-unchanged. ANYmarine transports the input; ANYsolver owns the constitutive law.
+unchanged. ANYmarine transports the input; ANYfeSolver owns the constitutive law.
 The new example uses 0.001 m as uncalibrated development data, not a universal seabed
 property. Existing v1 projects remain v1 on load, save and compilation.
 

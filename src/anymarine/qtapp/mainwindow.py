@@ -3150,7 +3150,7 @@ class MainWindow(QMainWindow):
         """(distribution, version) for the components ANYmarine runs on; 'not installed' when missing."""
         from importlib import metadata
         rows = []
-        for name in ("any3dview", "anyhydro", "anysolver", "anyloads", "numpy", "PySide6"):
+        for name in ("any3dview", "anyhydro", "anyfesolver", "anyloads", "numpy", "PySide6"):
             try:
                 rows.append((name, metadata.version(name)))
             except Exception:

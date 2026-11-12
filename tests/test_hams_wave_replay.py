@@ -28,7 +28,7 @@ def test_invalid_coordinate_units_and_nonfinite_refused(replay,args):
     with pytest.raises(ValueError):replay.response(**args)
 
 def test_portable_save_reopen_and_detached_service(replay,tmp_path,monkeypatch):
-    monkeypatch.setitem(sys.modules,'capytaine',None);monkeypatch.setitem(sys.modules,'anysolver',None)
+    monkeypatch.setitem(sys.modules,'capytaine',None);monkeypatch.setitem(sys.modules,'anyfesolver',None)
     service=ApplicationService(tmp_path/'previous');project,record=service.load_hams_wave_bundle()
     assert service.root is None and service.store is None and project.to_dict()==replay.project.to_dict()
     saved=service.save_hams_wave_bundle(tmp_path/'saved',record);assert saved.fields.content_hash()==record.fields.content_hash()

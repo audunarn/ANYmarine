@@ -1,10 +1,10 @@
 """Frequency-domain linearization of the native model (docs/RAO_REPORTING.md section 1).
 
-Tangents come from the same public ANYsolver calls the time-domain solver uses
+Tangents come from the same public ANYfeSolver calls the time-domain solver uses
 (ContributionSet in the 'initialization' phase plus RigidBody6D.dry_tangents),
 evaluated at a stationary linearization point; nothing is re-derived by hand.
 Convention: chart coordinates about the anchor, ``x(t) = Re{X exp(-i w t)}``,
-so ``Z(w) = K - i w C - w^2 M`` and ``Z q = X``. Qt-free; ANYsolver is
+so ``Z(w) = K - i w C - w^2 M`` and ``Z q = X``. Qt-free; ANYfeSolver is
 imported lazily. Mooring lines add 3 DOFs per free node after the body block,
 with the assembler's exact sparse tangents (MooringLineAssembler.evaluate).
 """
@@ -87,10 +87,10 @@ class LinearModel:
 
 def _solver():
     try:
-        return (importlib.import_module('anysolver.marine_contributions'),
-                importlib.import_module('anysolver.marine_rigid'))
+        return (importlib.import_module('anyfesolver.marine_contributions'),
+                importlib.import_module('anyfesolver.marine_rigid'))
     except ImportError as error:
-        raise RaoLinearizationError('install the tested ANYsolver marine mechanics') from error
+        raise RaoLinearizationError('install the tested ANYfeSolver marine mechanics') from error
 
 
 def stationary_states(states):
@@ -237,7 +237,7 @@ def kernel_transfer(kernel, dt, omega):
     """Steady-state transfer of the solver's trapezoidal radiation convolution.
 
     ``R_n = dt (K_0 v_n / 2 + sum_{l=1}^{L-1} K_l v_{n-l} + K_L v_{n-L} / 2)``
-    (anysolver marine_potential_flow, valid once n >= L = n_k - 1) gives
+    (anyfesolver marine_potential_flow, valid once n >= L = n_k - 1) gives
     ``R = Z_rad V`` with ``Z_rad = dt sum_l w_l K_l exp(i w l dt)``.
     """
     k = np.asarray(kernel, dtype=float)
@@ -401,7 +401,7 @@ def stateless_wave_excitation(contribution, model, states, omega, *, exclude_dra
 def _perturbed(states, nodes, body_ids, q, v=None):
     """Body/node state displaced by the chart increment q, with chart rates v (default zero)."""
     _, rigid = _solver()
-    from anysolver.marine_mooring import MooringNodeState
+    from anyfesolver.marine_mooring import MooringNodeState
     v = np.zeros_like(q) if v is None else v
     out = {}
     for i, bid in enumerate(body_ids):
@@ -600,7 +600,7 @@ def mooring_orbit_tensions(model, states, nodes, response, omega, *, samples=102
     rigorous (derivative-free) bound.
     """
     _, rigid = _solver()
-    from anysolver.marine_mooring import MooringNodeState
+    from anyfesolver.marine_mooring import MooringNodeState
     mooring = model.mooring
     body_ids = tuple(model.body_ids)
     base = stationary_states({bid: states[bid] for bid in body_ids})

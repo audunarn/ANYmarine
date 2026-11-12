@@ -64,7 +64,7 @@ def test_malformed_contact_intent_refused(failure):
 def test_missing_contact_backend_feature_fails_before_job(monkeypatch):
     import anymarine.mechanics as module
     original=module.importlib.import_module
-    def load(name):return SimpleNamespace(API_VERSION='old') if name=='anysolver.marine_seabed' else original(name)
+    def load(name):return SimpleNamespace(API_VERSION='old') if name=='anyfesolver.marine_seabed' else original(name)
     monkeypatch.setattr(module.importlib,'import_module',load)
     with pytest.raises(MechanicsUnavailableError,match='contact APIs'):
         ApplicationService().prepare_native_run(mooring_contact_project())

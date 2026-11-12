@@ -16,15 +16,15 @@ SRC = REPO_ROOT / "src"
 if SRC.is_dir() and str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-# The linear development route calls the optional anysolver.marine_linear
+# The linear development route calls the optional anyfesolver.marine_linear
 # public API. The read-only solver checkout is admitted explicitly for
 # checks/tests; nothing is installed and absence is a skip, never a failure.
-SOLVER_SRC = Path("C:/Github/ANYsolver/src")
+SOLVER_SRC = Path("C:/Github/ANYfeSolver/src")
 if SOLVER_SRC.is_dir():
     import importlib.util
 
     try:
-        if importlib.util.find_spec("anysolver") is None:
+        if importlib.util.find_spec("anyfesolver") is None:
             sys.path.insert(0, str(SOLVER_SRC))
     except ModuleNotFoundError:
         sys.path.insert(0, str(SOLVER_SRC))
@@ -38,7 +38,7 @@ PYTEST = sys.executable
 
 def solver_available() -> bool:
     try:
-        from anysolver import marine_linear  # noqa: F401
+        from anyfesolver import marine_linear  # noqa: F401
 
         return True
     except Exception:
@@ -46,7 +46,7 @@ def solver_available() -> bool:
 
 
 requires_solver = pytest.mark.skipif(
-    not solver_available(), reason="anysolver.marine_linear unavailable"
+    not solver_available(), reason="anyfesolver.marine_linear unavailable"
 )
 
 

@@ -1,4 +1,4 @@
-"""Qt-free named mooring intent and transport checks; ANYsolver owns physics."""
+"""Qt-free named mooring intent and transport checks; ANYfeSolver owns physics."""
 from dataclasses import dataclass
 from collections.abc import Mapping
 from types import MappingProxyType

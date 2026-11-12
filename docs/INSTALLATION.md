@@ -1,5 +1,7 @@
 # Installation and launch
 
+The native-morison and native-waves extras require ANYfeSolver 0.5.x. Stored replay can be opened without that optional package.
+
 From the checkout, run `python run_gui.py`. From an environment containing the
 installed packages, run:
 

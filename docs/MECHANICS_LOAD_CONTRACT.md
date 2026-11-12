@@ -18,9 +18,9 @@ limits, qualification) remain parent decisions.
 
 Source symbols referenced (all read-only, inspected 2026-10-08):
 
-- `anysolver.marine_linear.solve_marine_linear` — residual sign, Newmark
+- `anyfesolver.marine_linear.solve_marine_linear` — residual sign, Newmark
   effective operator, memory-at-rest convention
-  (`C:/Github/ANYsolver/src/anysolver/marine_linear.py`).
+  (`C:/Github/ANYfeSolver/src/anyfesolver/marine_linear.py`).
 - `anyhydro.transform` — `shift_matrix`, `map_matrix`, `map_force`,
   `shift_dataset_reference_point`, `rotate_axes` (translation-only)
   (`C:/Github/ANYhydro/src/anyhydro/transform.py`).
@@ -142,7 +142,7 @@ transport terms (section 4.4 gives the corrected Newton trial).
 
 ### 2.1 Authority
 
-ANYsolver owns dry mass \(m\), center of gravity \(c\) (body axes) and
+ANYfeSolver owns dry mass \(m\), center of gravity \(c\) (body axes) and
 the full inertia tensor \(I_G\) about the CG. Capytaine's automatically
 estimated inertia is never used (adopted plan 6.3). `anymarine.domain.Body`
 stores scalar `mass` and `reference_position` plus the opt-in explicit CG/inertia
@@ -393,7 +393,7 @@ unchanged.
 
 - **General-axes coefficient transformations are ANYhydro-owned** (the
   frame maps of section 5.1 are the contract they must satisfy); the
-  **consumer nonlinear mechanical pullback is ANYsolver-owned**. The
+  **consumer nonlinear mechanical pullback is ANYfeSolver-owned**. The
   public `anyhydro.rotate_axes`/`reframe_dataset` now provide fixed equilibrium-linear coefficient maps; source-axis reconciliation
   remains an **explicit prerequisite** for any model whose source axes
   differ from the mechanical axes.
@@ -417,7 +417,7 @@ unchanged.
   hydrostatics and declares `HYDROSTATIC_NOTE` (buoyancy-only). This is
   correct and preserved; **the current adapter does not double-count
   gravity** and no statement may claim it does.
-- Mechanics (ANYsolver) owns dry gravity: both the equilibrium wrench and
+- Mechanics (ANYfeSolver) owns dry gravity: both the equilibrium wrench and
   the incremental restoring. The BEM source owns the equilibrium buoyancy
   wrench and the incremental buoyancy stiffness (buoyancy-only \(C\)).
   One buoyancy owner per wetted entity (section 11).
@@ -688,7 +688,7 @@ BEM body.
 
 ### 10.2 Needed public APIs (proposed shapes RESERVED to parent)
 
-- **ANYsolver (W4):** `RigidBody6D` (reference origin, CG, full 6x6 dry
+- **ANYfeSolver (W4):** `RigidBody6D` (reference origin, CG, full 6x6 dry
   mass or \(m, c, I_G\), orientation state with anchor/rechart events,
   attachment frames); point kinematics/Jacobians with bias; the
   `DynamicContribution` protocol of plan 7.4 with the section 4 tangent
@@ -750,7 +750,7 @@ BEM body.
 5. Initial radiation memory beyond the at-rest convention (9).
 6. Public API names/signatures (10.2) and the `anymarine.domain.Body`
    CG/inertia schema extension.
-7. Ownership placement is resolved in section13: ANYhydro owns coefficient frame maps; ANYsolver owns consumer nonlinear pullbacks. Public signatures and integration remain pending.
+7. Ownership placement is resolved in section13: ANYhydro owns coefficient frame maps; ANYfeSolver owns consumer nonlinear pullbacks. Public signatures and integration remain pending.
 
 ## 13. Parent adoption and remaining admission obligations
 
@@ -765,7 +765,7 @@ ADR-004 is authoritative for baseline/source composition. Its gravity closed
 form applies only at theta=0 with world c=R_anchor*c_body; the general derivative
 is required elsewhere. Source-specific bases/baselines/derivatives must be resolved
 before affected six-DOF admission. General coefficient frame maps belong to
-ANYhydro; mechanical nonlinear pullbacks and inertial assembly belong to ANYsolver.
+ANYhydro; mechanical nonlinear pullbacks and inertial assembly belong to ANYfeSolver.
 
 Public signatures, CG/inertia persistence, integrator update and accepted-step
 rechart/history transport, HHT, source-specific FULL composition and case/source

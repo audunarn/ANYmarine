@@ -40,7 +40,7 @@ def oscillator_project():
 def solve_record(project):
     from anymarine.services import ApplicationService
     from anymarine.native_jobs import project_from_snapshot, record_from_evidence
-    import anysolver.marine_mechanical as solver
+    import anyfesolver.marine_mechanical as solver
     steps = project.native_inputs.run_spec['steps']
     snapshot = ApplicationService().native_input_snapshot(project, max_frames=steps + 1, wall_seconds=600.)
     produced = project_from_snapshot(snapshot)

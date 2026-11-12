@@ -23,7 +23,7 @@ from anymarine.linear import (
 from anymarine.mass_properties import BodyMassProperties
 from anymarine.persistence import ProjectStore
 
-pytestmark = requires_solver          # the rigid layout's dry mass is solver-owned (anysolver.marine_rigid)
+pytestmark = requires_solver          # the rigid layout's dry mass is solver-owned (anyfesolver.marine_rigid)
 
 INERTIA = ((4.0e5, 1.0e3, -2.0e3), (1.0e3, 6.0e5, 5.0e2), (-2.0e3, 5.0e2, 7.0e5))
 

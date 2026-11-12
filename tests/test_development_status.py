@@ -1,6 +1,6 @@
 """Qt-free loader tests for the bundled development status snapshot.
 
-These tests never import Qt, Capytaine, ANYsolver or any numerical backend,
+These tests never import Qt, Capytaine, ANYfeSolver or any numerical backend,
 and never run calculations. Corrupt or missing data must fail clearly.
 """
 
@@ -273,7 +273,7 @@ def test_loader_module_has_no_qt_or_backend_side_effects():
         "import sys\n"
         "import anymarine.development_status as ds\n"
         "banned = [name for name in sys.modules if name.split('.')[0] in "
-        "('PySide6', 'capytaine', 'anysolver', 'anyhydro', 'numpy', 'scipy')]\n"
+        "('PySide6', 'capytaine', 'anyfesolver', 'anyhydro', 'numpy', 'scipy')]\n"
         "assert not banned, banned\n"
         "status = ds.load_development_status()\n"
         "assert status['snapshot_date'] == '2026-10-10'\n"

@@ -1,4 +1,4 @@
-"""Immutable Qt-free native-run intent; ANYsolver owns physical admission.
+"""Immutable Qt-free native-run intent; ANYfeSolver owns physical admission.
 
 Only data are persisted. Initial rotation is BODY-to-WORLD, velocity is
 WORLD [linear, angular], and the solver computes consistent acceleration.
@@ -71,7 +71,7 @@ class NativeMechanicalInputs:
     """Declared dry mechanics data, not a solver model or accepted result.
 
     Stiffness/inertia physics and link-law admissibility are checked by the
-    public ANYsolver compiler. Fixed PSD tolerance is supplied there rather
+    public ANYfeSolver compiler. Fixed PSD tolerance is supplied there rather
     than accepting a saved tolerance that can weaken physical validation.
     """
     run_spec: Mapping

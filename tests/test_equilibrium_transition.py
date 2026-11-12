@@ -72,10 +72,10 @@ def regenerator(p,r):
         from anymarine.mechanics import prepare_native_run,prepare_native_nodes
         from anymarine.potential_flow_inputs import NativePotentialFlowInputs
         from anymarine.equilibrium_transition import EquilibriumRegeneration
-        from anysolver.marine_rigid import RigidBodyState
-        from anysolver.marine_coupled_equilibrium import evaluate_marine_static
-        from anysolver.marine_hydro_coordinates import EquilibriumHydroFrame,evaluate_coupled
-        from anysolver.marine_potential_flow import equilibrium_geometry_hash
+        from anyfesolver.marine_rigid import RigidBodyState
+        from anyfesolver.marine_coupled_equilibrium import evaluate_marine_static
+        from anyfesolver.marine_hydro_coordinates import EquilibriumHydroFrame,evaluate_coupled
+        from anyfesolver.marine_potential_flow import equilibrium_geometry_hash
         model,_,_=prepare_native_run(p)
         states={bid:RigidBodyState(position=r.positions[bid][-1],anchor=r.rotation_matrices[bid][-1]) for bid in r.body_ids}
         force=evaluate_marine_static(model,states,prepare_native_nodes(candidate)).components['potential-flow-development'][:12]

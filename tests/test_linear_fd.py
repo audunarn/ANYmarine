@@ -12,7 +12,7 @@ from anymarine import linear_fd as fd
 
 
 def _solve(M, A, C, K, kernel, dt, forces, q0=None):
-    from anysolver.marine_linear import MarineLinearSpec, solve_marine_linear
+    from anyfesolver.marine_linear import MarineLinearSpec, solve_marine_linear
     n_steps, n = forces.shape
     times = dt * np.arange(n_steps)
     spec = MarineLinearSpec(labels=[f"b:{k}" for k in range(n)], dt=dt, times=times, forces=forces, mass_dry=M,

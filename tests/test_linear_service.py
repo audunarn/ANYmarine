@@ -66,7 +66,7 @@ def test_run_linear_local_produces_authoritative_channels(service, project):
         for prefix in expected_prefixes:
             assert f"{prefix}{label}" in result.channels
     assert len(result.channels) == 4 * len(expected_prefixes)
-    assert "anysolver.marine_linear" in result.note
+    assert "anyfesolver.marine_linear" in result.note
     assert "not a qualified marine analysis" in result.note
 
 
@@ -91,7 +91,7 @@ def test_result_maps_surge_to_x_and_heave_to_z(service, project):
 
 
 def test_channels_match_direct_public_solver_call(service, project):
-    from anysolver import marine_linear
+    from anyfesolver import marine_linear
 
     inputs = demo_inputs(service, project)
     result = service.run_linear_local(project, inputs)

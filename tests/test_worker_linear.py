@@ -134,7 +134,7 @@ def test_worker_fails_closed_without_solver(linear_snapshot):
 import sys, runpy
 class BlockSolver:
     def find_spec(self, fullname, path=None, target=None):
-        if fullname == 'anysolver' or fullname.startswith('anysolver.'):
+        if fullname == 'anyfesolver' or fullname.startswith('anyfesolver.'):
             raise ModuleNotFoundError('optional solver deliberately unavailable')
 sys.meta_path.insert(0, BlockSolver())
 sys.argv = ['anymarine.worker', *sys.argv[1:]]
@@ -145,5 +145,5 @@ runpy.run_module('anymarine.worker', run_name='__main__')
         env=env, capture_output=True, text=True, timeout=15,
     )
     assert completed.returncode == 4
-    assert "anysolver.marine_linear" in completed.stderr
+    assert "anyfesolver.marine_linear" in completed.stderr
     assert not output_path.exists()

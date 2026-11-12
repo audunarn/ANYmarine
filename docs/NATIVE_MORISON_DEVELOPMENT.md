@@ -20,7 +20,7 @@ starts from a clearly labelled synthetic development environment template, or
 the exact shared environment when hydrodynamic mooring lines already declare
 one. No external JSON or scripting is required for these actions. The public
 envelope requires at least one member, so the last member cannot be removed;
-edit it instead. Validation uses the same public ANYsolver compiler as the CLI
+edit it instead. Validation uses the same public ANYfeSolver compiler as the CLI
 and worker through the shared admission service; incompatible ownership,
 invalid geometry or missing owner packages are refused there. Rejected edits
 leave the existing project intact. Saving/reopening preserves all
@@ -33,7 +33,7 @@ Replay uses the captured producing project and authoritative BODY-to-WORLD
 matrices, including member endpoints. Edited current inputs do not replace a
 stale result's geometry. Plots use stored authoritative force arrays.
 
-The optional `native-morison` extra needs the matched tested ANYsolver/ANYloads
+The optional `native-morison` extra needs the matched tested ANYfeSolver/ANYloads
 builds. The named contracts are `marine_morison_development_v1` and
 `marine_loads_v1`. Missing/incompatible owner packages fail with a typed refusal;
 base project imports, example loading and persistence remain Qt/solver-free.

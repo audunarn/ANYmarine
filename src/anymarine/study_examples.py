@@ -119,7 +119,7 @@ def run_modes(project, *, reference_available=False):
         RunMode('reference','Reference RAOs and wave animation',reference_available,
                 'Available for original single vessel only; stored external comparison, no new solve.'),
         RunMode('native','Native dry / configured transient',bool(native and mass),
-                'Run declared native inputs; installed ANYsolver validates admission.' if native and mass else
+                'Run declared native inputs; installed ANYfeSolver validates admission.' if native and mass else
                 'Import full CG inertia in body axes and native inputs; mass alone does not define rigid mechanics.'),
         RunMode('rao','Frequency-domain / time-domain RAO study (configure)',bool(native and mass),
                 'Open RAO: register a bound case, produce an FD table or run its TD campaign. '

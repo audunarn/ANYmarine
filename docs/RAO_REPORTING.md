@@ -13,7 +13,7 @@ only (no edits). Line references are to the code as read on 2026-10-12.
   (as `linear_assessment.py`, ANYhydro `radiation.py`, `excitation_series.py`).
 - Body DOFs: additive chart coordinates about the equilibrium anchor, translation of the
   body origin and rotation vector theta with `R = Exp(theta) R0`
-  (`anysolver/marine_rigid.py:111-150`). At theta = 0 chart covectors equal the WORLD
+  (`anyfesolver/marine_rigid.py:111-150`). At theta = 0 chart covectors equal the WORLD
   wrenches at the body origin stored in `AcceptedStepRecord.force_decomposition`.
   Mooring node DOFs (3 per free node) follow the body block.
 - RAO = response phasor per unit incident amplitude, per body DOF (amplitude, phase in deg).
@@ -22,7 +22,7 @@ only (no edits). Line references are to the code as read on 2026-10-12.
 
 Linearization point: a stationary state at which the wave-free model has zero residual within
 the `CoupledStaticSpec` limits, audited with `evaluate_marine_static`
-(`anysolver/marine_coupled_equilibrium.py:68-99`). Its source is declared in the case:
+(`anyfesolver/marine_coupled_equilibrium.py:68-99`). Its source is declared in the case:
 `declared_initial_state`, `adopted_equilibrium` (verified adoption receipt) or
 `static_solve_in_job` (`solve_coupled_marine_equilibrium` on the wave-free model).
 Failing the audit is a typed refusal. The wave-free model is a `model_to_dict` copy with
